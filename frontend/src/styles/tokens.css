@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+@theme {
+  /* Cool graphite — dark, the primary mode (TZ 12.1) */
+  --color-bg0: #13161b;
+  --color-bg1: #171b21;
+  --color-bg1b: #1a1f26;
+  --color-bg2: #212730;
+  --color-bgSel: #232d3b;
+  --color-border: #2a313b;
+  --color-borderStrong: #39424f;
+
+  --color-text: #dfe4ea;
+  --color-textMuted: #98a3b2;
+  --color-textDim: #69727f;
+
+  --color-accent: #35c9d6;
+  --color-accentDim: #123f44;
+  --color-accentFg: #7fe6ef;
+  --color-onAccent: #04252a;
+
+  --color-termFg: #cfd6de;
+  --color-termGreen: #6cc06c;
+  --color-termBlue: #5aa9d6;
+  --color-termGood: #5ac47a;
+
+  /* Semantic — these do not change with the theme (TZ 12.1).
+     Environment is always a square, status is always a circle (UI-11).
+     Never reuse an env colour to mean anything but that environment. */
+  --color-envProd: #cf6bc9;
+  --color-envStaging: #c99a3f;
+  --color-envDev: #5b8def;
+
+  --color-stConnected: #46c771;
+  --color-stConnecting: #e0a92e;
+  --color-stFailed: #e5544b;
+  --color-stDisc: #5f6773;
+  --color-stUnknown: #41474f;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* UI-11: the environment marker is a square at exactly this radius. Status is
+     always a circle (rounded-full). The two axes must never share a shape. */
+  --radius-env: 2px;
+}
+
+/* Terminal "Graphite" ANSI theme (dizayn manbasi: TerminalPalette.dc.html).
+   Read at runtime by lib/termTheme.ts into xterm's ITheme — this is the single
+   source, so keep it in sync with the design brief, not with a second copy in
+   TS. Kept OUT of @theme on purpose: these are not Tailwind utilities. */
+:root {
+  --term-bg: #13161b;
+  --term-fg: #cfd6de;
+  --term-cursor: #35c9d6;
+  --term-cursor-accent: #04252a;
+  --term-selection: rgba(53, 201, 214, 0.28);
+
+  --term-black: #2a313b;   --term-bright-black: #69727f;
+  --term-red: #e5544b;     --term-bright-red: #ff6f66;
+  --term-green: #6cc06c;   --term-bright-green: #86d986;
+  --term-yellow: #e0a92e;  --term-bright-yellow: #f2c65a;
+  --term-blue: #5aa9d6;    --term-bright-blue: #7fc0e8;
+  --term-magenta: #cf6bc9; --term-bright-magenta: #e08bd9;
+  --term-cyan: #35c9d6;    --term-bright-cyan: #7fe6ef;
+  --term-white: #98a3b2;   --term-bright-white: #dfe4ea;
+}
+
+/* Everything below participates in the normal cascade via @layer base, so that
+   Tailwind utilities (which Tailwind itself emits into @layer utilities) can
+   override these defaults instead of silently losing to them (CSS Cascade 5:
+   an unlayered normal declaration always beats a layered one, regardless of
+   specificity). */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: var(--color-bg0);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 13px; /* UI-01 */
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    /* This is chrome, not a document: labels, rows and buttons are not text
+       to be selected. Without this, a right-click to open a context menu (or
+       any drag) highlights the row's text — the wrong affordance for a
+       desktop app. Disable selection app-wide, then opt specific surfaces
+       back in below (form fields, and anything worth copying like a
+       fingerprint via the .selectable utility). The -webkit- prefix is
+       required: the macOS webview is WKWebView. */
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+
+  /* Form fields must stay editable and selectable regardless of the app-wide
+     default above. */
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+    cursor: auto;
+  }
+
+  /* Interactive controls get the pointer cursor. Browsers leave <button> at
+     the default arrow (pointer is a link convention), and the body rule above
+     sets `default` app-wide, so without this nothing clickable signals it is
+     clickable. Disabled controls stay on the default arrow. */
+  button:not(:disabled),
+  select,
+  [role='button'] {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+
+  /* Opt-in for content genuinely worth selecting/copying (e.g. a host-key
+     fingerprint the user compares against the server). Apply with the
+     `selectable` class. */
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+    cursor: text;
+  }
+
+  /* UI-10 */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+/* UI-07: the title bar drags the window, controls inside it do not.
+   These toggle a Wails-specific custom property, not a visual style, so they
+   are placed in @layer utilities: they are applied in markup the same way
+   Tailwind utility classes are (single-purpose, composable on any element),
+   and layering them keeps their precedence predictable relative to any other
+   utility class rather than unconditionally unlayered-winning for no reason
+   tied to accessibility (unlike the reduced-motion guard below). */
+@layer utilities {
+  .drag {
+    --wails-draggable: drag;
+  }
+  .no-drag {
+    --wails-draggable: no-drag;
+  }
+}
+
+/* Deliberately left unlayered (not @layer base): this uses !important so it
+   already wins the cascade regardless of layering, and it is a global
+   accessibility guard (UI-10-adjacent) that must not be overridable by any
+   component-level utility class. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* StatusDot's `connecting` pulse ring (UI-11): an expanding, fading ring
+   layered over the solid dot. Referenced via Tailwind's arbitrary
+   `animate-[ssh-pulse_1.4s_ease-out_infinite]` utility. */
+@keyframes ssh-pulse {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.55);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}

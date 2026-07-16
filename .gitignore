@@ -1,0 +1,33 @@
+# JetBrains
+.idea/
+
+# Scratch used by the subagent-driven-development skill
+.superpowers/
+
+.task
+bin
+frontend/dist
+frontend/node_modules
+build/linux/appimage/build
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+# Mobile generated (per-machine; overlays hold absolute paths)
+build/ios/xcode/overlay.json
+build/ios/xcode/gen/
+build/android/overlay.json
+build/android/gen/
+
+# Task 1 additions
+bin/
+frontend/dist/
+frontend/node_modules/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+
+# CI not needed for now (kept locally, not pushed)
+.github/workflows/
+# Superpowers implementation plans/specs — local working docs only
+docs/superpowers/
+# Internal version notes — local working docs only
+docs/*-notes.md

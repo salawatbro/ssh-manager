@@ -1,0 +1,141 @@
+version: '3'
+
+vars:
+  APP_NAME: "sshmgr"
+  BIN_DIR: "bin"
+  PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  # Target OS for build/package/run. Defaults to the host OS, and is overridden
+  # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
+  # tasks below dispatch to the matching platform Taskfile via this variable.
+  GOOS: '{{.GOOS | default OS}}'
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+  ios: ./build/ios/Taskfile.yml
+  android: ./build/android/Taskfile.yml
+
+tasks:
+  check:
+    desc: Bosqich darvozasi — TZ 15.1
+    cmds:
+      # The frontend goes first and the order is not cosmetic: main.go carries
+      # //go:embed all:frontend/dist and dist/ is gitignored. On a clean clone
+      # every Go command below — vet, lint, test — fails to even load the
+      # package with "pattern all:frontend/dist: no matching files found".
+      - cd frontend && npx tsc --noEmit
+      - cd frontend && npm run build
+
+      - go vet ./...
+      - golangci-lint run
+      - go test ./... -race -cover
+      - govulncheck ./...
+
+      # SEC-02: this must never appear in the codebase.
+      #
+      # The trailing `exit 0` is load-bearing, and its absence is a trap.
+      # Task does not use system sh — it embeds mvdan/sh, and there an `if`
+      # whose condition is false and which has no else branch yields the
+      # *condition's* status, not 0 as POSIX specifies. grep exits 1 when it
+      # finds nothing, so without this line the guard fails exactly when the
+      # banned string is absent: the gate could never pass. Verified both
+      # ways — absent yields 0 and continues, present still prints XATO and
+      # fails.
+      - cmd: |
+          if grep -rn "InsecureIgnoreHostKey" --include="*.go" .; then
+            echo "XATO: InsecureIgnoreHostKey ishlatilgan"
+            exit 1
+          fi
+          exit 0
+      # The cgo sqlite driver must never come back (Global Constraints).
+      # go.mod only: go.sum legitimately carries a gorm.io/driver/sqlite
+      # checksum pulled in by gorm's own external test package. It is not
+      # linked — the dep graph has neither mattn/go-sqlite3 nor
+      # gorm.io/driver/sqlite, and the implementation is modernc.org/libc,
+      # pure Go. Grepping go.sum would fail on that false positive.
+      # The trailing `exit 0` is required here for the same reason as above.
+      - cmd: |
+          if grep -rn "gorm.io/driver/sqlite" go.mod; then
+            echo "XATO: cgo sqlite driver ishlatilgan"
+            exit 1
+          fi
+          exit 0
+
+      # Global Constraint: every React component lives in one file, and that
+      # file never exceeds 200 lines. Nothing machine-checked this before —
+      # ServerForm.tsx drifted to 225 lines while the project record still
+      # claimed 196 — which is exactly how it went unnoticed. This checks
+      # every file under frontend/src, not just components, since the cap is
+      # simplest to enforce uniformly and a 200+ line non-component file would
+      # be worth a look too.
+      # Same mvdan/sh trap as the two guards above, same fix: a false `if`
+      # with no `else` returns the *condition's* status, not 0, so this needs
+      # its own trailing `exit 0`.
+      - cmd: |
+          offenders=$(
+            for f in $(find frontend/src -type f); do
+              n=$(wc -l < "$f")
+              if [ "$n" -gt 200 ]; then
+                echo "$f: $n qator"
+              fi
+            done
+          )
+          if [ -n "$offenders" ]; then
+            echo "XATO: 200 qatordan oshgan fayl(lar) (Global Constraint):"
+            echo "$offenders"
+            exit 1
+          fi
+          exit 0
+
+      # R-05: the data layer must stay free of cgo. The app binary is a
+      # different story — Wails links cgo and cannot not.
+      - CGO_ENABLED=0 go build ./internal/...
+      - wails3 build
+
+  build:
+    summary: Builds the application
+    cmds:
+      - task: "{{.GOOS}}:build"
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: "{{.GOOS}}:package"
+
+  run:
+    summary: Runs the application
+    cmds:
+      - task: "{{.GOOS}}:run"
+
+  dev:
+    summary: Runs the application in development mode
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  setup:docker:
+    summary: Builds Docker image for cross-compilation (~800MB download)
+    cmds:
+      - task: common:setup:docker
+
+  build:server:
+    summary: Builds the application in server mode (no GUI, HTTP server only)
+    cmds:
+      - task: common:build:server
+
+  run:server:
+    summary: Runs the application in server mode
+    cmds:
+      - task: common:run:server
+
+  build:docker:
+    summary: Builds a Docker image for server mode deployment
+    cmds:
+      - task: common:build:docker
+
+  run:docker:
+    summary: Builds and runs the Docker image
+    cmds:
+      - task: common:run:docker

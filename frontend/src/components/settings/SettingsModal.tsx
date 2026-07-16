@@ -1,0 +1,71 @@
+import { useEffect } from 'react'
+import { useSettings, type SettingsSection } from '../../stores/settings'
+import { GeneralSection } from './GeneralSection'
+import { TerminalSection } from './TerminalSection'
+import { ShortcutsSection } from './ShortcutsSection'
+import { DataSection } from './DataSection'
+import { AboutSection } from './AboutSection'
+
+const SECTIONS: { id: SettingsSection; label: string }[] = [
+  { id: 'general', label: 'General' },
+  { id: 'terminal', label: 'Terminal' },
+  { id: 'shortcuts', label: 'Shortcuts' },
+  { id: 'data', label: 'Data' },
+  { id: 'about', label: 'About' },
+]
+
+export function SettingsModal() {
+  const open = useSettings((s) => s.open)
+  const close = useSettings((s) => s.close)
+  const section = useSettings((s) => s.section)
+  const setSection = useSettings((s) => s.setSection)
+  const settings = useSettings((s) => s.settings)
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') close()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, close])
+
+  if (!open) return null
+
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={close}>
+      <div
+        className="flex h-[560px] w-[760px] overflow-hidden rounded-[9px] border border-borderStrong bg-bg2 shadow-[0_20px_60px_rgba(0,0,0,.5)]"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex w-[156px] shrink-0 flex-col gap-[1px] border-r border-border bg-bg1 p-[7px]">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setSection(s.id)}
+              className={`h-[28px] rounded-[5px] px-[9px] text-left text-[12.5px] ${
+                section === s.id ? 'bg-bgSel font-medium text-text' : 'text-textMuted hover:text-text'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <div className="min-w-0 flex-1 overflow-y-auto p-[16px_18px]">
+          {!settings ? (
+            <div className="text-[13px] text-textDim">Loading…</div>
+          ) : (
+            <>
+              {section === 'general' && <GeneralSection />}
+              {section === 'terminal' && <TerminalSection />}
+              {section === 'shortcuts' && <ShortcutsSection />}
+              {section === 'data' && <DataSection />}
+              {section === 'about' && <AboutSection />}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
