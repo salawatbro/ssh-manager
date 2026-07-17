@@ -8,6 +8,7 @@ import { GuardModal } from './components/modals/GuardModal'
 import { TerminalArea } from './components/terminal/TerminalArea'
 import { TabBar } from './components/terminal/TabBar'
 import { CommandPalette } from './components/palette/CommandPalette'
+import { SnippetPalette } from './components/snippets/SnippetPalette'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { ImportPreview } from './components/palette/ImportPreview'
 import { TunnelsPanel } from './components/forwards/TunnelsPanel'
@@ -155,6 +156,10 @@ export default function App() {
       )}
 
       <CommandPalette onNewServer={openAdd} onOpenTunnels={openTunnelsFor} />
+      {/* ⌘E overlay (v0.7 FR-16): snippet quick-run for the focused pane's
+          server, driven by stores/snippets.ts — same one-instance-in-App.tsx
+          pattern as CommandPalette/GuardModal. */}
+      <SnippetPalette />
       <SettingsModal />
       <ImportPreview />
       {/* Shared prod-guard modal (FR-14): one instance driven by stores/guard.ts,

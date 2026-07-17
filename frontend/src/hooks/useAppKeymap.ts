@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { resolveAction } from '../lib/keymap'
 import { usePalette } from '../stores/palette'
 import { useSettings } from '../stores/settings'
+import { useSnippets } from '../stores/snippets'
 
 // App-level hotkeys, always active (not terminal-scoped): open the palette and
 // New server. Uses the shared resolveAction so macOS ⌘K/⌘N and Windows
@@ -19,6 +20,9 @@ export function useAppKeymap(onNewServer: () => void) {
       } else if (action === 'settings') {
         e.preventDefault()
         useSettings.getState().show()
+      } else if (action === 'snippets' && !usePalette.getState().open) {
+        e.preventDefault()
+        useSnippets.getState().show()
       }
     }
     document.addEventListener('keydown', onKey)

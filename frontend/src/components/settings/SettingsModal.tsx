@@ -1,16 +1,18 @@
 import { useEffect } from 'react'
-import { Database, Info, Keyboard, Settings as SettingsIcon, Terminal, type LucideIcon } from 'lucide-react'
+import { Database, Info, Keyboard, Scissors, Settings as SettingsIcon, Terminal, type LucideIcon } from 'lucide-react'
 import { useSettings, type SettingsSection } from '../../stores/settings'
 import { GeneralSection } from './GeneralSection'
 import { TerminalSection } from './TerminalSection'
 import { ShortcutsSection } from './ShortcutsSection'
 import { DataSection } from './DataSection'
 import { AboutSection } from './AboutSection'
+import { SnippetManager } from '../snippets/SnippetManager'
 
 const SECTIONS: { id: SettingsSection; label: string; icon: LucideIcon }[] = [
   { id: 'general', label: 'General', icon: SettingsIcon },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
   { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
+  { id: 'snippets', label: 'Snippets', icon: Scissors },
   { id: 'data', label: 'Data', icon: Database },
   { id: 'about', label: 'About', icon: Info },
 ]
@@ -75,6 +77,7 @@ export function SettingsModal() {
                 {section === 'general' && <GeneralSection />}
                 {section === 'terminal' && <TerminalSection />}
                 {section === 'shortcuts' && <ShortcutsSection />}
+                {section === 'snippets' && <SnippetManager />}
                 {section === 'data' && <DataSection />}
                 {section === 'about' && <AboutSection />}
               </>

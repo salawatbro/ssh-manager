@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { SettingsService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import type { Settings } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 
-export type SettingsSection = 'general' | 'terminal' | 'shortcuts' | 'data' | 'about'
+export type SettingsSection = 'general' | 'terminal' | 'shortcuts' | 'data' | 'snippets' | 'about'
 
 interface SettingsState {
   settings: Settings | null
