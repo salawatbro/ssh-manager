@@ -2,14 +2,20 @@ package domain
 
 import "time"
 
-// ForwardType is the tunnel direction. L = local (-L), R = remote (-R).
+// ForwardType is the tunnel direction. L = local (-L), R = remote (-R), D =
+// dynamic (-D, a SOCKS5 proxy).
 type ForwardType string
 
-// The tunnel directions. ForwardLocal is an -L forward (local port to a remote
-// destination); ForwardRemote is an -R forward (remote port to a local one).
+// The tunnel directions. ForwardLocal is an -L forward (local port to a
+// remote destination); ForwardRemote is an -R forward (remote port to a
+// local one); ForwardDynamic is a -D forward (a local SOCKS5 proxy port —
+// each proxied connection's destination is negotiated by the SOCKS client
+// per-connection rather than fixed at forward-creation time, so it carries
+// no DestHost/DestPort).
 const (
-	ForwardLocal  ForwardType = "L"
-	ForwardRemote ForwardType = "R"
+	ForwardLocal   ForwardType = "L"
+	ForwardRemote  ForwardType = "R"
+	ForwardDynamic ForwardType = "D"
 )
 
 // PortForward is a saved tunnel definition attached to a server. It carries no
@@ -37,14 +43,20 @@ func (f *PortForward) Validate() error {
 	if f.Name == "" {
 		return validationError("The forward needs a name.")
 	}
-	if f.Type != ForwardLocal && f.Type != ForwardRemote {
-		return validationError("Forward type must be local (L) or remote (R).")
+	if f.Type != ForwardLocal && f.Type != ForwardRemote && f.Type != ForwardDynamic {
+		return validationError("Forward type must be local (L), remote (R), or dynamic (D).")
 	}
 	if f.BindAddr == "" {
 		return validationError("The bind address is required.")
 	}
 	if !validPort(f.BindPort) {
 		return validationError("The bind port must be between 1 and 65535.")
+	}
+	// -D (dynamic/SOCKS5) has no fixed destination: the SOCKS client
+	// negotiates one per proxied connection, so DestHost/DestPort don't
+	// apply and are deliberately not required here.
+	if f.Type == ForwardDynamic {
+		return nil
 	}
 	if f.DestHost == "" {
 		return validationError("The destination host is required.")

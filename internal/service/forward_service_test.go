@@ -366,7 +366,7 @@ func TestForwardUpdateRejectsInvalidInput(t *testing.T) {
 
 	in := validForwardInput(srv.ID)
 	in.ID = created.ID
-	in.Type = "D" // invalid
+	in.Type = "X" // invalid — "D" is now a valid type (domain.ForwardDynamic, -D/SOCKS5)
 	var de *domain.Error
 	if _, err := svc.Update(in); !errors.As(err, &de) || de.Code != domain.CodeValidation {
 		t.Fatalf("Update(invalid) error = %v, want ERR_VALIDATION", err)

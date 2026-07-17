@@ -1,10 +1,10 @@
-// Package forward runs background port-forward tunnels ("-L" and "-R") over
-// an existing SSH connection. The Manager owns each tunnel's listener and the
-// sshx.Conn it forwards through; Stop guarantees every goroutine the tunnel
-// spawned has exited before it returns (leak-free teardown), which is the
-// package's top design priority — a forward can run for the lifetime of the
-// app, and a leaked accept or copy goroutine per Stop/Start cycle would be a
-// slow, silent resource leak.
+// Package forward runs background port-forward tunnels ("-L", "-R", and "-D"
+// SOCKS5) over an existing SSH connection. The Manager owns each tunnel's
+// listener and the sshx.Conn it forwards through; Stop guarantees every
+// goroutine the tunnel spawned has exited before it returns (leak-free
+// teardown), which is the package's top design priority — a forward can run
+// for the lifetime of the app, and a leaked accept or copy goroutine per
+// Stop/Start cycle would be a slow, silent resource leak.
 package forward
 
 import (
@@ -133,6 +133,8 @@ func (m *Manager) Start(fwd domain.PortForward, conn *sshx.Conn) error {
 		ln, err = net.Listen("tcp", bind) // local listener
 	case domain.ForwardRemote:
 		ln, err = conn.Client.Listen("tcp", bind) // remote listener over ssh
+	case domain.ForwardDynamic:
+		ln, err = net.Listen("tcp", bind) // local listener, same as -L — the SOCKS5 client connects to it
 	default:
 		err = fmt.Errorf("unknown forward type %q", fwd.Type)
 	}
@@ -163,7 +165,11 @@ func (m *Manager) Start(fwd domain.PortForward, conn *sshx.Conn) error {
 	r.wg.Add(1)
 	m.mu.Unlock()
 
-	go m.accept(fwd, r, dest)
+	if fwd.Type == domain.ForwardDynamic {
+		go m.acceptDynamic(fwd, r)
+	} else {
+		go m.accept(fwd, r, dest)
+	}
 	m.report(fwd.ID, StateRunning, "")
 	return nil
 }
@@ -207,6 +213,74 @@ func (m *Manager) accept(fwd domain.PortForward, r *runner, dest string) {
 			defer func() { _ = out.Close() }()
 			pipe(in, out)
 		}()
+	}
+}
+
+// acceptDynamic is the -D counterpart to accept: it bridges serveSOCKS — a
+// deliberately Manager-independent SOCKS5 loop (see socks.go, driven
+// directly by socks_test.go without any Manager involved) — to the exact
+// same quit-vs-error/selfTeardown discipline accept uses, so a -D forward's
+// teardown is leak-free and reports StateError under the same rules -L/-R
+// already do.
+//
+// Why a wrapper instead of launching serveSOCKS directly as the tracked
+// goroutine: serveSOCKS has no *Manager reference (by design, so it stays
+// testable standalone) and so cannot call m.selfTeardown itself when its
+// accept loop dies from an unexpected error. Something with Manager access
+// has to make that call after serveSOCKS returns — this method is that
+// something.
+//
+// Two separate wg.Add(1)/Done() pairs are in play here, and keeping them
+// separate (rather than trying to reuse one for both) is what keeps this
+// leak-free:
+//
+//  1. Start's r.wg.Add(1) (identical to the -L/-R path) is matched by THIS
+//     function's own `defer r.wg.Done()` below — registered first, so (defers
+//     run LIFO) it fires LAST, only after the selfTeardown call below has
+//     fully returned. That mirrors accept()'s own shape exactly, where
+//     `defer r.wg.Done()` is also accept's first defer: it is what stops
+//     Stop's r.wg.Wait() from ever being able to return while this
+//     goroutine still has teardown work in flight. Fusing this Add/Done
+//     with serveSOCKS's own internal one (see next point) instead would let
+//     serveSOCKS's `defer wg.Done()` fire the moment its accept loop exits —
+//     BEFORE the selfTeardown call below even runs — which would let a
+//     racing Stop's r.wg.Wait() observe a zero count and return while this
+//     goroutine is still executing (see selfTeardown's own doc comment for
+//     why that race is otherwise harmless, but the whole point here is to
+//     not rely on that and instead preserve the exact ordering accept()
+//     guarantees).
+//  2. A second, local r.wg.Add(1) — made here, right before calling
+//     serveSOCKS — is the Add(1) serveSOCKS's contract requires its caller
+//     to make before invoking it (see serveSOCKS's doc comment: it performs
+//     `defer wg.Done()` for "the accept loop itself" without ever calling
+//     Add(1) on its own behalf). serveSOCKS is called synchronously (not via
+//     `go`) because this function IS already running in its own goroutine
+//     (launched by Start below `go m.acceptDynamic(fwd, r)`) — there is no
+//     need for a second one.
+//
+// Per-connection SOCKS goroutines serveSOCKS spawns internally use r.wg
+// directly (passed in below) exactly like -L/-R's per-connection copies do,
+// so Stop's single r.wg.Wait() still joins every goroutine a -D forward
+// spawns: this wrapper, serveSOCKS's own loop, and every per-connection
+// pipe.
+//
+// One known, deliberate gap versus accept(): the StateError detail string
+// on the selfTeardown path below is a fixed message, not the real
+// ln.Accept() error text accept() reports. serveSOCKS's signature (fixed by
+// the plan this was built from, and shared with socks_test.go) has no
+// return value to carry that error back out through — the trade-off was
+// judged worth it to keep serveSOCKS callable standalone with no
+// Manager-shaped error-reporting hook. StateError is still reported
+// correctly; only its Detail text is coarser here than -L/-R's.
+func (m *Manager) acceptDynamic(fwd domain.PortForward, r *runner) {
+	defer r.wg.Done()
+	dial := func(addr string) (net.Conn, error) { return r.conn.Client.Dial("tcp", addr) }
+	r.wg.Add(1)
+	serveSOCKS(r.listener, dial, r.quit, &r.wg)
+	select {
+	case <-r.quit: // deliberate Stop — not a real error, don't report one
+	default:
+		m.selfTeardown(fwd.ID, r, "socks listener closed unexpectedly")
 	}
 }
 

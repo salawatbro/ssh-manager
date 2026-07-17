@@ -435,3 +435,194 @@ func TestStartRemoteForwardAgainstNonForwardingServer(t *testing.T) {
 		t.Fatalf("Status after -R failure = %+v, want error", got)
 	}
 }
+
+// TestStartDynamicForwardTraffic proves the -D (SOCKS5) path end-to-end
+// through the Manager: Start opens a local listener that speaks SOCKS5, a
+// real SOCKS5 client CONNECTs through it to an echo server, and the proxied
+// destination is actually dialed over the jump chain (conn.Client.Dial
+// against startForwardingSSHServer's direct-tcpip handler) — the same shape
+// -L's own traffic test proves for its path.
+func TestStartDynamicForwardTraffic(t *testing.T) {
+	echoAddr := echoServer(t)
+	sshAddr, hostKey := startForwardingSSHServer(t)
+	conn := dialConn(t, sshAddr, hostKey)
+
+	bindPort := freePort(t)
+	fwd := domain.PortForward{
+		ID:       "fwd-d1",
+		Type:     domain.ForwardDynamic,
+		BindAddr: "127.0.0.1",
+		BindPort: bindPort,
+		// No DestHost/DestPort: -D negotiates its destination per-connection.
+	}
+
+	var mu sync.Mutex
+	var events []Status
+	m := NewManager(func(s Status) {
+		mu.Lock()
+		events = append(events, s)
+		mu.Unlock()
+	})
+
+	if err := m.Start(fwd, conn); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(m.StopAll)
+
+	if got := m.Status(fwd.ID); got.State != StateRunning {
+		t.Fatalf("Status after Start = %+v, want running", got)
+	}
+
+	socksAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(bindPort))
+	c := dialSOCKS5(t, socksAddr, echoAddr)
+
+	want := []byte("hello through the socks5 tunnel")
+	if _, err := c.Write(want); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+	got := make([]byte, len(want))
+	if _, err := io.ReadFull(c, got); err != nil {
+		t.Fatalf("read echo: %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("echoed = %q, want %q", got, want)
+	}
+	_ = c.Close()
+
+	if err := m.Stop(fwd.ID); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	if got := m.Status(fwd.ID); got.State != StateStopped {
+		t.Fatalf("Status after Stop = %+v, want stopped", got)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(events) == 0 {
+		t.Fatal("expected at least one emitted Status")
+	}
+}
+
+// TestStopIsLeakFreeDynamic is TestStopIsLeakFree's -D counterpart: it
+// proves Stop's r.wg.Wait() actually joins every goroutine the -D runner
+// spawned — the acceptDynamic wrapper goroutine, serveSOCKS's own accept
+// loop, AND the per-connection SOCKS copy — by reusing the same forward ID
+// (and bind port) for a follow-up Start immediately after Stop. If any of
+// those goroutines were still alive when Stop returned, either the port
+// would still be bound (Start's Listen would fail) or the map entry
+// wouldn't really be free, so this is the most direct behavioral proof of
+// leak-free teardown available for the -D-specific teardown bridge
+// (acceptDynamic) without exporting internal goroutine counts.
+func TestStopIsLeakFreeDynamic(t *testing.T) {
+	echoAddr := echoServer(t)
+	m := NewManager(nil)
+
+	const id = "reused-id-d"
+	bindPort := freePort(t)
+
+	start := func() *sshx.Conn {
+		sshAddr, hostKey := startForwardingSSHServer(t)
+		conn := dialConn(t, sshAddr, hostKey)
+		fwd := domain.PortForward{
+			ID: id, Type: domain.ForwardDynamic,
+			BindAddr: "127.0.0.1", BindPort: bindPort,
+		}
+		if err := m.Start(fwd, conn); err != nil {
+			t.Fatalf("Start: %v", err)
+		}
+		return conn
+	}
+
+	start()
+
+	// Drive real traffic through it so serveSOCKS's accept loop spawns a
+	// per-connection copy goroutine (not just the bare accept loop) before
+	// tearing down.
+	socksAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(bindPort))
+	c := dialSOCKS5(t, socksAddr, echoAddr)
+	if _, err := c.Write([]byte("ping")); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	buf := make([]byte, 4)
+	_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if _, err := io.ReadFull(c, buf); err != nil {
+		t.Fatalf("read echo: %v", err)
+	}
+	_ = c.Close()
+
+	if err := m.Stop(id); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+
+	// The listener and its port are free again — a follow-up Start with the
+	// SAME id on the SAME port must succeed with no leftover state.
+	start()
+	t.Cleanup(func() { _ = m.Stop(id) })
+
+	if got := m.Status(id); got.State != StateRunning {
+		t.Fatalf("Status after re-Start = %+v, want running", got)
+	}
+}
+
+// TestStopIsPromptWithConnectionHeldOpenDynamic is -D's counterpart to
+// TestStopIsPromptWithConnectionHeldOpen: it leaves the proxied SOCKS5
+// connection OPEN across Stop, so pipe()'s two io.Copy goroutines (one on
+// the SOCKS client conn serveSOCKS accepted, one on the upstream conn
+// r.conn.Client.Dial produced) are genuinely blocked in a Read at the moment
+// Stop runs — exactly the scenario acceptDynamic's doc comment reasons
+// about. The only thing that can unblock those Reads is Stop's
+// r.conn.Close() (the same mechanism -L relies on, and the one
+// acceptDynamic's dial closure rides via r.conn.Client.Dial); if that
+// stopped working for the -D path, Stop would hang on r.wg.Wait() until the
+// OS's own TCP idle behavior eventually gave up. The 5s timeout turns a
+// regression here into a fast, deterministic failure instead of a wedged
+// test run.
+func TestStopIsPromptWithConnectionHeldOpenDynamic(t *testing.T) {
+	echoAddr := echoServer(t)
+	sshAddr, hostKey := startForwardingSSHServer(t)
+	conn := dialConn(t, sshAddr, hostKey)
+
+	bindPort := freePort(t)
+	fwd := domain.PortForward{
+		ID: "hold-open-d", Type: domain.ForwardDynamic,
+		BindAddr: "127.0.0.1", BindPort: bindPort,
+	}
+
+	m := NewManager(nil)
+	if err := m.Start(fwd, conn); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	socksAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(bindPort))
+	c := dialSOCKS5(t, socksAddr, echoAddr)
+	t.Cleanup(func() { _ = c.Close() })
+
+	// Drive one round trip so the per-connection copy goroutine is actually
+	// running (not just the bare accept loop), then deliberately leave c
+	// OPEN across Stop.
+	if _, err := c.Write([]byte("ping")); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	buf := make([]byte, 4)
+	_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if _, err := io.ReadFull(c, buf); err != nil {
+		t.Fatalf("read echo: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- m.Stop(fwd.ID) }()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Stop: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not return within 5s with a proxied -D connection held open across it — pipe()'s blocked Read likely didn't unblock (r.conn.Close() regression)")
+	}
+
+	if got := m.Status(fwd.ID); got.State != StateStopped {
+		t.Fatalf("Status after Stop = %+v, want stopped", got)
+	}
+}
