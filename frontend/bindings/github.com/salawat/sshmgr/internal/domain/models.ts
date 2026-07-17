@@ -41,7 +41,8 @@ export enum Environment {
 };
 
 /**
- * ForwardType is the tunnel direction. L = local (-L), R = remote (-R).
+ * ForwardType is the tunnel direction. L = local (-L), R = remote (-R), D =
+ * dynamic (-D, a SOCKS5 proxy).
  */
 export enum ForwardType {
     /**
@@ -50,11 +51,16 @@ export enum ForwardType {
     $zero = "",
 
     /**
-     * The tunnel directions. ForwardLocal is an -L forward (local port to a remote
-     * destination); ForwardRemote is an -R forward (remote port to a local one).
+     * The tunnel directions. ForwardLocal is an -L forward (local port to a
+     * remote destination); ForwardRemote is an -R forward (remote port to a
+     * local one); ForwardDynamic is a -D forward (a local SOCKS5 proxy port —
+     * each proxied connection's destination is negotiated by the SOCKS client
+     * per-connection rather than fixed at forward-creation time, so it carries
+     * no DestHost/DestPort).
      */
     ForwardLocal = "L",
     ForwardRemote = "R",
+    ForwardDynamic = "D",
 };
 
 /**
@@ -143,3 +149,44 @@ export interface Settings {
     "guardEnabled": boolean;
     "guardPatterns": string;
 }
+
+/**
+ * Snippet is a saved command a user can run against a server's terminal. It
+ * carries no secret (SEC-01) — just a name, a body, and where it applies.
+ */
+export interface Snippet {
+    "id": string;
+    "name": string;
+    "body": string;
+    "scope": SnippetScope;
+
+    /**
+     * group name (group scope) / server id (server scope); "" for global
+     */
+    "scopeRef": string;
+
+    /**
+     * 0=none, 1..9 quick-run
+     */
+    "slot": number;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * SnippetScope controls which servers a snippet is offered for: everywhere,
+ * one group, or one server.
+ */
+export enum SnippetScope {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * The valid snippet scopes.
+     */
+    ScopeGlobal = "global",
+    ScopeGroup = "group",
+    ScopeServer = "server",
+};

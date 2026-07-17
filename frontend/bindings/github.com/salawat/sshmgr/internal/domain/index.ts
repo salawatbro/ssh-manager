@@ -4,11 +4,13 @@
 export {
     AuthType,
     Environment,
-    ForwardType
+    ForwardType,
+    SnippetScope
 } from "./models.js";
 
 export type {
     PortForward,
     Server,
-    Settings
+    Settings,
+    Snippet
 } from "./models.js";

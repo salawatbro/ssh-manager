@@ -6,12 +6,14 @@ import * as ImportService from "./importservice.js";
 import * as SSHService from "./sshservice.js";
 import * as ServerService from "./serverservice.js";
 import * as SettingsService from "./settingsservice.js";
+import * as SnippetService from "./snippetservice.js";
 export {
     ForwardService,
     ImportService,
     SSHService,
     ServerService,
-    SettingsService
+    SettingsService,
+    SnippetService
 };
 
 export type {
@@ -20,5 +22,6 @@ export type {
     HostKeyRequest,
     ImportItem,
     ImportPreview,
+    SnippetInput,
     TestResult
 } from "./models.js";

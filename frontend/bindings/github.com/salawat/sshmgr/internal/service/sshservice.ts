@@ -13,6 +13,15 @@
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
 /**
+ * Broadcast writes the same base64 payload to every listed session (FR-15). It
+ * is best-effort: a write to a gone session doesn't stop the others; the first
+ * error is returned so the UI can surface a partial failure.
+ */
+export function Broadcast(sessionIDs: string[] | null, dataB64: string): $CancellablePromise<void> {
+    return $Call.ByID(1722845442, sessionIDs, dataB64);
+}
+
+/**
  * Close ends a session at the user's request (closing a pane/tab).
  */
 export function Close(sessionID: string): $CancellablePromise<void> {

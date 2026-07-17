@@ -95,6 +95,8 @@ func main() {
 		fatalStartup("cannot resolve the ssh config path", err)
 	}
 	dataService := &DataService{servers: serverService, db: db}
+	snippetRepo := store.NewSnippetRepo(db)
+	snippetService := service.NewSnippetService(snippetRepo)
 
 	// forwardMgr's emit closure only runs at runtime, on a state transition
 	// well after app start (see appEmitter's comment above for why
@@ -105,6 +107,14 @@ func main() {
 		_ = application.Get().Event.Emit("forward:status", st)
 	})
 	forwardService := service.NewForwardService(forwardRepo, repo, kr, dialer, forwardMgr)
+
+	// Wires forwardRepo + forwardMgr into serverService so Delete tears down a
+	// server's live tunnels first (Task 4's deviation: a package-level func,
+	// not a method — see SetForwardDeps' doc comment in server_service.go for
+	// why a method form would leak a bogus frontend RPC). Must run after all
+	// three of serverService, forwardRepo and forwardMgr exist, which it does
+	// here.
+	service.SetForwardDeps(serverService, forwardRepo, forwardMgr)
 
 	// FR-04.3: the Connection-timeout setting drives the dialer live — read at
 	// each dial rather than baked in at construction, so a Settings change
@@ -130,6 +140,7 @@ func main() {
 			application.NewService(importService),
 			application.NewService(dataService),
 			application.NewService(forwardService),
+			application.NewService(snippetService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

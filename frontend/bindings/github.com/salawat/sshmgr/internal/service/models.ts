@@ -90,6 +90,20 @@ export interface ImportPreview {
 }
 
 /**
+ * SnippetInput is what the frontend sends to create or update a saved
+ * snippet. It mirrors ForwardInput's shape: a plain JSON-tagged struct the
+ * service turns into a domain.Snippet and validates again (SEC-08).
+ */
+export interface SnippetInput {
+    "id": string;
+    "name": string;
+    "body": string;
+    "scope": domain$0.SnippetScope;
+    "scopeRef": string;
+    "slot": number;
+}
+
+/**
  * TestResult is the outcome of TestConnection (FR-04). A connection outcome
  * (refused, timed out, auth failed, host key declined, keychain locked) is a
  * normal OK:false result carrying Code — not a thrown error — so the
