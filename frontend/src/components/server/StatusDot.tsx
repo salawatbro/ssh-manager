@@ -4,14 +4,16 @@ interface Props {
   status: Status
   // Server rows (UI-01) use the default 8px dot; the tunnels panel's cards
   // (dizayn manbasi: MainWindow.dc.html panel=tunnels) use a smaller 6px
-  // circle. Tailwind v4 scans source files for LITERAL class strings, so
-  // both sizes are spelled out in `sizeClasses` below rather than
-  // interpolated (`h-[${size}px]` would never be seen by the scanner).
-  size?: 6 | 8
+  // circle; the title bar's tab strip (panel=title bar + tabs) uses 7px.
+  // Tailwind v4 scans source files for LITERAL class strings, so all sizes
+  // are spelled out in `sizeClasses` below rather than interpolated
+  // (`h-[${size}px]` would never be seen by the scanner).
+  size?: 6 | 7 | 8
 }
 
-const sizeClasses: Record<6 | 8, string> = {
+const sizeClasses: Record<6 | 7 | 8, string> = {
   6: 'h-[6px] w-[6px]',
+  7: 'h-[7px] w-[7px]',
   8: 'h-[8px] w-[8px]',
 }
 

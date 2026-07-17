@@ -5,6 +5,7 @@ import { EmptyState } from './components/EmptyState'
 import { HostKeyModal } from './components/modals/HostKeyModal'
 import { HostKeyChangedModal } from './components/modals/HostKeyChangedModal'
 import { TerminalArea } from './components/terminal/TerminalArea'
+import { TabBar } from './components/terminal/TabBar'
 import { CommandPalette } from './components/palette/CommandPalette'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { ImportPreview } from './components/palette/ImportPreview'
@@ -94,12 +95,24 @@ export default function App() {
     // paints its own bg over the rest), so the bar reads as seamlessly a touch
     // taller rather than floating above a darker gap.
     <div className="flex h-full flex-col bg-bg1b pb-[6px]">
-      {/* Title bar: draggable band whose job is to clear the macOS traffic
-          lights (app name dropped — redundant with the window/Dock title).
-          52px leaves equal space above/below the lights, which Tahoe draws
-          lower than the pre-Tahoe 38px of TZ 12.1. Kept in fullscreen too, so
-          the top chrome stays consistent. */}
-      <div className="drag h-[52px] shrink-0 border-b border-border bg-bg1b" />
+      {/* Title bar: merges the macOS traffic-light clearance, app label, and
+          the session tab strip into one 52px draggable band (dizayn manbasi:
+          MainWindow.dc.html title bar + tabs). The design mocks the traffic
+          lights as three HTML dots, but on this Wails/WKWebView macOS build
+          the REAL lights are native, drawn by the OS over the window's
+          top-left corner — so they are never rendered here, only the
+          clearance is left empty. 52px leaves equal space above/below the
+          lights, which Tahoe draws lower than the pre-Tahoe 38px of TZ 12.1.
+          Kept in fullscreen too, so the top chrome stays consistent. `drag`
+          on the outer band makes it a window drag region everywhere except
+          the tabs / + button, which TabBar opts out with `.no-drag`. */}
+      <div className="drag flex h-[52px] shrink-0 border-b border-border bg-bg1b">
+        <div className="w-[78px] shrink-0" />
+        <div className="flex shrink-0 items-center border-r border-border pr-[12px]">
+          <span className="text-[12px] font-semibold tracking-[0.02em] text-textMuted">SSH Manager</span>
+        </div>
+        <TabBar />
+      </div>
 
       <div className="flex min-h-0 flex-1">
         {servers.length > 0 && <Sidebar onAdd={openAdd} onOpenTunnels={openTunnelsFor} />}

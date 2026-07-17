@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { replaceLeaf, removeLeaf, firstLeaf } from '../lib/paneTree'
+import { replaceLeaf, removeLeaf, firstLeaf, collectLeaves } from '../lib/paneTree'
+import type { TermStatus } from '../hooks/useTerminalSession'
+import type { Status } from '../lib/status'
 
 // A tab's panes form a binary split tree; a leaf is one terminal session for a
 // server. Task 6 fills in splitFocused/closePane; v0.3-Task-5 only ever builds
@@ -21,6 +23,13 @@ export interface Tab {
 interface SessionsState {
   tabs: Tab[]
   activeTabId: string | null
+  // Per-pane connection status, keyed by leaf (pane) id. Terminal mirrors its
+  // useTerminalSession status here so the title bar's tab strip (which never
+  // mounts a PTY itself) can read it — see tabStatus below for how a tab
+  // with multiple split panes collapses to the one dot the strip shows.
+  paneStatus: Record<string, TermStatus>
+  setPaneStatus: (paneId: string, status: TermStatus) => void
+  clearPaneStatus: (paneId: string) => void
   open: (server: Server) => void
   closeTab: (tabId: string) => void
   selectTab: (tabId: string) => void
@@ -42,6 +51,18 @@ function cycle(tabs: Tab[], activeId: string | null, delta: number): string | nu
 export const useSessions = create<SessionsState>((set, get) => ({
   tabs: [],
   activeTabId: null,
+  paneStatus: {},
+
+  setPaneStatus: (paneId, status) =>
+    set((s) => ({ paneStatus: { ...s.paneStatus, [paneId]: status } })),
+
+  clearPaneStatus: (paneId) =>
+    set((s) => {
+      if (!(paneId in s.paneStatus)) return {}
+      const paneStatus = { ...s.paneStatus }
+      delete paneStatus[paneId]
+      return { paneStatus }
+    }),
 
   // A new tab, one leaf, one session. Multiple tabs to the same server are
   // allowed (each leaf id is unique, so each drives its own PTY).
@@ -112,3 +133,24 @@ export const useSessions = create<SessionsState>((set, get) => ({
       return { tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, root, focusedPaneId } : t)) }
     }),
 }))
+
+const termToStatus: Record<TermStatus, Status> = {
+  connecting: 'connecting',
+  connected: 'connected',
+  error: 'failed',
+  closed: 'disc',
+}
+
+// tabStatus collapses a tab's pane statuses into the single dot the title
+// bar's tab strip shows (dizayn manbasi: MainWindow.dc.html). A tab can hold
+// more than one pane once split — a failed or still-connecting pane always
+// dominates a healthy sibling, so a problem is never hidden behind it. A pane
+// with no entry yet (Terminal hasn't mounted/reported) reads as connecting,
+// matching useTerminalSession's own initial state.
+export function tabStatus(tab: Tab, paneStatus: Record<string, TermStatus>): Status {
+  const statuses = collectLeaves(tab.root).map((leaf) => termToStatus[paneStatus[leaf.id] ?? 'connecting'])
+  if (statuses.includes('failed')) return 'failed'
+  if (statuses.includes('connecting')) return 'connecting'
+  if (statuses.includes('disc')) return 'disc'
+  return 'connected'
+}

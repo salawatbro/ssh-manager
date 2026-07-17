@@ -25,3 +25,10 @@ export function removeLeaf(node: PaneNode, paneId: string): PaneNode | null {
 export function firstLeaf(node: PaneNode): PaneNode {
   return node.kind === 'leaf' ? node : firstLeaf(node.a)
 }
+
+// collectLeaves returns every leaf in the tree, in left-to-right order. Used
+// to aggregate a tab's per-pane connection statuses into the single dot the
+// tab strip shows (dizayn manbasi: MainWindow.dc.html title bar).
+export function collectLeaves(node: PaneNode): PaneNode[] {
+  return node.kind === 'leaf' ? [node] : [...collectLeaves(node.a), ...collectLeaves(node.b)]
+}

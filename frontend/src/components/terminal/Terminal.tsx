@@ -8,16 +8,18 @@ import { graphiteTheme } from '../../lib/termTheme'
 import { isMac } from '../../lib/platform'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { useSettings } from '../../stores/settings'
+import { useSessions } from '../../stores/sessions'
 import { PaneError } from './PaneError'
 import { FindBar } from './FindBar'
 
 interface Props {
+  paneId: string
   serverId: string
   focused: boolean
   onFocus: () => void
 }
 
-export function Terminal({ serverId, focused, onFocus }: Props) {
+export function Terminal({ paneId, serverId, focused, onFocus }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<SearchAddon | null>(null)
   const [term, setTerm] = useState<XTerm | null>(null)
@@ -118,6 +120,16 @@ export function Terminal({ serverId, focused, onFocus }: Props) {
   }, [term, fit, cfg])
 
   const session = useTerminalSession(serverId, term, fit)
+
+  // Mirror this pane's status into the sessions store so the title bar's tab
+  // strip — which never mounts a PTY itself — can show a live status dot per
+  // tab (dizayn manbasi: MainWindow.dc.html title bar). Cleared on unmount
+  // (own effect, paneId-keyed) rather than on every status change, so the
+  // entry isn't dropped-then-re-added on each transition.
+  useEffect(() => {
+    useSessions.getState().setPaneStatus(paneId, session.status)
+  }, [paneId, session.status])
+  useEffect(() => () => useSessions.getState().clearPaneStatus(paneId), [paneId])
 
   function find(query: string, dir: 'next' | 'prev') {
     const s = searchRef.current
