@@ -10,7 +10,7 @@ import { CommandPalette } from './components/palette/CommandPalette'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { ImportPreview } from './components/palette/ImportPreview'
 import { TunnelsPanel } from './components/forwards/TunnelsPanel'
-import { StatusDot } from './components/server/StatusDot'
+import { StatusBar } from './components/layout/StatusBar'
 import { useAppKeymap } from './hooks/useAppKeymap'
 import { useServers } from './stores/servers'
 import { useHostKey } from './stores/hostkey'
@@ -30,9 +30,6 @@ export default function App() {
 
   const hostKeyRequest = useHostKey((s) => s.request)
   const confirmHostKey = useHostKey((s) => s.confirm)
-  const runningTunnels = useForwards(
-    (s) => Object.values(s.statusById).filter((st) => st.state === 'running').length,
-  )
 
   useEffect(() => {
     void load()
@@ -134,28 +131,11 @@ export default function App() {
         )}
       </div>
 
-      {/* TZ 12.1: 26px status bar. The tunnels segment mirrors the design's
-          static dot + count, but stays clickable when a server is selected —
-          it opens TunnelsPanel for that server in place of the old global
-          popover (removed: that view had no single server to scope to). */}
-      <div className="flex h-[26px] shrink-0 items-center border-t border-border bg-bg1b px-[12px] text-[11.5px] text-textDim">
-        <span>{servers.length} servers</span>
-        {selectedId ? (
-          <button
-            type="button"
-            onClick={() => openTunnelsFor(selectedId)}
-            className="ml-[14px] flex items-center gap-[5px] hover:text-text"
-          >
-            <StatusDot status={runningTunnels > 0 ? 'connected' : 'disc'} size={6} />
-            {runningTunnels} tunnels
-          </button>
-        ) : (
-          <span className="ml-[14px] flex items-center gap-[5px]">
-            <StatusDot status={runningTunnels > 0 ? 'connected' : 'disc'} size={6} />
-            {runningTunnels} tunnels
-          </span>
-        )}
-      </div>
+      {/* TZ 12.1 / design-conformance task 4: 26px status bar (dizayn manbasi:
+          MainWindow.dc.html). With an active session it shows the live
+          auth/target/dims/tunnels/uptime; with none, the server/tunnel
+          counts the bar showed before this rework. */}
+      <StatusBar onOpenTunnels={openTunnelsFor} />
 
       {/* key={hostKeyRequest.requestID} remounts the modal per request, so a
           NEW host-key request always starts fresh — most importantly, so

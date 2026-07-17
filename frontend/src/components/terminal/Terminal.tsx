@@ -48,6 +48,11 @@ export function Terminal({ paneId, serverId, focused, onFocus }: Props) {
     t.loadAddon(new CanvasAddon())
     fitAddon.fit()
     searchRef.current = search
+    // Seed the status bar's dimensions segment (dizayn manbasi:
+    // MainWindow.dc.html, `40×120`) right away — the resize-observer below
+    // only fires on a LATER container resize, so without this the very
+    // first pane of a session would show no dims until one occurred.
+    useSessions.getState().setPaneDims(paneId, { cols: t.cols, rows: t.rows })
 
     // Auto-copy on selection (user decision). Best-effort — clipboard can
     // reject when unfocused.
@@ -87,17 +92,18 @@ export function Terminal({ paneId, serverId, focused, onFocus }: Props) {
 
   useEffect(() => {
     const host = hostRef.current
-    if (!host || !fit) return
+    if (!host || !fit || !term) return
     const ro = new ResizeObserver(() => {
       try {
         fit.fit()
+        useSessions.getState().setPaneDims(paneId, { cols: term.cols, rows: term.rows })
       } catch {
         /* detached mid-teardown */
       }
     })
     ro.observe(host)
     return () => ro.disconnect()
-  }, [fit])
+  }, [fit, term, paneId])
 
   useEffect(() => {
     if (focused && term) term.focus()
@@ -114,10 +120,13 @@ export function Terminal({ paneId, serverId, focused, onFocus }: Props) {
     term.options.cursorBlink = cfg.termBlink
     try {
       fit?.fit()
+      // Font size is part of `cfg` — a change resizes the grid, so the
+      // status bar's dims segment needs a fresh read too.
+      useSessions.getState().setPaneDims(paneId, { cols: term.cols, rows: term.rows })
     } catch {
       /* detached */
     }
-  }, [term, fit, cfg])
+  }, [term, fit, cfg, paneId])
 
   const session = useTerminalSession(serverId, term, fit)
 
@@ -130,6 +139,10 @@ export function Terminal({ paneId, serverId, focused, onFocus }: Props) {
     useSessions.getState().setPaneStatus(paneId, session.status)
   }, [paneId, session.status])
   useEffect(() => () => useSessions.getState().clearPaneStatus(paneId), [paneId])
+  // Mirrors the paneStatus cleanup above exactly: its own effect, keyed only
+  // on paneId, so a dims UPDATE never accidentally clears the entry — only
+  // unmount (pane close) does.
+  useEffect(() => () => useSessions.getState().clearPaneDims(paneId), [paneId])
 
   function find(query: string, dir: 'next' | 'prev') {
     const s = searchRef.current

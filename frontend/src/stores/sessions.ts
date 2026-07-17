@@ -18,6 +18,20 @@ export interface Tab {
   hostLabel: string
   root: PaneNode
   focusedPaneId: string
+  // Wall-clock time (Date.now()) the tab's session was opened — the status
+  // bar's uptime segment (dizayn manbasi: MainWindow.dc.html, `00:14:32`)
+  // ticks off of this rather than a running timer, so it stays correct
+  // across re-renders and doesn't drift.
+  startedAt: number
+}
+
+// A pane's live xterm grid size, keyed by leaf (pane) id — mirrors paneStatus
+// below. Terminal writes its cols/rows here after every fit (initial open,
+// container resize, settings change) so the status bar can show the ACTIVE
+// pane's dimensions without mounting a second xterm instance of its own.
+export interface PaneDims {
+  cols: number
+  rows: number
 }
 
 interface SessionsState {
@@ -30,6 +44,9 @@ interface SessionsState {
   paneStatus: Record<string, TermStatus>
   setPaneStatus: (paneId: string, status: TermStatus) => void
   clearPaneStatus: (paneId: string) => void
+  paneDims: Record<string, PaneDims>
+  setPaneDims: (paneId: string, dims: PaneDims) => void
+  clearPaneDims: (paneId: string) => void
   open: (server: Server) => void
   closeTab: (tabId: string) => void
   selectTab: (tabId: string) => void
@@ -64,6 +81,19 @@ export const useSessions = create<SessionsState>((set, get) => ({
       return { paneStatus }
     }),
 
+  paneDims: {},
+
+  setPaneDims: (paneId, dims) =>
+    set((s) => ({ paneDims: { ...s.paneDims, [paneId]: dims } })),
+
+  clearPaneDims: (paneId) =>
+    set((s) => {
+      if (!(paneId in s.paneDims)) return {}
+      const paneDims = { ...s.paneDims }
+      delete paneDims[paneId]
+      return { paneDims }
+    }),
+
   // A new tab, one leaf, one session. Multiple tabs to the same server are
   // allowed (each leaf id is unique, so each drives its own PTY).
   open: (server) => {
@@ -75,6 +105,7 @@ export const useSessions = create<SessionsState>((set, get) => ({
       hostLabel: `${server.user}@${server.host}`,
       root: { kind: 'leaf', id: paneId, serverId: server.id },
       focusedPaneId: paneId,
+      startedAt: Date.now(),
     }
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
   },
