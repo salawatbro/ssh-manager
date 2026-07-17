@@ -47,9 +47,8 @@ export function StatusBar({ onOpenTunnels }: Props) {
   const tabs = useSessions((s) => s.tabs)
   const activeTabId = useSessions((s) => s.activeTabId)
   const paneDims = useSessions((s) => s.paneDims)
-  const runningTunnels = useForwards(
-    (s) => Object.values(s.statusById).filter((st) => st.state === 'running').length,
-  )
+  const byServer = useForwards((s) => s.byServer)
+  const statusById = useForwards((s) => s.statusById)
   const [now, setNow] = useState(() => Date.now())
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null
@@ -62,16 +61,34 @@ export function StatusBar({ onOpenTunnels }: Props) {
     return () => clearInterval(id)
   }, [activeTab])
 
+  // The bar is scoped to ONE server (the active session's, or the selected one
+  // when idle), so its tunnel count is that server's running tunnels, not a
+  // global total (matches the design's per-session bar and the click, which
+  // opens that server's tunnels panel). Load its forward definitions so the
+  // count is accurate even before that server's panel has ever been opened —
+  // statusById alone is keyed by forward id and can't be mapped to a server
+  // without the defs.
+  const barServerId = activeTab?.serverId ?? selectedId
+  useEffect(() => {
+    if (barServerId) void useForwards.getState().load(barServerId)
+  }, [barServerId])
+
+  const runningCountFor = (serverId: string | null): number =>
+    serverId
+      ? (byServer[serverId] ?? []).filter((f) => statusById[f.id]?.state === 'running').length
+      : 0
+
   // Mirrors the pre-rework bar exactly: clickable (opens TunnelsPanel) only
   // when there's a server to scope to, a plain inert span otherwise — a
   // disabled <button> would still be hover-styleable, which a span isn't.
   const tunnelsSegment = (targetId: string | null) => {
-    const dot = <StatusDot status={runningTunnels > 0 ? 'connected' : 'disc'} size={6} />
+    const count = runningCountFor(targetId)
+    const dot = <StatusDot status={count > 0 ? 'connected' : 'disc'} size={6} />
     if (!targetId) {
       return (
         <span className="flex items-center gap-[5px]">
           {dot}
-          {runningTunnels} tunnels
+          {count} tunnels
         </span>
       )
     }
@@ -82,7 +99,7 @@ export function StatusBar({ onOpenTunnels }: Props) {
         className="flex items-center gap-[5px] hover:text-text"
       >
         {dot}
-        {runningTunnels} tunnels
+        {count} tunnels
       </button>
     )
   }
