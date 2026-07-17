@@ -1,5 +1,6 @@
 import type { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { KeyInfo } from '@bindings/github.com/salawat/sshmgr/internal/sshx'
+import { useServers } from '../../stores/servers'
 import type { ServerFormValues } from './ServerForm'
 import { ServerFormAuth } from './ServerFormAuth'
 
@@ -10,6 +11,10 @@ interface Props {
   // Task 11 fills this from DetectKeys(); until then every caller can omit
   // it and ServerFormAuth's key branch falls back to a plain path input.
   detectedKeys?: KeyInfo[]
+  // The server being edited (null when adding), so the jump-host select can
+  // exclude itself from its own options — a server jumping through itself
+  // would be a same-id cycle.
+  serverId: string | null
 }
 
 const field =
@@ -21,7 +26,9 @@ const label = 'text-[11px] font-medium text-textMuted'
 // while this file absorbs new fields. v0.2 adds an auth block
 // (ServerFormAuth) after Group/Environment — the auth-method segmented
 // control plus password/key/agent sub-fields.
-export function ServerFormFields({ form, setForm, error, detectedKeys }: Props) {
+export function ServerFormFields({ form, setForm, error, detectedKeys, serverId }: Props) {
+  const servers = useServers((s) => s.servers)
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-[13px] overflow-y-auto p-[14px]">
       <div className="flex flex-col gap-[5px]">
@@ -87,6 +94,24 @@ export function ServerFormFields({ form, setForm, error, detectedKeys }: Props) 
             <option value="none">None</option>
           </select>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-[5px]">
+        <span className={label}>Jump host</span>
+        <select
+          className={field}
+          value={form.jumpId ?? ''}
+          onChange={(e) => setForm({ ...form, jumpId: e.target.value || null })}
+        >
+          <option value="">None</option>
+          {servers
+            .filter((s) => s.id !== serverId)
+            .map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+        </select>
       </div>
 
       <ServerFormAuth form={form} setForm={setForm} detectedKeys={detectedKeys} />
