@@ -5,6 +5,8 @@ import "time"
 // ForwardType is the tunnel direction. L = local (-L), R = remote (-R).
 type ForwardType string
 
+// The tunnel directions. ForwardLocal is an -L forward (local port to a remote
+// destination); ForwardRemote is an -R forward (remote port to a local one).
 const (
 	ForwardLocal  ForwardType = "L"
 	ForwardRemote ForwardType = "R"
