@@ -31,6 +31,16 @@ func (s *SettingsService) Get() (*domain.Settings, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Backfill the guard patterns for installs upgraded from before the v0.7
+	// guard: AutoMigrate added guard_patterns with an empty DB default, so an
+	// existing row carries "" and the guard would match nothing. Seed the
+	// defaults once (persisted) so an upgraded install gets a working guard.
+	// (A user who later clears all patterns sees them restored next load — an
+	// accepted resolution of the degenerate "guard on, no patterns" state.)
+	if cur.GuardPatterns == "" {
+		cur.GuardPatterns = domain.DefaultSettings().GuardPatterns
+		_ = s.repo.Save(cur) // best-effort: a save failure still returns usable defaults in-memory this session
+	}
 	cur.Sanitise()
 	return cur, nil
 }

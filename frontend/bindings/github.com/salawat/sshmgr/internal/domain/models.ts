@@ -118,11 +118,6 @@ export interface Settings {
     "startAtLogin": boolean;
     "keepRunningInTray": boolean;
     "confirmOnQuit": boolean;
-
-    /**
-     * ProdConfirm is persisted now; enforcement (the prod guard, FR-14) is v0.7.
-     */
-    "prodConfirm": boolean;
     "connectTimeoutSecs": number;
 
     /**

@@ -7,11 +7,9 @@ type Settings struct {
 	ID uint `gorm:"primaryKey" json:"-"`
 
 	// General
-	StartAtLogin      bool `json:"startAtLogin"`
-	KeepRunningInTray bool `gorm:"not null;default:true" json:"keepRunningInTray"`
-	ConfirmOnQuit     bool `gorm:"not null;default:true" json:"confirmOnQuit"`
-	// ProdConfirm is persisted now; enforcement (the prod guard, FR-14) is v0.7.
-	ProdConfirm        bool `gorm:"not null;default:true" json:"prodConfirm"`
+	StartAtLogin       bool `json:"startAtLogin"`
+	KeepRunningInTray  bool `gorm:"not null;default:true" json:"keepRunningInTray"`
+	ConfirmOnQuit      bool `gorm:"not null;default:true" json:"confirmOnQuit"`
 	ConnectTimeoutSecs int  `gorm:"not null;default:10" json:"connectTimeoutSecs"`
 
 	// Terminal (read live by the frontend; v0.3 hard-coded these)
@@ -39,7 +37,6 @@ func DefaultSettings() Settings {
 		ID:                 1,
 		KeepRunningInTray:  true,
 		ConfirmOnQuit:      true,
-		ProdConfirm:        true,
 		ConnectTimeoutSecs: 10,
 		TermFont:           "JetBrains Mono",
 		TermFontSize:       13,

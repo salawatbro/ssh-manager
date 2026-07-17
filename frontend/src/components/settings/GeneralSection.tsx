@@ -30,13 +30,6 @@ export function GeneralSection() {
         <Toggle on={s.confirmOnQuit} onChange={(v) => void update({ confirmOnQuit: v })} />
       </Row>
       <Row
-        label="Type-to-confirm on prod"
-        badge={<ProdBadge />}
-        hint="Destructive commands on prod hosts need confirmation. (Enforced in a later version.)"
-      >
-        <Toggle on={s.prodConfirm} onChange={(v) => void update({ prodConfirm: v })} />
-      </Row>
-      <Row
         label="Production command guard"
         badge={<ProdBadge />}
         hint="Ask for confirmation before running a matching command on a production server."
