@@ -116,7 +116,7 @@ export default function App() {
             openTunnelsFor enforces it) — both occupy the same 392px slot. key
             remounts per target server so TunnelsPanel's `editing` state
             (add/edit-in-place) never carries over from one server to the next. */}
-        {tunnelsFor && (
+        {tunnelsFor && !formOpen && (
           <TunnelsPanel key={tunnelsFor} serverId={tunnelsFor} onClose={() => setTunnelsFor(null)} />
         )}
       </div>

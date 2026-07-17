@@ -72,7 +72,7 @@ export function ServerRow({ server, selected, onSelect, onContextMenu, onTunnels
           e.stopPropagation()
           onTunnels()
         }}
-        className="absolute right-[8px] top-1/2 flex h-[20px] w-[20px] -translate-y-1/2 items-center justify-center rounded-[4px] text-textDim opacity-0 hover:bg-bg2 hover:text-text group-hover:opacity-100"
+        className="absolute right-[8px] top-1/2 flex h-[20px] w-[20px] -translate-y-1/2 items-center justify-center rounded-[4px] text-textDim opacity-0 hover:bg-bg2 hover:text-text group-hover:opacity-100 focus-visible:opacity-100"
       >
         <ArrowLeftRight size={13} />
       </button>
