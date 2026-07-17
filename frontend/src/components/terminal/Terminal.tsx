@@ -129,7 +129,7 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
     }
   }, [term, fit, cfg, paneId])
 
-  const session = useTerminalSession(serverId, term, fit)
+  const session = useTerminalSession(serverId, paneId, term, fit)
 
   // Mirror this pane's status into the sessions store so the title bar's tab
   // strip — which never mounts a PTY itself — can show a live status dot per

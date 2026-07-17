@@ -9,6 +9,7 @@ import { createGuardBuffer, matchesDangerous, splitPatterns } from '../lib/guard
 import { useServers } from '../stores/servers'
 import { useSettings } from '../stores/settings'
 import { useGuard } from '../stores/guard'
+import { useSessions } from '../stores/sessions'
 
 // 'exited' is a clean shell exit (`exit`/Ctrl-D/`exit N`) — the pane closes
 // itself, no notice. 'closed' is an abnormal drop (dead peer, connection
@@ -27,7 +28,12 @@ export interface TermSession {
 // 'error'/'closed' as an inline PaneNotice and closes the pane itself on
 // 'exited'. `retry` re-runs the whole effect (a fresh Open) — used by both
 // Retry (open failure) and Reconnect (drop), which are the same operation.
-export function useTerminalSession(serverId: string, term: Terminal | null, fit: FitAddon | null): TermSession {
+export function useTerminalSession(
+  serverId: string,
+  paneId: string,
+  term: Terminal | null,
+  fit: FitAddon | null,
+): TermSession {
   const [status, setStatus] = useState<TermStatus>('connecting')
   const [message, setMessage] = useState('')
   const [attempt, setAttempt] = useState(0)
@@ -148,6 +154,7 @@ export function useTerminalSession(serverId: string, term: Terminal | null, fit:
         }
         myId = id
         sessionId.current = id
+        useSessions.getState().setPaneSession(paneId, id)
         setStatus('connected')
         for (const o of preBuffer) {
           if (o.sessionID === id) ingest(o.seq, o.data)
@@ -177,9 +184,10 @@ export function useTerminalSession(serverId: string, term: Terminal | null, fit:
       offState?.()
       const id = sessionId.current
       sessionId.current = null
+      useSessions.getState().clearPaneSession(paneId)
       if (id) void SSHService.Close(id).catch(() => {})
     }
-  }, [serverId, term, fit, attempt])
+  }, [serverId, paneId, term, fit, attempt])
 
   return { status, message, retry }
 }

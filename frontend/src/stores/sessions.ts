@@ -18,17 +18,13 @@ export interface Tab {
   hostLabel: string
   root: PaneNode
   focusedPaneId: string
-  // Wall-clock time (Date.now()) the tab's session was opened — the status
-  // bar's uptime segment (dizayn manbasi: MainWindow.dc.html, `00:14:32`)
-  // ticks off of this rather than a running timer, so it stays correct
-  // across re-renders and doesn't drift.
+  // Wall-clock open time (Date.now()) — the status bar's uptime segment
+  // (MainWindow.dc.html, `00:14:32`) ticks off this, not a running timer.
   startedAt: number
 }
 
 // A pane's live xterm grid size, keyed by leaf (pane) id — mirrors paneStatus
-// below. Terminal writes its cols/rows here after every fit (initial open,
-// container resize, settings change) so the status bar can show the ACTIVE
-// pane's dimensions without mounting a second xterm instance of its own.
+// below; lets the status bar show the ACTIVE pane's dims without its own xterm.
 export interface PaneDims {
   cols: number
   rows: number
@@ -37,16 +33,18 @@ export interface PaneDims {
 interface SessionsState {
   tabs: Tab[]
   activeTabId: string | null
-  // Per-pane connection status, keyed by leaf (pane) id. Terminal mirrors its
-  // useTerminalSession status here so the title bar's tab strip (which never
-  // mounts a PTY itself) can read it — see tabStatus below for how a tab
-  // with multiple split panes collapses to the one dot the strip shows.
+  // Per-pane connection status, keyed by leaf (pane) id — mirrored from
+  // useTerminalSession so the tab strip (no PTY of its own) can read it.
   paneStatus: Record<string, TermStatus>
   setPaneStatus: (paneId: string, status: TermStatus) => void
   clearPaneStatus: (paneId: string) => void
   paneDims: Record<string, PaneDims>
   setPaneDims: (paneId: string, dims: PaneDims) => void
   clearPaneDims: (paneId: string) => void
+  // paneId → live session id (useTerminalSession); BroadcastBar's source for sessionIds.
+  paneSession: Record<string, string>
+  setPaneSession: (paneId: string, sessionId: string) => void
+  clearPaneSession: (paneId: string) => void
   open: (server: Server) => void
   closeTab: (tabId: string) => void
   selectTab: (tabId: string) => void
@@ -92,6 +90,19 @@ export const useSessions = create<SessionsState>((set, get) => ({
       const paneDims = { ...s.paneDims }
       delete paneDims[paneId]
       return { paneDims }
+    }),
+
+  paneSession: {},
+
+  setPaneSession: (paneId, sessionId) =>
+    set((s) => ({ paneSession: { ...s.paneSession, [paneId]: sessionId } })),
+
+  clearPaneSession: (paneId) =>
+    set((s) => {
+      if (!(paneId in s.paneSession)) return {}
+      const paneSession = { ...s.paneSession }
+      delete paneSession[paneId]
+      return { paneSession }
     }),
 
   // A new tab, one leaf, one session. Multiple tabs to the same server are
@@ -176,12 +187,10 @@ const termToStatus: Record<TermStatus, Status> = {
   exited: 'disc',
 }
 
-// tabStatus collapses a tab's pane statuses into the single dot the title
-// bar's tab strip shows (dizayn manbasi: MainWindow.dc.html). A tab can hold
-// more than one pane once split — a failed or still-connecting pane always
-// dominates a healthy sibling, so a problem is never hidden behind it. A pane
-// with no entry yet (Terminal hasn't mounted/reported) reads as connecting,
-// matching useTerminalSession's own initial state.
+// tabStatus collapses a tab's pane statuses into the single dot the tab strip
+// shows (MainWindow.dc.html). A failed/connecting pane always dominates a
+// healthy sibling. A pane with no entry yet (not mounted/reported) reads as
+// connecting, matching useTerminalSession's initial state.
 export function tabStatus(tab: Tab, paneStatus: Record<string, TermStatus>): Status {
   const statuses = collectLeaves(tab.root).map((leaf) => termToStatus[paneStatus[leaf.id] ?? 'connecting'])
   if (statuses.includes('failed')) return 'failed'
