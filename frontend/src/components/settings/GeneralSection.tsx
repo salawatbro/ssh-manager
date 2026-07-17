@@ -1,6 +1,6 @@
 import { useSettings } from '../../stores/settings'
 import { Row } from './Row'
-import { Toggle, Stepper } from './controls'
+import { Toggle, Stepper, ProdBadge } from './controls'
 
 export function GeneralSection() {
   const s = useSettings((st) => st.settings)
@@ -17,7 +17,11 @@ export function GeneralSection() {
       <Row label="Confirm before quitting" hint="Ask when terminal sessions are still open.">
         <Toggle on={s.confirmOnQuit} onChange={(v) => void update({ confirmOnQuit: v })} />
       </Row>
-      <Row label="Type-to-confirm on prod" hint="Destructive commands on prod hosts need confirmation. (Enforced in a later version.)">
+      <Row
+        label="Type-to-confirm on prod"
+        badge={<ProdBadge />}
+        hint="Destructive commands on prod hosts need confirmation. (Enforced in a later version.)"
+      >
         <Toggle on={s.prodConfirm} onChange={(v) => void update({ prodConfirm: v })} />
       </Row>
       <Row label="Connection timeout" hint="Give up if the host does not answer." last>

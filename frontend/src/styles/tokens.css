@@ -179,3 +179,19 @@
     transform: scale(1.5);
   }
 }
+
+/* TerminalPreview's caret in the Settings > Terminal live preview (dizayn
+   manbasi: Settings.dc.html). Referenced via Tailwind's arbitrary
+   `animate-[ssh-blink_1.1s_step-end_infinite]` utility, only when the
+   blink-cursor setting is on — a step-end blink, not a fade, to read as a
+   terminal caret rather than a pulsing dot. */
+@keyframes ssh-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
