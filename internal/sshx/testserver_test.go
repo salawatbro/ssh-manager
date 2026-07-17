@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"encoding/pem"
 	"errors"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -125,6 +126,77 @@ func newDualKeyTestServer(t *testing.T) (addr string, ed25519Key, rsaKey ssh.Pub
 		}
 	}()
 	return ln.Addr().String(), edSigner.PublicKey(), rsaSigner.PublicKey()
+}
+
+// newJumpTestServer starts an in-process SSH server that behaves as a bastion:
+// it accepts direct-tcpip channels and pipes them to the requested address, so
+// a client can Dial THROUGH it to reach another server. Any auth is accepted.
+func newJumpTestServer(t *testing.T) (addr string, hostKey ssh.PublicKey) {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromSigner(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := &ssh.ServerConfig{NoClientAuth: true}
+	cfg.AddHostKey(signer)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				sc, chans, reqs, err := ssh.NewServerConn(c, cfg)
+				if err != nil {
+					_ = c.Close()
+					return
+				}
+				go ssh.DiscardRequests(reqs)
+				go func() {
+					for ch := range chans {
+						if ch.ChannelType() != "direct-tcpip" {
+							_ = ch.Reject(ssh.Prohibited, "only direct-tcpip")
+							continue
+						}
+						var p struct {
+							DestHost string
+							DestPort uint32
+							SrcHost  string
+							SrcPort  uint32
+						}
+						if err := ssh.Unmarshal(ch.ExtraData(), &p); err != nil {
+							_ = ch.Reject(ssh.ConnectionFailed, "bad payload")
+							continue
+						}
+						upstream, err := net.Dial("tcp", net.JoinHostPort(p.DestHost, strconv.Itoa(int(p.DestPort))))
+						if err != nil {
+							_ = ch.Reject(ssh.ConnectionFailed, err.Error())
+							continue
+						}
+						channel, chReqs, err := ch.Accept()
+						if err != nil {
+							_ = upstream.Close()
+							continue
+						}
+						go ssh.DiscardRequests(chReqs)
+						go func() { _, _ = io.Copy(channel, upstream); _ = channel.Close() }()
+						go func() { _, _ = io.Copy(upstream, channel); _ = upstream.Close() }()
+					}
+				}()
+				_ = sc.Wait()
+			}()
+		}
+	}()
+	return ln.Addr().String(), signer.PublicKey()
 }
 
 // splitHostPort splits addr (as returned by newTestServer / newRejectingServer,

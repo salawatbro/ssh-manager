@@ -242,6 +242,166 @@ func TestClassifyDialError(t *testing.T) {
 	}
 }
 
+// A 1-hop chain (jumpless) dials the target directly and behaves like Dial:
+// a working client, no jumps recorded, clean close.
+func TestDialChainSingleHop(t *testing.T) {
+	addr, _ := newTestServer(t)
+	host, port := splitHostPort(t, addr)
+	srv := domain.Server{Host: host, Port: port, User: "x", AuthType: domain.AuthPassword}
+	chain := []Hop{{Server: srv, Creds: Credentials{Password: "pw"}}}
+
+	conn, err := dialerFor(t, true).DialChain(context.Background(), chain)
+	if err != nil {
+		t.Fatalf("DialChain: %v", err)
+	}
+	if got := string(conn.Client.ServerVersion()); got == "" {
+		t.Fatal("no server version from target")
+	}
+	if len(conn.jumps) != 0 {
+		t.Fatalf("jumps = %d, want 0 for a jumpless chain", len(conn.jumps))
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+// A 2-hop chain reaches the target THROUGH the jump: the jump forwards a
+// direct-tcpip channel to the target, and the handshake completes on the far
+// side of that relay.
+func TestDialChainTwoHops(t *testing.T) {
+	jumpAddr, _ := newJumpTestServer(t)
+	jumpHost, jumpPort := splitHostPort(t, jumpAddr)
+	jumpSrv := domain.Server{Name: "jump", Host: jumpHost, Port: jumpPort, User: "x", AuthType: domain.AuthPassword}
+
+	targetAddr, _ := newTestServer(t)
+	targetHost, targetPort := splitHostPort(t, targetAddr)
+	targetSrv := domain.Server{Name: "target", Host: targetHost, Port: targetPort, User: "x", AuthType: domain.AuthPassword}
+
+	creds := Credentials{Password: "pw"}
+	chain := []Hop{
+		{Server: jumpSrv, Creds: creds},
+		{Server: targetSrv, Creds: creds},
+	}
+
+	conn, err := dialerFor(t, true).DialChain(context.Background(), chain)
+	if err != nil {
+		t.Fatalf("DialChain: %v", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	if got := string(conn.Client.ServerVersion()); got == "" {
+		t.Fatal("no server version from target through jump")
+	}
+	if len(conn.jumps) != 1 {
+		t.Fatalf("jumps = %d, want 1", len(conn.jumps))
+	}
+}
+
+// Conn.Close closes the whole chain, not just the target: after Close, the
+// jump client (reached only through conn.jumps) is unusable too.
+func TestDialChainCloseClosesWholeChain(t *testing.T) {
+	jumpAddr, _ := newJumpTestServer(t)
+	jumpHost, jumpPort := splitHostPort(t, jumpAddr)
+	jumpSrv := domain.Server{Name: "jump", Host: jumpHost, Port: jumpPort, User: "x", AuthType: domain.AuthPassword}
+
+	targetAddr, _ := newTestServer(t)
+	targetHost, targetPort := splitHostPort(t, targetAddr)
+	targetSrv := domain.Server{Name: "target", Host: targetHost, Port: targetPort, User: "x", AuthType: domain.AuthPassword}
+
+	creds := Credentials{Password: "pw"}
+	chain := []Hop{
+		{Server: jumpSrv, Creds: creds},
+		{Server: targetSrv, Creds: creds},
+	}
+
+	conn, err := dialerFor(t, true).DialChain(context.Background(), chain)
+	if err != nil {
+		t.Fatalf("DialChain: %v", err)
+	}
+	if len(conn.jumps) != 1 {
+		t.Fatalf("jumps = %d, want 1", len(conn.jumps))
+	}
+	jumpClient := conn.jumps[0]
+
+	if err := conn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	// The jump client's underlying transport is closed too: a follow-up op
+	// on it must fail.
+	if _, err := jumpClient.Dial("tcp", targetAddr); err == nil {
+		t.Fatal("jump client still usable after Conn.Close — chain not fully closed")
+	}
+}
+
+// When the LAST hop of a 2-hop chain is unreachable (the jump is fine, but
+// the address it's asked to relay to refuses the connection), DialChain
+// reports the target's own classified error — exactly what Dial would
+// report for the same unreachable host — not a generic jump failure. This
+// also pins that a jumpless (1-element) chain behaves exactly like Dial, per
+// DialChain's doc comment: the same classification path is exercised at the
+// last hop regardless of chain length.
+func TestDialChainLastHopUnreachableClassifiesLikeDial(t *testing.T) {
+	jumpAddr, _ := newJumpTestServer(t)
+	jumpHost, jumpPort := splitHostPort(t, jumpAddr)
+	jumpSrv := domain.Server{Name: "jump", Host: jumpHost, Port: jumpPort, User: "x", AuthType: domain.AuthPassword}
+
+	// Nothing listens on port 1 — the jump's own net.Dial to it is refused.
+	deadSrv := domain.Server{Name: "dead", Host: "127.0.0.1", Port: 1, User: "x", AuthType: domain.AuthPassword}
+
+	creds := Credentials{Password: "pw"}
+	chain := []Hop{
+		{Server: jumpSrv, Creds: creds},
+		{Server: deadSrv, Creds: creds},
+	}
+
+	conn, err := dialerFor(t, true).DialChain(context.Background(), chain)
+	if err == nil {
+		_ = conn.Close()
+		t.Fatal("DialChain succeeded dialing a dead address, want error")
+	}
+	if conn != nil {
+		t.Fatalf("conn = %+v, want nil on failure", conn)
+	}
+	assertCode(t, err, domain.CodeConnRefused)
+}
+
+// When the MIDDLE hop of a 3-hop chain is unreachable, DialChain reports a
+// jump failure naming that hop (CodeJumpFailed) — the caller reached the
+// first jump fine, but that jump can't relay to the next one. Nothing is
+// left open: the first hop's client is closed before DialChain returns.
+func TestDialChainMiddleHopFailureIsJumpFailed(t *testing.T) {
+	jump1Addr, _ := newJumpTestServer(t)
+	jump1Host, jump1Port := splitHostPort(t, jump1Addr)
+	jump1Srv := domain.Server{Name: "jump1", Host: jump1Host, Port: jump1Port, User: "x", AuthType: domain.AuthPassword}
+
+	// jump2 is a dead address: jump1 can reach it at the TCP level (or
+	// rather, fails to) when asked to relay to it — this is the "middle hop
+	// fails" case, distinct from the last-hop case above.
+	deadJump2 := domain.Server{Name: "jump2", Host: "127.0.0.1", Port: 1, User: "x", AuthType: domain.AuthPassword}
+
+	targetSrv := domain.Server{Name: "target", Host: "127.0.0.1", Port: 2, User: "x", AuthType: domain.AuthPassword}
+
+	creds := Credentials{Password: "pw"}
+	chain := []Hop{
+		{Server: jump1Srv, Creds: creds},
+		{Server: deadJump2, Creds: creds},
+		{Server: targetSrv, Creds: creds},
+	}
+
+	conn, err := dialerFor(t, true).DialChain(context.Background(), chain)
+	if err == nil {
+		_ = conn.Close()
+		t.Fatal("DialChain succeeded through a dead middle hop, want error")
+	}
+	if conn != nil {
+		t.Fatalf("conn = %+v, want nil on failure", conn)
+	}
+	assertCode(t, err, domain.CodeJumpFailed)
+	if !strings.Contains(err.Error(), "jump2") {
+		t.Fatalf("error %q should name the failing hop %q", err.Error(), "jump2")
+	}
+}
+
 func assertCode(t *testing.T, err error, code string) {
 	t.Helper()
 	var de *domain.Error

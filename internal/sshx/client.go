@@ -133,7 +133,26 @@ func (d *Dialer) Test(ctx context.Context, srv domain.Server, creds Credentials)
 // The TCP dial itself is bounded separately by dialTimeout — shorter than
 // the ctx (handshakeDeadline) so an unreachable host fails fast without
 // waiting out the prompt-sized ceiling.
+//
+// It is a thin wrapper over tcpDial + handshake, the same two steps
+// DialChain uses per hop — single-host Dial and chain dialing share one
+// handshake path.
 func (d *Dialer) dial(ctx context.Context, addr string, cfg *ssh.ClientConfig) (*ssh.Client, error) {
+	raw, err := d.tcpDial(ctx, addr)
+	if err != nil {
+		return nil, err
+	}
+	client, err := d.handshake(ctx, raw, addr, cfg)
+	if err != nil {
+		_ = raw.Close()
+		return nil, err
+	}
+	return client, nil
+}
+
+// tcpDial is the root-hop TCP dial, bounded by the live dial timeout (or its
+// override from SetDialTimeoutProvider).
+func (d *Dialer) tcpDial(ctx context.Context, addr string) (net.Conn, error) {
 	to := d.dialTimeout
 	if d.dialTimeoutFn != nil {
 		if v := d.dialTimeoutFn(); v > 0 {
@@ -141,10 +160,33 @@ func (d *Dialer) dial(ctx context.Context, addr string, cfg *ssh.ClientConfig) (
 		}
 	}
 	nd := net.Dialer{Timeout: to}
-	raw, err := nd.DialContext(ctx, "tcp", addr)
-	if err != nil {
-		return nil, err
+	return nd.DialContext(ctx, "tcp", addr)
+}
+
+// dialThrough opens a TCP conn to addr THROUGH an existing ssh client (the
+// jump host), racing ctx so a hung jump-dial is abandoned when the overall
+// deadline fires.
+func dialThrough(ctx context.Context, via *ssh.Client, addr string) (net.Conn, error) {
+	type res struct {
+		c   net.Conn
+		err error
 	}
+	ch := make(chan res, 1)
+	go func() { c, err := via.Dial("tcp", addr); ch <- res{c, err} }()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case r := <-ch:
+		return r.c, r.err
+	}
+}
+
+// handshake runs the SSH banner/kex over raw, aborting on ctx cancel by
+// closing raw (the existing watcher pattern from dial). raw is owned by the
+// returned client on success; on failure the caller must close raw itself —
+// handshake never closes it so a caller with its own retry/cleanup policy
+// (chain dialing) stays in control.
+func (d *Dialer) handshake(ctx context.Context, raw net.Conn, addr string, cfg *ssh.ClientConfig) (*ssh.Client, error) {
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -156,7 +198,6 @@ func (d *Dialer) dial(ctx context.Context, addr string, cfg *ssh.ClientConfig) (
 	}()
 	c, chans, reqs, err := ssh.NewClientConn(raw, addr, cfg)
 	if err != nil {
-		_ = raw.Close()
 		return nil, err
 	}
 	client := ssh.NewClient(c, chans, reqs)
@@ -173,6 +214,127 @@ func (d *Dialer) dial(ctx context.Context, addr string, cfg *ssh.ClientConfig) (
 		return nil, err
 	}
 	return client, nil
+}
+
+// Hop is one server in a jump chain plus its resolved credentials.
+type Hop struct {
+	Server domain.Server
+	Creds  Credentials
+}
+
+// Conn is a live SSH connection, possibly reached through jump hops. Client is
+// the target. Close closes the target first, then each jump client in reverse
+// (target-side first), so no hop is orphaned.
+type Conn struct {
+	Client *ssh.Client
+	jumps  []*ssh.Client // root .. last-jump (target excluded)
+}
+
+// Close closes the target client, then each jump client nearest-to-target
+// first. It returns the first error encountered, if any, but always attempts
+// every close so a failure on one hop never leaks the rest.
+func (c *Conn) Close() error {
+	var err error
+	if c.Client != nil {
+		err = c.Client.Close()
+	}
+	for i := len(c.jumps) - 1; i >= 0; i-- {
+		if e := c.jumps[i].Close(); e != nil && err == nil {
+			err = e
+		}
+	}
+	return err
+}
+
+// DialChain dials chain[0] directly (TCP), then each subsequent hop THROUGH the
+// previous hop's client, running the full auth + host-key flow at every hop.
+// chain is ordered root-first, target-last (len >= 1). A jumpless server is a
+// 1-element chain and behaves exactly like Dial. On any hop's failure every
+// already-opened client is closed and a CodeJumpFailed error names the hop
+// (the last hop keeps its own classified error instead, matching Dial).
+func (d *Dialer) DialChain(ctx context.Context, chain []Hop) (*Conn, error) {
+	if len(chain) == 0 {
+		return nil, domain.NewError(domain.CodeJumpFailed, "Empty connection chain.")
+	}
+	ctx, cancel := context.WithTimeout(ctx, d.handshakeDeadline)
+	defer cancel()
+
+	var opened []*ssh.Client
+	closeAll := func() {
+		for i := len(opened) - 1; i >= 0; i-- {
+			_ = opened[i].Close()
+		}
+	}
+
+	for i, hop := range chain {
+		cfg, err := d.clientConfig(hop)
+		if err != nil {
+			closeAll()
+			return nil, err
+		}
+		addr := net.JoinHostPort(hop.Server.Host, strconv.Itoa(hop.Server.Port))
+
+		var raw net.Conn
+		if i == 0 {
+			raw, err = d.tcpDial(ctx, addr)
+		} else {
+			raw, err = dialThrough(ctx, opened[i-1], addr)
+		}
+		if err != nil {
+			closeAll()
+			// The target (last hop) keeps its own classified error, exactly
+			// like Dial would for the same failure — this is what makes a
+			// 1-element (jumpless) chain behave exactly like Dial per the
+			// doc comment above. Earlier hops are jump failures: the
+			// connectivity problem is between two hops the caller never
+			// dialed directly, so it's reported as the named hop failing to
+			// relay, not misattributed to the caller's own network.
+			if i == len(chain)-1 {
+				return nil, classifyDialError(err)
+			}
+			return nil, jumpError(chain, i, err)
+		}
+
+		client, err := d.handshake(ctx, raw, addr, cfg)
+		if err != nil {
+			_ = raw.Close()
+			closeAll()
+			// Same last-hop-vs-jump split as above, for a handshake (auth /
+			// host-key) failure instead of a raw TCP/relay failure.
+			if i == len(chain)-1 {
+				return nil, classifyDialError(err)
+			}
+			return nil, jumpError(chain, i, err)
+		}
+		opened = append(opened, client)
+	}
+
+	return &Conn{Client: opened[len(opened)-1], jumps: opened[:len(opened)-1]}, nil
+}
+
+// clientConfig builds the per-hop ssh.ClientConfig (auth + host-key callback +
+// pinned host-key algorithms), the same way Dial does for a single host.
+func (d *Dialer) clientConfig(hop Hop) (*ssh.ClientConfig, error) {
+	methods, err := AuthMethods(hop.Server, hop.Creds)
+	if err != nil {
+		return nil, err
+	}
+	addr := net.JoinHostPort(hop.Server.Host, strconv.Itoa(hop.Server.Port))
+	cfg := &ssh.ClientConfig{User: hop.Server.User, Auth: methods, HostKeyCallback: d.verifier.Callback()}
+	if algos := d.verifier.HostKeyAlgorithms(addr); len(algos) > 0 {
+		cfg.HostKeyAlgorithms = algos
+	}
+	return cfg, nil
+}
+
+// jumpError wraps a hop failure with the hop's name for the UI.
+func jumpError(chain []Hop, i int, err error) error {
+	name := chain[i].Server.Name
+	if name == "" {
+		name = chain[i].Server.Host
+	}
+	return domain.NewError(domain.CodeJumpFailed,
+		fmt.Sprintf("Could not connect to jump host %q: %v", name, err))
 }
 
 // classifyDialError maps a dial/handshake failure to a coded domain error.
