@@ -310,6 +310,74 @@ func TestStopIsLeakFree(t *testing.T) {
 	}
 }
 
+// TestStopIsPromptWithConnectionHeldOpen proves the other half of leak-free
+// teardown that TestStopIsLeakFree doesn't reach: that closes the tunneled
+// conn BEFORE calling Stop, so no pipe() copy is actually in flight when
+// Stop's r.wg.Wait() runs. Here the tunneled connection is left OPEN across
+// Stop, so both of pipe()'s io.Copy goroutines are genuinely parked in a
+// blocking Read (one on the forward's accepted conn, one on the SSH-dialed
+// conn to the echo server) at the moment Stop runs. The only thing that can
+// unblock those Reads is Stop closing r.conn out from under them (see Stop's
+// doc comment); if that mechanism ever regressed — e.g. someone reordered
+// Stop's teardown, or made it wait before closing conn — Stop would hang on
+// r.wg.Wait() until the OS's own TCP idle/keepalive behavior eventually gave
+// up (which, unbounded, could be a very long time). The 5s timeout below
+// turns that into a fast, deterministic test failure instead of a wedged
+// test run, so a regression of I1/I2's promptness guarantees fails loudly.
+func TestStopIsPromptWithConnectionHeldOpen(t *testing.T) {
+	echoAddr := echoServer(t)
+	sshAddr, hostKey := startForwardingSSHServer(t)
+	conn := dialConn(t, sshAddr, hostKey)
+
+	bindPort := freePort(t)
+	fwd := domain.PortForward{
+		ID: "hold-open", Type: domain.ForwardLocal,
+		BindAddr: "127.0.0.1", BindPort: bindPort,
+		DestHost: "127.0.0.1", DestPort: splitPort(t, echoAddr),
+	}
+
+	m := NewManager(nil)
+	if err := m.Start(fwd, conn); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	c, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(bindPort)), 2*time.Second)
+	if err != nil {
+		t.Fatalf("dial forward bind addr: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+
+	// Drive one round trip so accept() has actually spawned the per-connection
+	// copy goroutine and pipe() is running (not just the bare accept loop),
+	// then deliberately leave c OPEN: both io.Copy directions inside pipe()
+	// are now blocked waiting for more data that never comes, until Stop
+	// closes the underlying conns.
+	if _, err := c.Write([]byte("ping")); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	buf := make([]byte, 4)
+	_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if _, err := io.ReadFull(c, buf); err != nil {
+		t.Fatalf("read echo: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- m.Stop(fwd.ID) }()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Stop: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not return within 5s with a tunneled connection held open across it — pipe()'s blocked Read likely didn't unblock (conn.Close() regression)")
+	}
+
+	if got := m.Status(fwd.ID); got.State != StateStopped {
+		t.Fatalf("Status after Stop = %+v, want stopped", got)
+	}
+}
+
 func TestStartBindErrorAlreadyInUse(t *testing.T) {
 	occupied, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

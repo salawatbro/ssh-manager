@@ -8,6 +8,7 @@
 package forward
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -41,11 +42,24 @@ type Status struct {
 // runner holds one live tunnel's goroutine coordination. wg tracks every
 // goroutine the tunnel spawns — the accept loop and every per-connection copy
 // — so Stop's wg.Wait() only returns once all of them have actually exited.
+//
+// A runner is published into Manager.runs the moment Start reserves the
+// forward ID, BEFORE the (possibly slow) network listen completes — see
+// Start's doc comment. Until the listen finishes, listener is nil: that's
+// the signal (checked only under m.mu) that this runner is still a
+// reservation, not a live tunnel. conn and quit/ctx/cancel are set at
+// construction, before the runner is ever published, so every goroutine that
+// later reads them via a m.mu-guarded map lookup sees a fully-initialized
+// value (Go's mutex Lock/Unlock gives that publication a happens-before
+// edge) — only listener is filled in later, under m.mu, once the listen
+// succeeds.
 type runner struct {
 	listener net.Listener
 	conn     *sshx.Conn
 	wg       sync.WaitGroup
-	quit     chan struct{} // closed by Stop to mark the shutdown as deliberate
+	quit     chan struct{}   // closed by Stop to mark the shutdown as deliberate
+	ctx      context.Context // cancelled by Stop; bounds per-connection dials so they can't outlive the runner
+	cancel   context.CancelFunc
 }
 
 // Manager owns all live forwards. It takes ownership of each conn passed to
@@ -68,12 +82,41 @@ func NewManager(emit func(Status)) *Manager {
 // listen failure here, a later accept error, or a call to Stop/StopAll. The
 // one exception is the "already running" error below: Start never touched
 // conn, so ownership never transferred and the caller keeps it.
+//
+// The network listen (net.Listen for -L, conn.Client.Listen for -R) happens
+// OUTSIDE m.mu. For -R that's an SSH "tcpip-forward" round-trip with no
+// timeout, and m.mu guards Stop/StopAll/Status/Running/every other Start —
+// holding it across an unbounded remote round-trip would let one hung -R
+// Start freeze the whole Manager. Instead:
+//
+//  1. Under m.mu: fail fast if fwd.ID is already occupied — either a live
+//     runner or another Start's in-flight reservation — otherwise publish a
+//     placeholder *runner (listener still nil) into m.runs so a concurrent
+//     Start(same ID) sees it and fails fast too.
+//  2. Outside m.mu: do the listen.
+//  3. Under m.mu again: confirm the placeholder we published is STILL the
+//     one in m.runs (pointer identity, not just "some entry exists" — a
+//     racing Stop can free the ID and let a brand-new Start reserve it
+//     before we get back here, and mistaking that newer reservation for our
+//     own would finalize the wrong runner or double-finalize). If it's ours,
+//     finalize on success or clean up on failure. If it's NOT ours, a
+//     concurrent Stop won the race (see Stop's doc comment for its half of
+//     this handshake): roll back whatever we just created and do not touch
+//     m.runs or m.status — Stop already reported StateStopped for this ID,
+//     and clobbering that with a late StateError/StateRunning here would
+//     show a stale status (or, worse, race a brand-new Start's own report).
 func (m *Manager) Start(fwd domain.PortForward, conn *sshx.Conn) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	r := &runner{conn: conn, quit: make(chan struct{}), ctx: ctx, cancel: cancel}
+
 	m.mu.Lock()
 	if _, ok := m.runs[fwd.ID]; ok {
 		m.mu.Unlock()
+		cancel()
 		return fmt.Errorf("forward %s already running", fwd.ID)
 	}
+	m.runs[fwd.ID] = r // reservation: r.listener is nil until finalized below
+	m.mu.Unlock()
 
 	bind := net.JoinHostPort(fwd.BindAddr, itoa(fwd.BindPort))
 	dest := net.JoinHostPort(fwd.DestHost, itoa(fwd.DestPort))
@@ -88,20 +131,30 @@ func (m *Manager) Start(fwd domain.PortForward, conn *sshx.Conn) error {
 	default:
 		err = fmt.Errorf("unknown forward type %q", fwd.Type)
 	}
-	if err != nil {
-		// Held m.mu since the map check above so a concurrent Start for the
-		// same fwd.ID can't race the listen call, but it MUST be released
-		// before report: report locks m.mu itself, and Go's sync.Mutex is
-		// not reentrant — calling report while still holding the lock here
-		// would self-deadlock.
+
+	m.mu.Lock()
+	cur, stillOurs := m.runs[fwd.ID]
+	stillOurs = stillOurs && cur == r
+	if !stillOurs {
+		// A concurrent Stop removed our reservation before we finished
+		// listening (or failing to). It already tore down and reported;
+		// we just clean up what we made and stay quiet.
 		m.mu.Unlock()
+		if err == nil {
+			_ = ln.Close()
+		}
+		_ = conn.Close()
+		return fmt.Errorf("forward %s: stopped before start completed", fwd.ID)
+	}
+	if err != nil {
+		delete(m.runs, fwd.ID)
+		m.mu.Unlock()
+		cancel()
 		_ = conn.Close()
 		m.report(fwd.ID, StateError, err.Error())
 		return err
 	}
-
-	r := &runner{listener: ln, conn: conn, quit: make(chan struct{})}
-	m.runs[fwd.ID] = r
+	r.listener = ln
 	r.wg.Add(1)
 	m.mu.Unlock()
 
@@ -120,7 +173,7 @@ func (m *Manager) accept(fwd domain.PortForward, r *runner, dest string) {
 			select {
 			case <-r.quit: // deliberate Stop — not a real error, don't report one
 			default:
-				m.report(fwd.ID, StateError, err.Error())
+				m.selfTeardown(fwd.ID, r, err.Error())
 			}
 			return
 		}
@@ -131,9 +184,17 @@ func (m *Manager) accept(fwd domain.PortForward, r *runner, dest string) {
 			var out net.Conn
 			var derr error
 			if fwd.Type == domain.ForwardLocal {
-				out, derr = r.conn.Client.Dial("tcp", dest) // -L: remote side
+				// -L: remote side. Client.Dial itself blocks uncancellably,
+				// but conn.Close() (Stop) already unblocks it, so ctx here
+				// is a low-cost belt-and-suspenders, not a strict need.
+				out, derr = r.conn.Client.DialContext(r.ctx, "tcp", dest)
 			} else {
-				out, derr = net.Dial("tcp", dest) // -R: local side
+				// -R: local side. Plain net.Dial has no way to be
+				// interrupted short of its OS-level connect timeout
+				// (~1-2 min against an unreachable dest), which would stall
+				// Stop's r.wg.Wait() behind it. DialContext bounds it to
+				// r.ctx, cancelled the moment Stop runs.
+				out, derr = (&net.Dialer{}).DialContext(r.ctx, "tcp", dest)
 			}
 			if derr != nil {
 				return
@@ -142,6 +203,41 @@ func (m *Manager) accept(fwd domain.PortForward, r *runner, dest string) {
 			pipe(in, out)
 		}()
 	}
+}
+
+// selfTeardown handles an accept loop that died from an unexpected (non-Stop)
+// Accept error: without it, the runner's conn/map entry would stay live
+// until someone happened to call Stop, silently leaking the SSH connection.
+//
+// It uses the exact same "whoever deletes the map entry owns teardown"
+// handshake as Stop (see Stop's doc comment): at most one of {selfTeardown,
+// a concurrently-running Stop} can win the delete for a given id, and only
+// the winner tears down and reports. This must NOT call r.wg.Wait() —
+// accept() itself is one of the goroutines r.wg is tracking, and it hasn't
+// returned yet (this call is still on its stack), so waiting here would
+// deadlock waiting on its own completion. Closing r.conn is enough to drop
+// any in-flight per-connection copies; they unblock and finish (and call
+// their own r.wg.Done()) independently, with nothing left needing to wait on
+// them synchronously.
+func (m *Manager) selfTeardown(id string, r *runner, detail string) {
+	m.mu.Lock()
+	cur, ok := m.runs[id]
+	won := ok && cur == r
+	if won {
+		delete(m.runs, id)
+	}
+	m.mu.Unlock()
+	if !won {
+		// A concurrent Stop already claimed this id; it owns teardown and
+		// will report StateStopped. Reporting StateError here too would be
+		// racy with that report (and could clobber a fresher status from a
+		// brand-new Start that reused the id after Stop freed it).
+		return
+	}
+	r.cancel()
+	_ = r.listener.Close() // mirrors Stop's teardown; Accept() already failed on it, but this releases the fd for certain
+	_ = r.conn.Close()
+	m.report(id, StateError, detail)
 }
 
 // pipe copies a<->b until either direction ends (EOF or error), then closes
@@ -184,6 +280,21 @@ func pipe(a, b net.Conn) {
 // Stop tears the forward down: closes the listener and conn (dropping any
 // in-flight tunneled connections), waits for every goroutine the runner
 // spawned to exit, then reports stopped. Stopping an unknown id is a no-op.
+//
+// The map lookup-and-delete is the exactly-once handshake this package uses
+// wherever two goroutines could both try to own the same runner's teardown
+// (see also selfTeardown, and Start's "stillOurs" check): whichever caller
+// actually finds and deletes m.runs[id] under m.mu is the one that tears it
+// down and reports; a caller that finds the entry already gone treats it as
+// a no-op rather than risk a double-close or a double report.
+//
+// This also runs correctly against a runner Start hasn't finished starting
+// yet (r.listener still nil, r.wg count still 0 — see Start's doc comment):
+// closing r.conn here still unblocks a -R Start that's mid-listen (an SSH
+// global request fails once the underlying connection closes), so the
+// in-flight Start observes the lost reservation and rolls back on its own
+// when it eventually returns. r.wg.Wait() returns immediately since nothing
+// has Add()ed to it yet, so Stop stays prompt either way.
 func (m *Manager) Stop(id string) error {
 	m.mu.Lock()
 	r, ok := m.runs[id]
@@ -195,8 +306,11 @@ func (m *Manager) Stop(id string) error {
 		return nil
 	}
 	close(r.quit)
-	_ = r.listener.Close()
-	_ = r.conn.Close() // drops in-flight tunneled conns, unblocking any pipe() still running
+	r.cancel() // unblocks any in-flight -R per-conn dial waiting in DialContext
+	if r.listener != nil {
+		_ = r.listener.Close()
+	}
+	_ = r.conn.Close() // drops in-flight tunneled conns (and, if Start is still mid-listen, the listen itself)
 	r.wg.Wait()        // no goroutine leak: every accept/copy goroutine has now exited
 	m.report(id, StateStopped, "")
 	return nil
@@ -226,12 +340,19 @@ func (m *Manager) Status(id string) Status {
 	return Status{ForwardID: id}
 }
 
-// Running lists the status of every currently-running forward.
+// Running lists the status of every currently-running forward. A forward
+// whose Start is still mid-listen (see Start's doc comment: reserved in
+// m.runs but r.listener not yet set) is deliberately excluded — it isn't
+// actually running yet, and reporting it as such would be a regression from
+// before Start's reservation was published ahead of the listen.
 func (m *Manager) Running() []Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := make([]Status, 0, len(m.runs))
-	for id := range m.runs {
+	for id, r := range m.runs {
+		if r.listener == nil {
+			continue
+		}
 		if st, ok := m.status[id]; ok {
 			out = append(out, st)
 			continue
