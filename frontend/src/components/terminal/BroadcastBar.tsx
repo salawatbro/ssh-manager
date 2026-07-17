@@ -34,7 +34,7 @@ export function BroadcastBar({ tab }: { tab: Tab }) {
     if (sessionIds.length === 0) return
 
     const doBroadcast = () => {
-      void SSHService.Broadcast(sessionIds, strToB64(text + '\r'))
+      void SSHService.Broadcast(sessionIds, strToB64(text + '\r')).catch(() => {})
       setText('')
     }
 

@@ -3,6 +3,7 @@ import { resolveAction } from '../lib/keymap'
 import { usePalette } from '../stores/palette'
 import { useSettings } from '../stores/settings'
 import { useSnippets } from '../stores/snippets'
+import { useGuard } from '../stores/guard'
 
 // App-level hotkeys, always active (not terminal-scoped): open the palette and
 // New server. Uses the shared resolveAction so macOS ⌘K/⌘N and Windows
@@ -11,7 +12,8 @@ export function useAppKeymap(onNewServer: () => void) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const action = resolveAction(e)
-      if (action === 'palette') {
+      // Never stack a palette over an open guard confirmation.
+      if (action === 'palette' && !useGuard.getState().open) {
         e.preventDefault()
         usePalette.getState().toggle()
       } else if (action === 'new-server' && !usePalette.getState().open) {
@@ -20,7 +22,7 @@ export function useAppKeymap(onNewServer: () => void) {
       } else if (action === 'settings') {
         e.preventDefault()
         useSettings.getState().show()
-      } else if (action === 'snippets' && !usePalette.getState().open) {
+      } else if (action === 'snippets' && !usePalette.getState().open && !useGuard.getState().open) {
         e.preventDefault()
         useSnippets.getState().show()
       }

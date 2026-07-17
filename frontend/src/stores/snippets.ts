@@ -149,7 +149,7 @@ export const useSnippets = create<SnippetsState>((set, get) => ({
     const { sessionId, server } = target
 
     const send = () => {
-      void SSHService.Write(sessionId, strToB64(snippet.body + '\r'))
+      void SSHService.Write(sessionId, strToB64(snippet.body + '\r')).catch(() => {})
     }
 
     const settings = useSettings.getState().settings

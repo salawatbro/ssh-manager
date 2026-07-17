@@ -57,7 +57,10 @@ export function GuardModal() {
   if (!open) return null
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+    // z-[60]: strictly above every other overlay (CommandPalette,
+    // SnippetPalette, SettingsModal, ImportPreview, ServerContextMenu's
+    // popup all use z-50) so a confirmation can never be painted over.
+    <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/50">
       <div className="w-[460px] rounded-[9px] border border-borderStrong bg-bg2 p-[20px] shadow-[0_20px_60px_rgba(0,0,0,.45)]">
         <div className="text-[15px] font-semibold text-text">Confirm on production</div>
         <div className="mt-[3px] truncate break-all font-mono text-[12px] text-textMuted">{command}</div>

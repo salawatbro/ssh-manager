@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useSessions } from '../stores/sessions'
 import { usePalette } from '../stores/palette'
 import { useSnippets } from '../stores/snippets'
+import { useGuard } from '../stores/guard'
 import { resolveAction } from '../lib/keymap'
 
 // Terminal-scoped keymap (split / close pane / switch tab / snippet
@@ -14,11 +15,13 @@ export function useTerminalKeymap() {
     function onKey(e: KeyboardEvent) {
       const action = resolveAction(e)
       if (action === null) return
-      // Both overlays own the keyboard while open — mirrors the command
+      // All three overlays own the keyboard while open — mirrors the command
       // palette's existing gate; the snippet palette gets the same one so a
       // ⌘⇧<digit> typed while browsing/filtering it doesn't ALSO fire a
-      // quick-slot run underneath.
-      if (usePalette.getState().open || useSnippets.getState().open) return
+      // quick-slot run underneath. The guard modal is included too: while a
+      // confirmation is up, split/close/tab-switch/quick-slot must not fire
+      // underneath it.
+      if (usePalette.getState().open || useSnippets.getState().open || useGuard.getState().open) return
       const st = useSessions.getState()
       const active = st.tabs.find((t) => t.id === st.activeTabId)
       if (!active) return
