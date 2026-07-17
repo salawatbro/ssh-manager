@@ -163,7 +163,7 @@ func TestServeSOCKSDialFailureRepliesConnectionRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantErr := &net.OpError{Op: "dial", Err: net.UnknownNetworkError("refused")}
-	dial := func(addr string) (net.Conn, error) { return nil, wantErr }
+	dial := func(_ string) (net.Conn, error) { return nil, wantErr }
 	quit := make(chan struct{})
 	var wg sync.WaitGroup
 	wg.Add(1)
