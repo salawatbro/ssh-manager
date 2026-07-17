@@ -7,7 +7,6 @@ import { useServers } from '../../stores/servers'
 import { AuthType, Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { KeyInfo } from '@bindings/github.com/salawat/sshmgr/internal/sshx'
 import { useTestConnection } from '../../hooks/useTestConnection'
-import { ForwardEditor } from './ForwardEditor'
 import { ServerFormFields } from './ServerFormFields'
 import { TestConnectionStrip } from './TestConnectionStrip'
 
@@ -154,9 +153,6 @@ export function ServerForm({ serverId, onClose }: Props) {
         detectedKeys={detectedKeys}
         serverId={serverId}
       />
-
-      {/* Forwards need a persisted server_id FK — nothing to edit yet. */}
-      {serverId && <ForwardEditor serverId={serverId} />}
 
       <TestConnectionStrip result={testResult} testing={testing} />
 

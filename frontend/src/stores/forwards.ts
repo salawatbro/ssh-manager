@@ -7,7 +7,7 @@ import type { Status } from '@bindings/github.com/salawat/sshmgr/internal/forwar
 
 // A forward's live state, keyed by forward id. Populated by the
 // forward:status event stream (see `listen` below) and read by
-// ForwardEditor's status dot and TunnelsPanel.
+// TunnelCard's status dot and toggle.
 export type ForwardStatus = { state: string; detail: string }
 
 interface ForwardsState {
@@ -22,9 +22,9 @@ interface ForwardsState {
   stop: (id: string) => Promise<string | null>
   // listen wires the forward:status event once, at app mount, and returns an
   // unsubscribe — mirrors hostkey.ts's `listen`. Registering at mount (not
-  // inside ForwardEditor/TunnelsPanel) avoids the emit-before-listener drop:
-  // Start's tunnel can begin accepting, and emitting status, before any
-  // per-server view happens to be mounted to hear it.
+  // inside TunnelsPanel) avoids the emit-before-listener drop: Start's
+  // tunnel can begin accepting, and emitting status, before any per-server
+  // view happens to be mounted to hear it.
   listen: () => () => void
 }
 
@@ -34,7 +34,7 @@ export const useForwards = create<ForwardsState>((set, get) => ({
 
   // Best-effort like servers.ts's detectKeys: a failed load must not crash
   // the caller's useEffect — fall back to an empty list for that server so
-  // ForwardEditor still has something to render.
+  // TunnelsPanel still has something to render.
   load: async (serverID) => {
     try {
       const list = (await ForwardService.List(serverID)) ?? []
@@ -80,7 +80,7 @@ export const useForwards = create<ForwardsState>((set, get) => ({
   // Mirrors remove/create: unwrap .message for the RuntimeError-prefix
   // reason. No optimistic statusById write here — the forward:status event
   // this triggers on the backend drives the real state, so a Start error is
-  // just surfaced to the caller (e.g. ForwardEditor's row) as text.
+  // just surfaced to the caller (e.g. TunnelCard's toggle) as text.
   start: async (id) => {
     try {
       await ForwardService.Start(id)

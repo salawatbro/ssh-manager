@@ -9,6 +9,7 @@ interface Props {
   y: number
   onClose: () => void
   onEdit: () => void
+  onTunnels: () => void
 }
 
 // FR-01.8: right-click menu — Open terminal, Edit, Duplicate, Copy SSH
@@ -21,7 +22,7 @@ interface Props {
 // inline: the first click arms it ("Delete server?", already red), the
 // second commits and closes the menu. Same pattern the user already knows
 // from the form, no extra navigation.
-export function ServerContextMenu({ server, x, y, onClose, onEdit }: Props) {
+export function ServerContextMenu({ server, x, y, onClose, onEdit, onTunnels }: Props) {
   const duplicate = useServers((s) => s.duplicate)
   const copySSHCommand = useServers((s) => s.copySSHCommand)
   const remove = useServers((s) => s.remove)
@@ -57,6 +58,13 @@ export function ServerContextMenu({ server, x, y, onClose, onEdit }: Props) {
       label: 'Edit',
       run: () => {
         onEdit()
+        onClose()
+      },
+    },
+    {
+      label: 'Tunnels',
+      run: () => {
+        onTunnels()
         onClose()
       },
     },

@@ -27,10 +27,15 @@ function validPort(p: number | ''): boolean {
   return p !== '' && p >= 1 && p <= 65535
 }
 
-// Add/edit form for one PortForward, inline in ForwardEditor's list.
+// Add/edit form for one PortForward, opened from a TunnelCard in
+// TunnelsPanel (replacing that card in place) or appended when adding.
 // Validation mirrors domain.PortForward.Validate (name/bindAddr/destHost
 // required, both ports 1-65535) so a bad row never round-trips to the
 // backend just to bounce off SEC-08's server-side re-validation.
+//
+// Delete lives here rather than on the card (mirrors ServerForm, which owns
+// its own Delete rather than putting it on ServerRow) — only shown when
+// editing an existing forward.
 export function ForwardForm({ serverId, initial, onDone }: Props) {
   const [name, setName] = useState(initial?.name ?? '')
   const [type, setType] = useState<ForwardType>(initial?.type ?? ForwardType.ForwardLocal)
@@ -40,6 +45,22 @@ export function ForwardForm({ serverId, initial, onDone }: Props) {
   const [destPort, setDestPort] = useState<number | ''>(initial?.destPort ?? '')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // Mirrors ServerForm's confirmDelete: first click arms it, second confirms
+  // — a saved forward has no undo, so a stray click must not remove it.
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  async function onDelete() {
+    if (!initial) return
+    if (!confirmDelete) {
+      setConfirmDelete(true)
+      return
+    }
+    setSaving(true)
+    const err = await useForwards.getState().remove(initial.id, serverId)
+    setSaving(false)
+    if (err) setError(err)
+    else onDone()
+  }
 
   async function onSave() {
     if (!name) return setError('The forward needs a name.')
@@ -139,6 +160,18 @@ export function ForwardForm({ serverId, initial, onDone }: Props) {
       {error && <span className="text-[11px] text-stFailed">{error}</span>}
 
       <div className="flex items-center gap-[6px]">
+        {initial && (
+          <button
+            type="button"
+            onClick={() => void onDelete()}
+            disabled={saving}
+            className={`h-[26px] shrink-0 rounded-[5px] border px-[10px] text-[11.5px] font-medium disabled:opacity-50 ${
+              confirmDelete ? 'border-stFailed bg-stFailed text-bg0' : 'border-border text-stFailed'
+            }`}
+          >
+            {confirmDelete ? 'Confirm?' : 'Delete'}
+          </button>
+        )}
         <button
           type="button"
           onClick={onDone}

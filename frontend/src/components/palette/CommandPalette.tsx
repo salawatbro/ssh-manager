@@ -13,11 +13,15 @@ export function CommandPalette({
   onOpenTunnels,
 }: {
   onNewServer: () => void
-  onOpenTunnels: () => void
+  // TunnelsPanel is per-server (dizayn manbasi: MainWindow.dc.html
+  // panel=tunnels), so the palette can only offer it for the currently
+  // selected server — see the `selectedId` filter below.
+  onOpenTunnels: (id: string) => void
 }) {
   const open = usePalette((s) => s.open)
   const hide = usePalette((s) => s.hide)
   const servers = useServers((s) => s.servers)
+  const selectedId = useServers((s) => s.selectedId)
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
 
@@ -26,10 +30,12 @@ export function CommandPalette({
     const ql = q.trim().toLowerCase()
     const commands: PaletteRowData[] = [
       { kind: 'command' as const, id: 'new-server', label: 'New server', run: onNewServer },
-      { kind: 'command' as const, id: 'tunnels', label: 'Tunnels', run: onOpenTunnels },
+      ...(selectedId
+        ? [{ kind: 'command' as const, id: 'tunnels', label: 'Tunnels', run: () => onOpenTunnels(selectedId) }]
+        : []),
     ].filter((c) => !ql || c.label.toLowerCase().includes(ql))
     return [...serverRows, ...commands]
-  }, [servers, q, onNewServer, onOpenTunnels])
+  }, [servers, q, onNewServer, onOpenTunnels, selectedId])
 
   useEffect(() => {
     setI(0)

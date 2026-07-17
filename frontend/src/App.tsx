@@ -9,6 +9,7 @@ import { CommandPalette } from './components/palette/CommandPalette'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { ImportPreview } from './components/palette/ImportPreview'
 import { TunnelsPanel } from './components/forwards/TunnelsPanel'
+import { StatusDot } from './components/server/StatusDot'
 import { useAppKeymap } from './hooks/useAppKeymap'
 import { useServers } from './stores/servers'
 import { useHostKey } from './stores/hostkey'
@@ -21,7 +22,10 @@ export default function App() {
   const selectedId = useServers((s) => s.selectedId)
   const select = useServers((s) => s.select)
   const [adding, setAdding] = useState(false)
-  const [tunnelsOpen, setTunnelsOpen] = useState(false)
+  // TunnelsPanel is per-server (dizayn manbasi: MainWindow.dc.html
+  // panel=tunnels) and shares ServerForm's 392px right-hand slot, so only
+  // one of the two is ever open — see the mutual-exclusion effect below.
+  const [tunnelsFor, setTunnelsFor] = useState<string | null>(null)
 
   const hostKeyRequest = useHostKey((s) => s.request)
   const confirmHostKey = useHostKey((s) => s.confirm)
@@ -57,6 +61,14 @@ export default function App() {
   const formOpen = adding || selectedId !== null
   const formFor = adding ? null : selectedId
 
+  // Both panels live in the same 392px right-hand slot — whenever the edit
+  // form opens (from any of its several entry points: a row click, the
+  // context menu's Edit, "Add server", …), close the tunnels panel rather
+  // than tracking every one of those call sites individually.
+  useEffect(() => {
+    if (formOpen) setTunnelsFor(null)
+  }, [formOpen])
+
   function closeForm() {
     setAdding(false)
     select(null)
@@ -65,6 +77,11 @@ export default function App() {
   function openAdd() {
     select(null)
     setAdding(true)
+  }
+
+  function openTunnelsFor(id: string) {
+    closeForm()
+    setTunnelsFor(id)
   }
 
   useAppKeymap(openAdd)
@@ -85,7 +102,7 @@ export default function App() {
       <div className="drag h-[52px] shrink-0 border-b border-border bg-bg1b" />
 
       <div className="flex min-h-0 flex-1">
-        {servers.length > 0 && <Sidebar onAdd={openAdd} />}
+        {servers.length > 0 && <Sidebar onAdd={openAdd} onOpenTunnels={openTunnelsFor} />}
         {servers.length === 0 && !formOpen ? (
           <EmptyState onAdd={openAdd} />
         ) : (
@@ -95,18 +112,36 @@ export default function App() {
             internal state (including confirmDelete) always starts fresh —
             see ServerForm's effect comment for why this matters. */}
         {formOpen && <ServerForm key={formFor ?? 'new'} serverId={formFor} onClose={closeForm} />}
+        {/* Mutually exclusive with the form above (the effect near
+            openTunnelsFor enforces it) — both occupy the same 392px slot. key
+            remounts per target server so TunnelsPanel's `editing` state
+            (add/edit-in-place) never carries over from one server to the next. */}
+        {tunnelsFor && (
+          <TunnelsPanel key={tunnelsFor} serverId={tunnelsFor} onClose={() => setTunnelsFor(null)} />
+        )}
       </div>
 
-      {/* TZ 12.1: 26px status bar */}
+      {/* TZ 12.1: 26px status bar. The tunnels segment mirrors the design's
+          static dot + count, but stays clickable when a server is selected —
+          it opens TunnelsPanel for that server in place of the old global
+          popover (removed: that view had no single server to scope to). */}
       <div className="flex h-[26px] shrink-0 items-center border-t border-border bg-bg1b px-[12px] text-[11.5px] text-textDim">
         <span>{servers.length} servers</span>
-        <button
-          type="button"
-          onClick={() => setTunnelsOpen((v) => !v)}
-          className="ml-[14px] hover:text-text"
-        >
-          {runningTunnels} tunnels
-        </button>
+        {selectedId ? (
+          <button
+            type="button"
+            onClick={() => openTunnelsFor(selectedId)}
+            className="ml-[14px] flex items-center gap-[5px] hover:text-text"
+          >
+            <StatusDot status={runningTunnels > 0 ? 'connected' : 'disc'} size={6} />
+            {runningTunnels} tunnels
+          </button>
+        ) : (
+          <span className="ml-[14px] flex items-center gap-[5px]">
+            <StatusDot status={runningTunnels > 0 ? 'connected' : 'disc'} size={6} />
+            {runningTunnels} tunnels
+          </span>
+        )}
       </div>
 
       {/* key={hostKeyRequest.requestID} remounts the modal per request, so a
@@ -121,10 +156,9 @@ export default function App() {
         <HostKeyChangedModal key={hostKeyRequest.requestID} request={hostKeyRequest} onConfirm={confirmHostKey} />
       )}
 
-      <CommandPalette onNewServer={openAdd} onOpenTunnels={() => setTunnelsOpen(true)} />
+      <CommandPalette onNewServer={openAdd} onOpenTunnels={openTunnelsFor} />
       <SettingsModal />
       <ImportPreview />
-      {tunnelsOpen && <TunnelsPanel onClose={() => setTunnelsOpen(false)} />}
     </div>
   )
 }

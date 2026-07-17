@@ -11,7 +11,12 @@ interface MenuState {
   y: number
 }
 
-export function ServerList() {
+interface Props {
+  // Opens TunnelsPanel for the given server id (App.tsx's `tunnelsFor`).
+  onOpenTunnels: (id: string) => void
+}
+
+export function ServerList({ onOpenTunnels }: Props) {
   const servers = useServers((s) => s.servers)
   const selectedId = useServers((s) => s.selectedId)
   const select = useServers((s) => s.select)
@@ -36,6 +41,7 @@ export function ServerList() {
               selected={s.id === selectedId}
               onSelect={() => select(s.id)}
               onContextMenu={(x, y) => setMenu({ server: s, x, y })}
+              onTunnels={() => onOpenTunnels(s.id)}
             />
           ))}
         </div>
@@ -47,6 +53,7 @@ export function ServerList() {
           y={menu.y}
           onClose={() => setMenu(null)}
           onEdit={() => select(menu.server.id)}
+          onTunnels={() => onOpenTunnels(menu.server.id)}
         />
       )}
     </div>
