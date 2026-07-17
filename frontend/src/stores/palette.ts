@@ -1,10 +1,14 @@
 import { create } from 'zustand'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import type { Status } from '../lib/status'
 
 // A palette row is either a server (Enter opens its terminal) or a command
 // (Enter runs it). Commands are supplied by the CommandPalette from app state.
+// `status` (UI-11 status circle) is derived once in CommandPalette from the
+// live sessions store, so PaletteRow only ever renders it — it never reaches
+// into stores/sessions itself.
 export type PaletteRowData =
-  | { kind: 'server'; server: Server }
+  | { kind: 'server'; server: Server; status: Status }
   | { kind: 'command'; id: string; label: string; run: () => void }
 
 interface PaletteState {
