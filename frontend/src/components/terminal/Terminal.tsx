@@ -9,17 +9,18 @@ import { isMac } from '../../lib/platform'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { useSettings } from '../../stores/settings'
 import { useSessions } from '../../stores/sessions'
-import { PaneError } from './PaneError'
+import { PaneNotice } from './PaneNotice'
 import { FindBar } from './FindBar'
 
 interface Props {
   paneId: string
+  tabId: string
   serverId: string
   focused: boolean
   onFocus: () => void
 }
 
-export function Terminal({ paneId, serverId, focused, onFocus }: Props) {
+export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<SearchAddon | null>(null)
   const [term, setTerm] = useState<XTerm | null>(null)
@@ -144,6 +145,13 @@ export function Terminal({ paneId, serverId, focused, onFocus }: Props) {
   // unmount (pane close) does.
   useEffect(() => () => useSessions.getState().clearPaneDims(paneId), [paneId])
 
+  // A clean shell exit (`exit`/Ctrl-D) closes the pane automatically, like a
+  // real terminal (iTerm) — no reconnect notice. closePane also closes the
+  // tab when this was its last leaf.
+  useEffect(() => {
+    if (session.status === 'exited') useSessions.getState().closePane(tabId, paneId)
+  }, [session.status, tabId, paneId])
+
   function find(query: string, dir: 'next' | 'prev') {
     const s = searchRef.current
     if (!s || !query) return
@@ -164,7 +172,7 @@ export function Terminal({ paneId, serverId, focused, onFocus }: Props) {
       <div ref={hostRef} className="h-full w-full p-[6px]" />
       {findOpen && <FindBar onFind={find} onClose={() => setFindOpen(false)} />}
       {(session.status === 'error' || session.status === 'closed') && (
-        <PaneError
+        <PaneNotice
           kind={session.status === 'error' ? 'failed' : 'dropped'}
           message={session.message}
           onAction={session.retry}

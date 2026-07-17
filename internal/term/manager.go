@@ -149,7 +149,13 @@ func (m *Manager) pumpLoop(sessionID string, r *runner, dataCh <-chan []byte) {
 		case chunk, ok := <-dataCh:
 			if !ok {
 				emit() // flush the tail before the close notice
-				m.shutdown(sessionID, r, true, domain.CodeSessionClosed, "Connection lost.")
+				code, msg := domain.CodeSessionClosed, "Connection lost."
+				if w, ok := r.pty.(interface{ WaitExitClean() bool }); ok && w.WaitExitClean() {
+					// A clean shell exit (exit 0/N, or Ctrl-D) — no notice; the
+					// frontend closes the pane the way a real terminal would.
+					code, msg = "", ""
+				}
+				m.shutdown(sessionID, r, true, code, msg)
 				return
 			}
 			acc = append(acc, chunk...)

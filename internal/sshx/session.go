@@ -1,6 +1,7 @@
 package sshx
 
 import (
+	"errors"
 	"io"
 	"sync"
 
@@ -100,6 +101,20 @@ func (s *Session) KeepAlive() error {
 
 // Wait blocks until the remote shell exits.
 func (s *Session) Wait() error { return s.sess.Wait() }
+
+// WaitExitClean blocks until the shell exits and reports whether it ended as
+// a clean process exit (exit 0 OR a non-zero status — the user's shell simply
+// ended) versus an unexpected drop (no exit status / transport gone). Call
+// once, after Read has returned io.EOF. Wait is used nowhere else, so this is
+// the sole consumer.
+func (s *Session) WaitExitClean() bool {
+	err := s.sess.Wait()
+	if err == nil {
+		return true
+	}
+	var ee *ssh.ExitError
+	return errors.As(err, &ee)
+}
 
 // Close closes the session and the whole connection (target + jumps), once.
 // Safe to call from several goroutines (the manager's shutdown races

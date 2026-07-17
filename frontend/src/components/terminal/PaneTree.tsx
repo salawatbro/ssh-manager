@@ -11,6 +11,7 @@ export function PaneTree({ node, tabId, focusedPaneId }: { node: PaneNode; tabId
     return (
       <Terminal
         paneId={node.id}
+        tabId={tabId}
         serverId={node.serverId}
         focused={focusedPaneId === node.id}
         onFocus={() => focusPane(tabId, node.id)}

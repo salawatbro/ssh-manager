@@ -157,7 +157,9 @@ func TestKeepAliveFailureClosesSession(t *testing.T) {
 	}
 }
 
-// EOF from Read (remote shell exit) also emits closed.
+// EOF from Read (remote shell exit) also emits closed. A pty that doesn't
+// implement WaitExitClean (like fakePTY) can't be told apart from a drop, so
+// it must default to the abnormal-close values.
 func TestReaderEOFClosesSession(t *testing.T) {
 	e := &capEmitter{}
 	m := NewManager(e, 15*time.Millisecond, time.Hour)
@@ -169,6 +171,61 @@ func TestReaderEOFClosesSession(t *testing.T) {
 		s, ok := e.lastState()
 		return ok && s.State == StateClosed
 	})
+	s, _ := e.lastState()
+	if s.Code != "ERR_SESSION_CLOSED" {
+		t.Fatalf("pty without WaitExitClean should be treated as a drop, got %+v", s)
+	}
+}
+
+// fakePTYWait wraps fakePTY and adds WaitExitClean, so pumpLoop's EOF
+// classification takes the "ask the pty" branch instead of defaulting to a
+// drop.
+type fakePTYWait struct {
+	*fakePTY
+	clean bool
+}
+
+func (f fakePTYWait) WaitExitClean() bool { return f.clean }
+
+// A clean shell exit (WaitExitClean()==true — `exit`/Ctrl-D/exit N) closes the
+// session with an empty Code/Message: the frontend's signal to close the pane
+// silently, like a real terminal, instead of showing a reconnect notice.
+func TestReaderEOFCleanExitEmitsEmptyCode(t *testing.T) {
+	e := &capEmitter{}
+	m := NewManager(e, 15*time.Millisecond, time.Hour)
+	pty := fakePTYWait{fakePTY: newFakePTY(), clean: true}
+	m.Add("s1", pty)
+	_ = pty.Close() // closes chunks → Read returns EOF
+
+	waitFor(t, 2*time.Second, func() bool {
+		s, ok := e.lastState()
+		return ok && s.State == StateClosed
+	})
+	s, _ := e.lastState()
+	if s.Code != "" || s.Message != "" {
+		t.Fatalf("clean exit should carry no code/message, got %+v", s)
+	}
+}
+
+// A shell that ends without a clean exit status (WaitExitClean()==false — no
+// exit status, transport gone) is still classified as a drop:
+// ERR_SESSION_CLOSED, the same as today, so the frontend still offers
+// Reconnect.
+func TestReaderEOFUncleanExitEmitsSessionClosed(t *testing.T) {
+	e := &capEmitter{}
+	m := NewManager(e, 15*time.Millisecond, time.Hour)
+	pty := fakePTYWait{fakePTY: newFakePTY(), clean: false}
+	m.Add("s1", pty)
+	_ = pty.Close() // closes chunks → Read returns EOF
+
+	waitFor(t, 2*time.Second, func() bool {
+		s, ok := e.lastState()
+		return ok && s.State == StateClosed
+	})
+	s, _ := e.lastState()
+	if s.Code != "ERR_SESSION_CLOSED" {
+		t.Fatalf("unclean exit should be classified as a drop, got %+v", s)
+	}
 }
 
 // Write base64-decodes and reaches the pty; a bad id errors.

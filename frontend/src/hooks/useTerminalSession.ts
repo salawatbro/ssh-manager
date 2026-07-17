@@ -5,7 +5,11 @@ import type { Terminal } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import { b64ToBytes, strToB64 } from '../lib/termbytes'
 
-export type TermStatus = 'connecting' | 'connected' | 'error' | 'closed'
+// 'exited' is a clean shell exit (`exit`/Ctrl-D/`exit N`) — the pane closes
+// itself, no notice. 'closed' is an abnormal drop (dead peer, connection
+// lost) — the pane shows an inline Reconnect notice over the scrollback.
+// 'error' is a connect failure (open never succeeded) — inline Retry.
+export type TermStatus = 'connecting' | 'connected' | 'error' | 'closed' | 'exited'
 export interface TermSession {
   status: TermStatus
   message: string
@@ -14,9 +18,10 @@ export interface TermSession {
 
 // useTerminalSession owns one PTY session for a mounted xterm: it Opens on the
 // backend, streams term:data in seq order, forwards input and resizes, and
-// surfaces open-failure / drop as a status the pane renders as PaneError.
-// `retry` re-runs the whole effect (a fresh Open) — used by both Retry (open
-// failure) and Reconnect (drop), which are the same operation.
+// surfaces open-failure / drop / clean-exit as a status. Terminal renders
+// 'error'/'closed' as an inline PaneNotice and closes the pane itself on
+// 'exited'. `retry` re-runs the whole effect (a fresh Open) — used by both
+// Retry (open failure) and Reconnect (drop), which are the same operation.
 export function useTerminalSession(serverId: string, term: Terminal | null, fit: FitAddon | null): TermSession {
   const [status, setStatus] = useState<TermStatus>('connecting')
   const [message, setMessage] = useState('')
@@ -32,7 +37,7 @@ export function useTerminalSession(serverId: string, term: Terminal | null, fit:
     let expected = 1
     const pending = new Map<number, Uint8Array>()
     const preBuffer: Array<{ sessionID: string; seq: number; data: string }> = []
-    const statePreBuffer: Array<{ sessionID: string; state: string; message: string }> = []
+    const statePreBuffer: Array<{ sessionID: string; state: string; code: string; message: string }> = []
 
     setStatus('connecting')
     setMessage('')
@@ -70,18 +75,27 @@ export function useTerminalSession(serverId: string, term: Terminal | null, fit:
       }
       if (o.sessionID === myId) ingest(o.seq, o.data)
     })
+    // A closed event with an empty Code is a clean shell exit (backend's
+    // manager.pumpLoop only clears Code/Message on WaitExitClean==true) — the
+    // pane closes itself, no notice. Anything else is an abnormal drop.
+    const applyClosed = (code: string, message: string) => {
+      if (code === '') {
+        setStatus('exited')
+      } else {
+        setStatus('closed')
+        setMessage(message || 'The connection was lost.')
+      }
+    }
+
     const offState = Events.On('session:state', (ev) => {
-      const s = ev.data as { sessionID: string; state: string; message: string }
+      const s = ev.data as { sessionID: string; state: string; code: string; message: string }
       if (myId === null) {
         statePreBuffer.push(s)
         if (statePreBuffer.length > 256) statePreBuffer.shift()
         return
       }
       if (s.sessionID !== myId) return
-      if (s.state === 'closed') {
-        setStatus('closed')
-        setMessage(s.message || 'The connection was lost.')
-      }
+      if (s.state === 'closed') applyClosed(s.code, s.message)
     })
 
     void SSHService.Open(serverId)
@@ -103,10 +117,7 @@ export function useTerminalSession(serverId: string, term: Terminal | null, fit:
         // Apply the last such event for us so the pane doesn't get stuck
         // showing 'connected' with no way to reconnect.
         const closedEvent = statePreBuffer.find((s) => s.sessionID === id && s.state === 'closed')
-        if (closedEvent) {
-          setStatus('closed')
-          setMessage(closedEvent.message || 'The connection was lost.')
-        }
+        if (closedEvent) applyClosed(closedEvent.code, closedEvent.message)
         statePreBuffer.length = 0
         fit?.fit() // fires onResize → sizes the remote pty to the real layout
       })

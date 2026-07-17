@@ -170,6 +170,10 @@ const termToStatus: Record<TermStatus, Status> = {
   connected: 'connected',
   error: 'failed',
   closed: 'disc',
+  // Transient: Terminal closes the pane on the same render pass this status
+  // lands, so the tab strip rarely shows it — 'disc' is the closest steady
+  // state if it's ever observed mid-teardown.
+  exited: 'disc',
 }
 
 // tabStatus collapses a tab's pane statuses into the single dot the title
