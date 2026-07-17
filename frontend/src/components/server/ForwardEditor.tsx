@@ -16,8 +16,15 @@ interface Props {
 // open at a time.
 type Editing = PortForward | 'new' | null
 
+// A stable empty fallback. Zustand v5 wraps React's useSyncExternalStore with
+// NO selector memoization, so returning a fresh `[]` from the selector on every
+// getSnapshot (the state before `load` populates byServer[serverId]) would fail
+// React's snapshot-consistency check and spin an infinite render loop. One
+// shared reference keeps the snapshot stable until real data lands.
+const NO_FORWARDS: PortForward[] = []
+
 export function ForwardEditor({ serverId }: Props) {
-  const forwards = useForwards((s) => s.byServer[serverId] ?? [])
+  const forwards = useForwards((s) => s.byServer[serverId] ?? NO_FORWARDS)
   const [editing, setEditing] = useState<Editing>(null)
 
   useEffect(() => {

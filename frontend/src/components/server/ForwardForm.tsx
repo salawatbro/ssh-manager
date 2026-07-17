@@ -103,8 +103,12 @@ export function ForwardForm({ serverId, initial, onDone }: Props) {
           <span className={label}>Bind port</span>
           <input
             className={`${field} font-mono`}
+            inputMode="numeric"
             value={bindPort}
-            onChange={(e) => setBindPort(e.target.value === '' ? '' : Number(e.target.value))}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, '')
+              setBindPort(v === '' ? '' : Number(v))
+            }}
           />
         </div>
       </div>
@@ -122,8 +126,12 @@ export function ForwardForm({ serverId, initial, onDone }: Props) {
           <span className={label}>Destination port</span>
           <input
             className={`${field} font-mono`}
+            inputMode="numeric"
             value={destPort}
-            onChange={(e) => setDestPort(e.target.value === '' ? '' : Number(e.target.value))}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, '')
+              setDestPort(v === '' ? '' : Number(v))
+            }}
           />
         </div>
       </div>
