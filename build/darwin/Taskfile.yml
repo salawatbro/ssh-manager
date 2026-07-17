@@ -191,3 +191,36 @@ tasks:
       - task: package
     cmds:
       - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}.app" --notarize {{.CLI_ARGS}}
+
+  dmg:
+    summary: Builds a drag-to-install DMG from the ad-hoc-signed .app (macOS only)
+    vars:
+      VERSION: "1.0.0"        # keep in sync with build/config.yml `version`
+      VOLNAME: "SSH Manager"
+      STAGING: "{{.BIN_DIR}}/dmg-staging"
+      DMG_OUT: "{{.BIN_DIR}}/SSH Manager-{{.VERSION}}.dmg"
+    deps:
+      - task: package
+    cmds:
+      - task: '{{if eq OS "darwin"}}dmg:build{{else}}dmg:skip{{end}}'
+
+  dmg:build:
+    internal: true
+    vars:
+      VERSION: "1.0.0"
+      VOLNAME: "SSH Manager"
+      STAGING: "{{.BIN_DIR}}/dmg-staging"
+      DMG_OUT: "{{.BIN_DIR}}/SSH Manager-{{.VERSION}}.dmg"
+    cmds:
+      - rm -rf "{{.STAGING}}" "{{.DMG_OUT}}"
+      - mkdir -p "{{.STAGING}}"
+      - cp -R "{{.BIN_DIR}}/{{.APP_NAME}}.app" "{{.STAGING}}/{{.VOLNAME}}.app"
+      - ln -s /Applications "{{.STAGING}}/Applications"
+      - hdiutil create -volname "{{.VOLNAME}}" -srcfolder "{{.STAGING}}" -ov -format UDZO "{{.DMG_OUT}}"
+      - rm -rf "{{.STAGING}}"
+      - 'echo "Built {{.DMG_OUT}}"'
+
+  dmg:skip:
+    internal: true
+    cmds:
+      - 'echo "Skipping DMG (hdiutil is macOS-only). Build on macOS."'
