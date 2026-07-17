@@ -14,12 +14,14 @@ export function Sidebar({ onAdd, onOpenTunnels }: Props) {
     <div className="flex w-[220px] shrink-0 flex-col border-r border-border bg-bg1">
       {/* Search box (dizayn manbasi: MainWindow.dc.html sidebar, ~28px, bottom
           divider): not a second search implementation — the ⌘K palette is
-          the real search, so clicking OR focusing this just opens it. */}
+          the real search, so clicking (or keyboard-activating) this just opens
+          it. No onFocus handler: closing the palette returns focus here, which
+          would re-open it in an unclosable loop; a button already fires onClick
+          on Enter/Space, so keyboard users are covered. */}
       <div className="shrink-0 border-b border-border p-[8px]">
         <button
           type="button"
           onClick={() => usePalette.getState().show()}
-          onFocus={() => usePalette.getState().show()}
           className="no-drag flex h-[28px] w-full items-center gap-[7px] rounded-[5px] border border-border bg-bg0 px-[8px] text-left"
         >
           <Search size={13} strokeWidth={2.2} className="shrink-0 text-textDim" />
