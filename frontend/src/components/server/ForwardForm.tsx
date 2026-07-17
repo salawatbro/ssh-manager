@@ -83,7 +83,10 @@ export function ForwardForm({ serverId, initial, onDone }: Props) {
       bindAddr,
       bindPort: bindPort as number,
       destHost,
-      destPort: destPort as number,
+      // Dynamic (-D) never validates destPort above, so a fresh Dynamic
+      // form can still be '' here (its untouched initial state) — send 0
+      // rather than the literal empty string to the int-typed wire field.
+      destPort: destPort === '' ? 0 : destPort,
     }
     const err = initial
       ? await useForwards.getState().update(input)
