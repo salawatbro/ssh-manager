@@ -16,7 +16,9 @@ interface Props {
 // One tunnel row in TunnelsPanel (dizayn manbasi: MainWindow.dc.html
 // panel=tunnels): a type badge, name + mono `bindPort → destHost:destPort`
 // subtitle, a status circle, and a 28×16 toggle that starts/stops the
-// tunnel. The badge and name only light up (accentDim / text) while the
+// tunnel. Dynamic (-D) forwards have no fixed destination, so their
+// subtitle reads `SOCKS5 · bindAddr:bindPort` instead. The badge and name
+// only light up (accentDim / text) while the
 // tunnel is actually running — a card whose last start attempt errored
 // still shows its toggle in the "off" position, matching the design's
 // broken-forward example.
@@ -52,14 +54,20 @@ export function TunnelCard({ forward, status, onEdit }: Props) {
             running ? 'bg-accentDim text-accentFg' : 'border border-border text-textDim'
           }`}
         >
-          {forward.type === ForwardType.ForwardLocal ? '-L' : '-R'}
+          {forward.type === ForwardType.ForwardLocal
+            ? '-L'
+            : forward.type === ForwardType.ForwardRemote
+              ? '-R'
+              : '-D'}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
           <span className={`truncate text-[12.5px] ${running ? 'text-text' : 'text-textMuted'}`}>
             {forward.name}
           </span>
           <span className="truncate font-mono text-[11px] text-textDim">
-            {forward.bindPort} → {forward.destHost}:{forward.destPort}
+            {forward.type === ForwardType.ForwardDynamic
+              ? `SOCKS5 · ${forward.bindAddr}:${forward.bindPort}`
+              : `${forward.bindPort} → ${forward.destHost}:${forward.destPort}`}
           </span>
         </div>
         <StatusDot status={forwardDotStatus(status?.state)} size={6} />

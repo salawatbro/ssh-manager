@@ -6,6 +6,7 @@ import { ForwardType } from '@bindings/github.com/salawat/sshmgr/internal/domain
 import type { PortForward } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { ForwardInput } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { useForwards } from '../../stores/forwards'
+import { DestFields } from './DestFields'
 
 interface Props {
   serverId: string
@@ -21,6 +22,7 @@ const label = 'text-[10.5px] font-medium text-textMuted'
 const types: { value: ForwardType; label: string }[] = [
   { value: ForwardType.ForwardLocal, label: 'Local (-L)' },
   { value: ForwardType.ForwardRemote, label: 'Remote (-R)' },
+  { value: ForwardType.ForwardDynamic, label: 'Dynamic (-D)' },
 ]
 
 function validPort(p: number | ''): boolean {
@@ -66,8 +68,10 @@ export function ForwardForm({ serverId, initial, onDone }: Props) {
     if (!name) return setError('The forward needs a name.')
     if (!bindAddr) return setError('The bind address is required.')
     if (!validPort(bindPort)) return setError('The bind port must be between 1 and 65535.')
-    if (!destHost) return setError('The destination host is required.')
-    if (!validPort(destPort)) return setError('The destination port must be between 1 and 65535.')
+    if (type !== ForwardType.ForwardDynamic) {
+      if (!destHost) return setError('The destination host is required.')
+      if (!validPort(destPort)) return setError('The destination port must be between 1 and 65535.')
+    }
 
     setError(null)
     setSaving(true)
@@ -134,28 +138,20 @@ export function ForwardForm({ serverId, initial, onDone }: Props) {
         </div>
       </div>
 
-      <div className="flex gap-[6px]">
-        <div className="flex flex-[2] flex-col gap-[4px]">
-          <span className={label}>Destination host</span>
-          <input
-            className={`${field} font-mono`}
-            value={destHost}
-            onChange={(e) => setDestHost(e.target.value)}
-          />
+      {type === ForwardType.ForwardDynamic ? (
+        <div className="rounded-[5px] border border-border bg-bg1 px-[8px] py-[6px] text-[11px] text-textDim">
+          SOCKS5 proxy on {bindAddr || '127.0.0.1'}:{bindPort}
         </div>
-        <div className="flex flex-1 flex-col gap-[4px]">
-          <span className={label}>Destination port</span>
-          <input
-            className={`${field} font-mono`}
-            inputMode="numeric"
-            value={destPort}
-            onChange={(e) => {
-              const v = e.target.value.replace(/\D/g, '')
-              setDestPort(v === '' ? '' : Number(v))
-            }}
-          />
-        </div>
-      </div>
+      ) : (
+        <DestFields
+          field={field}
+          label={label}
+          destHost={destHost}
+          setDestHost={setDestHost}
+          destPort={destPort}
+          setDestPort={setDestPort}
+        />
+      )}
 
       {error && <span className="text-[11px] text-stFailed">{error}</span>}
 
