@@ -8,10 +8,10 @@ info:
   companyName: "Salawat" # The name of the company
   productName: "SSH Manager" # The name of the application
   productIdentifier: "uz.salawat.sshmgr" # The unique product identifier
-  description: "A program that does X" # The application description
-  copyright: "(c) 2025, My Company" # Copyright text
+  description: "Local-first SSH connection manager for macOS — servers, jump hosts, tunnels, and a built-in terminal." # The application description
+  copyright: "(c) 2026 Salawat" # Copyright text
   comments: "Local SSH connection manager." # Comments
-  version: "0.0.1" # The application version
+  version: "1.0.0" # The application version
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"
