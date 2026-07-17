@@ -100,7 +100,7 @@ func TestDialReturnsLiveClientAndSessionEchoes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
-	sess, err := OpenSession(client, 80, 24)
+	sess, err := OpenSession(&Conn{Client: client}, 80, 24)
 	if err != nil {
 		t.Fatalf("OpenSession: %v", err)
 	}

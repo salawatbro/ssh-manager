@@ -46,6 +46,19 @@ func (d *fakeDialer) Dial(_ context.Context, _ domain.Server, creds sshx.Credent
 	return nil, d.dialErr
 }
 
+// DialChain mirrors Dial: it never touches a live connection, only records
+// that a chain was dialed and returns dialErr. No test in this package
+// exercises SSHService.Open (that orchestration lives in
+// ssh_service_test.go), so this only needs to keep fakeDialer satisfying the
+// Dialer interface.
+func (d *fakeDialer) DialChain(_ context.Context, chain []sshx.Hop) (*sshx.Conn, error) {
+	if len(chain) > 0 {
+		d.seen = chain[len(chain)-1].Creds
+	}
+	d.dialed = true
+	return nil, d.dialErr
+}
+
 func newService(t *testing.T) *ServerService {
 	t.Helper()
 	svc, _ := newServiceWithRepo(t)

@@ -60,6 +60,7 @@ type TestResult struct {
 type Dialer interface {
 	Test(ctx context.Context, srv domain.Server, creds sshx.Credentials) (sshx.DialResult, error)
 	Dial(ctx context.Context, srv domain.Server, creds sshx.Credentials) (*ssh.Client, error)
+	DialChain(ctx context.Context, chain []sshx.Hop) (*sshx.Conn, error)
 }
 
 // ServerService is bound to the frontend as ServerService.

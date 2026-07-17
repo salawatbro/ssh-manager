@@ -50,19 +50,19 @@ func (s *SSHService) Open(serverID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	creds, err := credsFor(s.secret, srv)
+	chain, err := resolveChain(s.repo, s.secret, srv)
 	if err != nil {
-		return "", err // coded (auth / keychain) — dialer never called
+		return "", err // coded (auth / keychain / jump cycle / jump depth)
 	}
 
-	client, err := s.dialer.Dial(context.Background(), *srv, creds)
-	// SEC-10: drop the plaintext secrets the instant the handshake is done.
-	creds.Password, creds.Passphrase = "", ""
+	conn, err := s.dialer.DialChain(context.Background(), chain)
+	// SEC-10: drop every hop's plaintext secrets the instant dialing is done.
+	zeroChainCreds(chain)
 	if err != nil {
-		return "", err // Dial already classified it
+		return "", err // DialChain already classified it
 	}
 
-	sess, err := sshx.OpenSession(client, 0, 0) // OpenSession closes client on error
+	sess, err := sshx.OpenSession(conn, 0, 0) // OpenSession closes conn (target+jumps) on error
 	if err != nil {
 		return "", domain.NewError(domain.CodeConnRefused, "Connected, but the server would not open a shell.")
 	}
