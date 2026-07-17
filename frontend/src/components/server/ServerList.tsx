@@ -33,7 +33,11 @@ export function ServerList({ onOpenTunnels }: Props) {
         // the literal string "Ungrouped" a user could name a group — only the
         // label shown below folds '' into "Ungrouped".
         <div key={g.group}>
-          <GroupHeader group={g.group || 'Ungrouped'} count={g.servers.length} />
+          <GroupHeader
+            group={g.group || 'Ungrouped'}
+            count={g.servers.length}
+            env={g.servers[0].environment}
+          />
           {g.servers.map((s) => (
             <ServerRow
               key={s.id}
