@@ -29,7 +29,10 @@ export function Create($in: $models.ForwardInput): $CancellablePromise<domain$0.
 }
 
 /**
- * Delete removes a saved forward definition.
+ * Delete removes a saved forward definition. It first stops any running tunnel
+ * for this id — otherwise deleting the definition would orphan the live tunnel,
+ * which keeps forwarding traffic until the app quits with no row left to stop
+ * it from. Stop is a no-op when nothing is running (Manager.Stop's contract).
  */
 export function Delete(id: string): $CancellablePromise<void> {
     return $Call.ByID(772879475, id);

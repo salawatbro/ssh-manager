@@ -90,8 +90,12 @@ func (s *ForwardService) Update(in ForwardInput) (*domain.PortForward, error) {
 	return s.repo.Get(fwd.ID)
 }
 
-// Delete removes a saved forward definition.
+// Delete removes a saved forward definition. It first stops any running tunnel
+// for this id — otherwise deleting the definition would orphan the live tunnel,
+// which keeps forwarding traffic until the app quits with no row left to stop
+// it from. Stop is a no-op when nothing is running (Manager.Stop's contract).
 func (s *ForwardService) Delete(id string) error {
+	_ = s.mgr.Stop(id)
 	return s.repo.Delete(id)
 }
 

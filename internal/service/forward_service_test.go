@@ -252,6 +252,29 @@ func (d *connReturningDialer) DialChain(_ context.Context, chain []sshx.Hop) (*s
 	return d.conn, d.dialErr
 }
 
+// Deleting a forward must stop its tunnel first, or the live tunnel is orphaned
+// (keeps forwarding with no row left to stop it from).
+func TestForwardDeleteStopsTunnel(t *testing.T) {
+	mgr := &fakeTunnelManager{}
+	svc, _, servers := newForwardService(t, &fakeDialer{}, mgr)
+	srv := mkServer(t, servers, "s1", nil)
+
+	created, err := svc.Create(validForwardInput(srv.ID))
+	if err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+	if err := svc.Delete(created.ID); err != nil {
+		t.Fatalf("Delete error = %v", err)
+	}
+	if mgr.stoppedID != created.ID {
+		t.Errorf("Delete stopped tunnel %q, want %q", mgr.stoppedID, created.ID)
+	}
+	list, _ := svc.List(srv.ID)
+	if len(list) != 0 {
+		t.Fatalf("List() = %d after Delete, want 0", len(list))
+	}
+}
+
 func TestForwardStopCallsManager(t *testing.T) {
 	mgr := &fakeTunnelManager{}
 	svc, _, _ := newForwardService(t, &fakeDialer{}, mgr)

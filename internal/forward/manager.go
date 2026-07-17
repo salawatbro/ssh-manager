@@ -113,6 +113,11 @@ func (m *Manager) Start(fwd domain.PortForward, conn *sshx.Conn) error {
 	if _, ok := m.runs[fwd.ID]; ok {
 		m.mu.Unlock()
 		cancel()
+		// The caller hands us ownership of conn. On this refusal we never
+		// store it, so close it here instead of leaking a freshly dialed,
+		// authenticated connection (matters in the concurrent double-Start
+		// TOCTOU the caller's guard can't cover).
+		_ = conn.Close()
 		return fmt.Errorf("forward %s already running", fwd.ID)
 	}
 	m.runs[fwd.ID] = r // reservation: r.listener is nil until finalized below
