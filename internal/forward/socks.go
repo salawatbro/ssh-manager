@@ -20,9 +20,9 @@ const (
 	socks5AtypDomain    = 0x03
 	socks5AtypIPv6      = 0x04
 	socks5RepSucceeded  = 0x00
+	socks5RepConnRefuse = 0x05
 	socks5RepCmdNotSupp = 0x07
 	socks5RepAtypNotSup = 0x08
-	socks5RepConnRefuse = 0x05
 )
 
 // serveSOCKS runs a SOCKS5 (no-auth, CONNECT-only) accept loop on ln. Each
@@ -40,20 +40,20 @@ const (
 //     before `go m.accept(...)` — serveSOCKS's own `defer wg.Done()` below
 //     is the matching Done() for that Add(1), not one it performs itself.
 //   - closes quit and ln to signal shutdown: closing ln is what actually
-//     unblocks the blocked Accept() call below (quit itself is never
-//     selected on inside this loop, exactly mirroring how accept() in
-//     manager.go is unblocked by listener.Close(), not by a select on
-//     r.quit) — quit is threaded through only so a caller wiring this into
-//     something with a quit-vs-error distinction (like the Manager) can
-//     inspect the SAME channel after serveSOCKS returns, to tell a
-//     deliberate shutdown apart from a real accept error.
+//     unblocks the blocked Accept() call below (mirroring how accept() in
+//     manager.go is unblocked by listener.Close()). quit is ALSO handed
+//     down to every per-connection goroutine (see handleSOCKSConn) because,
+//     unlike -L/-R, a -D connection can be blocked reading the SOCKS
+//     handshake from the client BEFORE any upstream/dial-derived conn
+//     exists — closing the listener or an eventual dial target does nothing
+//     for that goroutine, so quit is what a caller (Stop, via acceptDynamic)
+//     uses to unblock it directly.
 //
 // On ANY Accept() error (deliberate close or a real failure) the loop just
 // returns — same as manager.go's accept(), which doesn't retry either — so
 // the function always tears down cleanly regardless of which caused it.
 func serveSOCKS(ln net.Listener, dial func(addr string) (net.Conn, error), quit <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
-	_ = quit // see doc comment: interpreted by the caller after this returns, not selected on here
 	for {
 		c, err := ln.Accept()
 		if err != nil {
@@ -62,7 +62,7 @@ func serveSOCKS(ln net.Listener, dial func(addr string) (net.Conn, error), quit 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			handleSOCKSConn(c, dial)
+			handleSOCKSConn(c, dial, quit, wg)
 		}()
 	}
 }
@@ -72,8 +72,41 @@ func serveSOCKS(ln net.Listener, dial func(addr string) (net.Conn, error), quit 
 // both ways until the connection ends. c is always closed before returning
 // (directly on every early-return path, and via pipe's own close-both-ends
 // behavior on the success path).
-func handleSOCKSConn(c net.Conn, dial func(addr string) (net.Conn, error)) {
+//
+// A client that stalls anywhere in the handshake (the greeting, the
+// request, or mid-CONNECT) — a slow client, a paused handshake, or a bare
+// TCP health-check/port probe against the SOCKS port — would otherwise
+// block this goroutine's io.ReadFull calls forever: unlike -L/-R, where the
+// per-connection goroutine dials the Stop-closable SSH conn immediately
+// after Accept (so an idle client is unblocked transitively once Stop
+// closes it), -D must read from the client FIRST, before any upstream conn
+// exists to be closed. Nothing else in this package's teardown (closing the
+// listener, closing r.conn) touches this accepted conn's read, so a watcher
+// goroutine is started to close c the moment quit fires — the same "close
+// it out from under the blocked Read" mechanism pipe() and Stop already use
+// elsewhere, applied to the one conn neither of those reaches.
+//
+// The watcher is tracked in wg (a second Add/Done pair, same "nested Add
+// from an already-tracked goroutine" pattern Manager.acceptDynamic uses) so
+// Stop's r.wg.Wait() doesn't return until it, too, has exited — it always
+// does: `defer close(done)` guarantees the watcher observes done on every
+// return path of this function (success, any handshake rejection, or a
+// dial failure), and if quit fires first the watcher's own c.Close() is
+// what causes this function to return, closing done right after.
+func handleSOCKSConn(c net.Conn, dial func(addr string) (net.Conn, error), quit <-chan struct{}, wg *sync.WaitGroup) {
+	done := make(chan struct{})
+	defer close(done)
 	defer func() { _ = c.Close() }()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		select {
+		case <-quit:
+			_ = c.Close() // unblocks whichever Read/Write handleSOCKSConn is currently parked in
+		case <-done:
+		}
+	}()
 
 	// Greeting: VER(1) NMETHODS(1) METHODS(NMETHODS).
 	hdr := make([]byte, 2)

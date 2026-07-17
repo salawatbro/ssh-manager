@@ -626,3 +626,64 @@ func TestStopIsPromptWithConnectionHeldOpenDynamic(t *testing.T) {
 		t.Fatalf("Status after Stop = %+v, want stopped", got)
 	}
 }
+
+// TestStopIsPromptWithStalledDynamicHandshake is the Manager-integrated
+// counterpart to socks_test.go's TestServeSOCKSStalledHandshakeTeardown: it
+// proves Manager.Stop itself — not just serveSOCKS driven standalone — does
+// not hang when a -D client has connected but never sent a byte (a slow
+// client, a paused handshake, or a bare TCP health-check/port probe against
+// the SOCKS bind port).
+//
+// This is the scenario TestStopIsPromptWithConnectionHeldOpenDynamic does
+// NOT cover: that test completes a full handshake and a round trip before
+// holding the conn open, so it only exercises the pipe() phase, where
+// Stop's r.conn.Close() already unblocks things transitively through the
+// dialed upstream. Here the client is held open BEFORE any handshake byte
+// is sent — before dial is ever called — so nothing upstream-related exists
+// yet for r.conn.Close() to reach; the fix (a per-connection watcher that
+// closes the accepted conn on quit) is what Stop actually relies on for
+// this path.
+func TestStopIsPromptWithStalledDynamicHandshake(t *testing.T) {
+	sshAddr, hostKey := startForwardingSSHServer(t)
+	conn := dialConn(t, sshAddr, hostKey)
+
+	bindPort := freePort(t)
+	fwd := domain.PortForward{
+		ID: "hold-open-d-stalled", Type: domain.ForwardDynamic,
+		BindAddr: "127.0.0.1", BindPort: bindPort,
+	}
+
+	m := NewManager(nil)
+	if err := m.Start(fwd, conn); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	// Connect but send NOTHING — the per-connection goroutine stalls inside
+	// its very first read (the SOCKS greeting), before any dial ever
+	// happens.
+	stalled, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(bindPort)), 2*time.Second)
+	if err != nil {
+		t.Fatalf("dial socks bind addr: %v", err)
+	}
+	t.Cleanup(func() { _ = stalled.Close() })
+
+	// Give the accept loop a moment to actually accept it and spawn the
+	// per-connection goroutine before tearing down.
+	time.Sleep(50 * time.Millisecond)
+
+	done := make(chan error, 1)
+	go func() { done <- m.Stop(fwd.ID) }()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Stop: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not return within 5s with a stalled pre-handshake -D client held open — leaked goroutine / handshake-stall regression")
+	}
+
+	if got := m.Status(fwd.ID); got.State != StateStopped {
+		t.Fatalf("Status after Stop = %+v, want stopped", got)
+	}
+}

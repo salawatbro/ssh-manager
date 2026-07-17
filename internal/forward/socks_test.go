@@ -201,3 +201,56 @@ func TestServeSOCKSDialFailureRepliesConnectionRefused(t *testing.T) {
 		t.Fatalf("connect reply = % x, want VER=05 REP=05 (connection refused)", connReply)
 	}
 }
+
+// TestServeSOCKSStalledHandshakeTeardown covers the pre-dial handshake
+// stall: a client that opens the TCP connection but never sends a byte (a
+// slow client, a paused handshake, or a bare TCP health-check/port probe
+// against the SOCKS port) leaves its per-connection goroutine blocked in the
+// very first io.ReadFull (the SOCKS greeting) — BEFORE dial is ever called.
+//
+// Unlike the pipe phase (where an upstream conn eventually exists and
+// Stop's r.conn.Close() unblocks it transitively), nothing dial-related is
+// in play yet here: the accepted conn is a plain TCP conn from ln.Accept(),
+// unrelated to any upstream. Closing the listener (which only stops NEW
+// Accepts) does not touch it, so without an explicit unblock mechanism this
+// goroutine — and thus wg.Wait() — would hang forever if the stalled client
+// never sends or closes.
+//
+// This is deliberately unlike TestServeSOCKSProxiesTraffic (whose teardown
+// check runs AFTER a full handshake + round trip, past this window
+// entirely): it holds the conn open PRE-handshake, which is exactly the gap
+// that window leaves untested.
+func TestServeSOCKSStalledHandshakeTeardown(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dial := func(addr string) (net.Conn, error) { return net.Dial("tcp", addr) }
+	quit := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go serveSOCKS(ln, dial, quit, &wg)
+
+	stalled, err := net.DialTimeout("tcp", ln.Addr().String(), 2*time.Second)
+	if err != nil {
+		t.Fatalf("dial socks listener: %v", err)
+	}
+	t.Cleanup(func() { _ = stalled.Close() })
+
+	// Give the accept loop a moment to actually accept the conn and spawn
+	// its per-connection goroutine before tearing down, so the test
+	// genuinely exercises a goroutine parked mid-handshake rather than one
+	// that never started.
+	time.Sleep(50 * time.Millisecond)
+
+	close(quit)
+	_ = ln.Close()
+
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("serveSOCKS did not tear down within 5s with a stalled pre-handshake client conn — leaked goroutine (Stop would hang)")
+	}
+}
