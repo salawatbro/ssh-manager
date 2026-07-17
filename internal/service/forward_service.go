@@ -38,6 +38,10 @@ type tunnelManager interface {
 	Status(id string) forward.Status
 }
 
+// var _ tunnelManager = (*forward.Manager)(nil) locks the interface/impl
+// match at compile time, instead of only where main.go happens to wire them.
+var _ tunnelManager = (*forward.Manager)(nil)
+
 // ForwardService is bound to the frontend as ForwardService.
 type ForwardService struct {
 	repo    *store.ForwardRepo
@@ -97,12 +101,25 @@ func (s *ForwardService) Delete(id string) error {
 // ERR_NOT_FOUND, a bad jump chain is ERR_JUMP_CYCLE/ERR_JUMP_FAILED, a
 // dial failure keeps the dialer's classified code.
 //
-// On a mgr.Start failure the Manager has already closed conn (see
-// forward.Manager.Start's doc comment) — this must not double-close it.
+// The already-running check happens BEFORE the dial, not after: dialing is
+// a full jump-chain SSH handshake, and Manager.Start's "already running"
+// branch never touches (let alone closes) conn — per its doc comment,
+// ownership only transfers to the Manager once Start actually accepts the
+// forward. Dialing first and then hitting that branch would leak the freshly
+// authenticated connection, since nothing would ever close it. Checking
+// Status first avoids the wasted dial entirely.
+//
+// This has a benign TOCTOU: two concurrent Starts for the same id could both
+// pass the guard and both dial. That's acceptable for a single-user desktop
+// UI — the second one still fails, in mgr.Start, without leaking (see
+// below) — so no locking is added here for it.
 func (s *ForwardService) Start(id string) error {
 	fwd, err := s.repo.Get(id)
 	if err != nil {
 		return err
+	}
+	if s.mgr.Status(id).State == forward.StateRunning {
+		return domain.NewError(domain.CodeValidation, "This forward is already running.")
 	}
 	srv, err := s.servers.Get(fwd.ServerID)
 	if err != nil {
@@ -119,8 +136,13 @@ func (s *ForwardService) Start(id string) error {
 	if err != nil {
 		return err
 	}
+	// The guard above already covers the "already running" branch of
+	// Manager.Start, which is the one case where it does not take
+	// ownership of conn. Every other failure here (e.g. listen failure)
+	// does close conn per Manager.Start's doc comment, so this must not
+	// double-close it.
 	if err := s.mgr.Start(*fwd, conn); err != nil {
-		return err // Manager.Start already closed conn on failure
+		return err
 	}
 	return nil
 }

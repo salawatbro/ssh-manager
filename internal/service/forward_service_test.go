@@ -27,6 +27,10 @@ type fakeTunnelManager struct {
 	stopErr   error
 
 	running []forward.Status
+
+	// statusState is what Status(id) reports — used to drive the
+	// already-running guard in Start.
+	statusState forward.State
 }
 
 func (m *fakeTunnelManager) Start(fwd domain.PortForward, conn *sshx.Conn) error {
@@ -44,7 +48,7 @@ func (m *fakeTunnelManager) Stop(id string) error {
 func (m *fakeTunnelManager) Running() []forward.Status { return m.running }
 
 func (m *fakeTunnelManager) Status(id string) forward.Status {
-	return forward.Status{ForwardID: id}
+	return forward.Status{ForwardID: id, State: m.statusState}
 }
 
 // newForwardService wires a ForwardService over a real, shared database (so
@@ -267,5 +271,111 @@ func TestForwardStatusesReturnsManagerRunning(t *testing.T) {
 	got := svc.Statuses()
 	if len(got) != 1 || got[0].ForwardID != "f1" {
 		t.Fatalf("Statuses() = %+v, want the manager's running list", got)
+	}
+}
+
+// Update overwrites the editable fields and reads the row back.
+func TestForwardUpdateChangesEditableFields(t *testing.T) {
+	svc, _, servers := newForwardService(t, &fakeDialer{}, &fakeTunnelManager{})
+	srv := mkServer(t, servers, "s1", nil)
+
+	created, err := svc.Create(validForwardInput(srv.ID))
+	if err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+
+	in := validForwardInput(srv.ID)
+	in.ID = created.ID
+	in.Name = "renamed"
+	in.BindPort = 15432
+	in.DestPort = 5432
+	got, err := svc.Update(in)
+	if err != nil {
+		t.Fatalf("Update error = %v", err)
+	}
+	if got.Name != "renamed" || got.BindPort != 15432 || got.DestPort != 5432 {
+		t.Fatalf("Update = %+v, want name/ports changed", got)
+	}
+}
+
+// SEC-07 boundary: Update must NOT be able to rehome a forward onto a different
+// (or bogus) server — ForwardRepo.Update's column Select excludes server_id.
+func TestForwardUpdateCannotCorruptServerID(t *testing.T) {
+	svc, _, servers := newForwardService(t, &fakeDialer{}, &fakeTunnelManager{})
+	srv := mkServer(t, servers, "s1", nil)
+
+	created, err := svc.Create(validForwardInput(srv.ID))
+	if err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+
+	in := validForwardInput(srv.ID)
+	in.ID = created.ID
+	in.ServerID = "bogus" // attempt to rehome
+	got, err := svc.Update(in)
+	if err != nil {
+		t.Fatalf("Update error = %v", err)
+	}
+	if got.ServerID != srv.ID {
+		t.Fatalf("ServerID = %q after Update, want it unchanged at %q", got.ServerID, srv.ID)
+	}
+}
+
+func TestForwardUpdateUnknownIDReturnsErrNotFound(t *testing.T) {
+	svc, _, servers := newForwardService(t, &fakeDialer{}, &fakeTunnelManager{})
+	srv := mkServer(t, servers, "s1", nil)
+
+	in := validForwardInput(srv.ID)
+	in.ID = "ghost"
+	if _, err := svc.Update(in); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Update(unknown) error = %v, want domain.ErrNotFound", err)
+	}
+}
+
+func TestForwardUpdateRejectsInvalidInput(t *testing.T) {
+	svc, _, servers := newForwardService(t, &fakeDialer{}, &fakeTunnelManager{})
+	srv := mkServer(t, servers, "s1", nil)
+
+	created, err := svc.Create(validForwardInput(srv.ID))
+	if err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+
+	in := validForwardInput(srv.ID)
+	in.ID = created.ID
+	in.Type = "D" // invalid
+	var de *domain.Error
+	if _, err := svc.Update(in); !errors.As(err, &de) || de.Code != domain.CodeValidation {
+		t.Fatalf("Update(invalid) error = %v, want ERR_VALIDATION", err)
+	}
+}
+
+// A second Start on an already-running forward must be refused BEFORE any dial
+// — otherwise the freshly-dialed connection would leak, since Manager.Start's
+// already-running branch never takes ownership of it.
+func TestForwardStartAlreadyRunningDoesNotDial(t *testing.T) {
+	dial := &fakeDialer{}
+	mgr := &fakeTunnelManager{statusState: forward.StateRunning}
+	svc, forwards, servers := newForwardService(t, dial, mgr)
+
+	srv := mkServer(t, servers, "s1", nil)
+	fwd := &domain.PortForward{
+		ID: "f1", ServerID: srv.ID, Name: "app", Type: domain.ForwardLocal,
+		BindAddr: "127.0.0.1", BindPort: 8080, DestHost: "10.0.1.5", DestPort: 80,
+	}
+	if err := forwards.Create(fwd); err != nil {
+		t.Fatalf("Create(fwd) error = %v", err)
+	}
+
+	err := svc.Start(fwd.ID)
+	var de *domain.Error
+	if !errors.As(err, &de) || de.Code != domain.CodeValidation {
+		t.Fatalf("Start(already-running) error = %v, want ERR_VALIDATION", err)
+	}
+	if dial.dialed {
+		t.Error("dialer was called for an already-running forward (would leak the conn)")
+	}
+	if mgr.started {
+		t.Error("manager.Start was called for an already-running forward")
 	}
 }
