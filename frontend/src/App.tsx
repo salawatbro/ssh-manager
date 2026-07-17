@@ -112,7 +112,11 @@ export default function App() {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {servers.length > 0 && <Sidebar onAdd={openAdd} onOpenTunnels={openTunnelsFor} />}
+        {/* Kept mounted at 0 servers too (dizayn manbasi: EmptyState.dc.html)
+            — the design's empty state still shows the sidebar shell (dimmed
+            search box, "No servers yet" placeholder, "+ Add server" footer),
+            only the content area swaps to the centered hero. */}
+        <Sidebar onAdd={openAdd} onOpenTunnels={openTunnelsFor} />
         {servers.length === 0 && !formOpen ? (
           <EmptyState onAdd={openAdd} />
         ) : (

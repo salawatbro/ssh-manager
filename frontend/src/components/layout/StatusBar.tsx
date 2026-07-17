@@ -36,10 +36,11 @@ const divider = <span className="text-border">│</span>
 
 // TZ 12.1: 26px status bar. When a tab is active it shows the live session's
 // auth method, target, terminal size, tunnel count and uptime (dizayn
-// manbasi: MainWindow.dc.html, content=session). With no active tab there is
-// no session to describe, so it falls back to the server/tunnel counts the
-// bar showed before this rework — the design's `content` prop never actually
-// mocks an empty-bar state to match instead.
+// manbasi: MainWindow.dc.html, content=session). With no active tab and no
+// servers at all it shows the design's dedicated "No connection" empty state
+// (dizayn manbasi: EmptyState.dc.html). With no active tab but servers
+// present, it falls back to the server/tunnel counts the bar showed before
+// this rework — MainWindow.dc.html has no mock for that in-between state.
 export function StatusBar({ onOpenTunnels }: Props) {
   const servers = useServers((s) => s.servers)
   const selectedId = useServers((s) => s.selectedId)
@@ -87,6 +88,19 @@ export function StatusBar({ onOpenTunnels }: Props) {
   }
 
   if (!activeTab) {
+    if (servers.length === 0) {
+      // dizayn manbasi: EmptyState.dc.html status bar — an outline dot +
+      // "No connection", replacing the server/tunnel counts that have
+      // nothing to count yet.
+      return (
+        <div className="flex h-[26px] shrink-0 items-center border-t border-border bg-bg1b px-[12px] text-[11.5px] text-textDim">
+          <span className="flex items-center gap-[5px]">
+            <StatusDot status="disc" size={6} />
+            No connection
+          </span>
+        </div>
+      )
+    }
     return (
       <div className="flex h-[26px] shrink-0 items-center gap-[14px] border-t border-border bg-bg1b px-[12px] text-[11.5px] text-textDim">
         <span>{servers.length} servers</span>

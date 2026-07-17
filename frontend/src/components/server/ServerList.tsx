@@ -26,6 +26,16 @@ export function ServerList({ onOpenTunnels }: Props) {
 
   const groups = groupServers(servers)
 
+  if (servers.length === 0) {
+    // dizayn manbasi: EmptyState.dc.html sidebar — a centered "No servers
+    // yet" line fills the list area instead of leaving it blank.
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center p-[20px] text-center">
+        <span className="text-[12px] leading-[1.5] text-textDim">No servers yet</span>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-0 flex-1 overflow-y-auto py-[4px]">
       {groups.map((g) => (

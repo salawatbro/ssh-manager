@@ -1,4 +1,5 @@
-import { Download, Plus, TerminalSquare } from 'lucide-react'
+import { Plus, TerminalSquare } from 'lucide-react'
+import { useImport } from '../stores/import'
 
 interface Props {
   onAdd: () => void
@@ -26,18 +27,17 @@ export function EmptyState({ onAdd }: Props) {
           Add server
         </button>
 
-        {/* FR-13.2 requires two actions in the empty state. Import lands in
-            v0.5 (FR-13.3: no onboarding wizard) — this is a single honestly
-            disabled line, not a feature: visibly non-interactive, and it says
-            why it can't be clicked yet. */}
-        <div
-          aria-disabled="true"
-          className="mt-[12px] flex items-center gap-[7px] text-[12.5px] text-textDim"
+        {/* FR-13.2's second empty-state action. v0.5 shipped ssh_config
+            import (dizayn manbasi: EmptyState.dc.html — plain accentFg text
+            link, no icon), so this now opens the same preview modal the
+            palette's import entry point uses. */}
+        <button
+          type="button"
+          onClick={() => void useImport.getState().show()}
+          className="no-drag mt-[12px] flex items-center gap-[6px] text-[13px] text-accentFg"
         >
-          <Download size={14} />
-          <span className="font-mono">Import from ~/.ssh/config</span>
-          <span>· Coming in v0.5</span>
-        </div>
+          Import from <span className="font-mono text-[12px]">~/.ssh/config</span>
+        </button>
       </div>
     </div>
   )
