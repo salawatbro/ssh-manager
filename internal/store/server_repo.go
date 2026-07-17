@@ -125,6 +125,19 @@ func (r *ServerRepo) BumpUsage(id string) error {
 	return nil
 }
 
+// CountByJumpID counts servers that use id as their jump host. Delete uses
+// this to enforce ON DELETE RESTRICT with a clear message before touching
+// the row (see TestDeleteRefusesWhenAnotherServerJumpsThroughIt).
+func (r *ServerRepo) CountByJumpID(id string) (int64, error) {
+	var n int64
+	err := r.db.Model(&domain.Server{}).Where("jump_id = ?", id).Count(&n).Error
+	if err != nil {
+		return 0, fmt.Errorf(
+			"cannot count servers jumping through %s; check the database file is readable and not locked by another instance: %w", id, err)
+	}
+	return n, nil
+}
+
 // Groups returns the distinct non-empty group names, sorted.
 func (r *ServerRepo) Groups() ([]string, error) {
 	var groups []string

@@ -15,6 +15,7 @@ const (
 type PortForward struct {
 	ID        string      `gorm:"primaryKey;type:text" json:"id"`
 	ServerID  string      `gorm:"not null;index" json:"serverId"`
+	Server    *Server     `gorm:"foreignKey:ServerID;constraint:OnDelete:CASCADE" json:"-"`
 	Name      string      `gorm:"not null" json:"name"`
 	Type      ForwardType `gorm:"not null" json:"type"`
 	BindAddr  string      `gorm:"not null;default:'127.0.0.1'" json:"bindAddr"`

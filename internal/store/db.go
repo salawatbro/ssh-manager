@@ -131,7 +131,7 @@ func Open(dbPath string) (*gorm.DB, error) {
 			"cannot set 0600 on %s-shm; check that you own it: %w", dbPath, err)
 	}
 
-	if err := db.AutoMigrate(&domain.Server{}, &domain.Settings{}); err != nil {
+	if err := db.AutoMigrate(&domain.Server{}, &domain.Settings{}, &domain.PortForward{}); err != nil {
 		return nil, fmt.Errorf("cannot migrate the schema: %w", err)
 	}
 

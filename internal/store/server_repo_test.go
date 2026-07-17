@@ -352,6 +352,37 @@ func TestCreateWithDanglingJumpIDFails(t *testing.T) {
 	}
 }
 
+// TestCountByJumpID backs Delete's ability to refuse cleanly with a clear
+// message before touching a row that other servers still jump through (see
+// TestDeleteRefusesWhenAnotherServerJumpsThroughIt): the count must be 0
+// when nothing references the jump host, and match the exact number of
+// dependents when several do.
+func TestCountByJumpID(t *testing.T) {
+	r := newRepo(t)
+	jump := sample("j", "bastion", "Prod")
+	if err := r.Create(jump); err != nil {
+		t.Fatalf("Create(bastion) error = %v", err)
+	}
+
+	if n, err := r.CountByJumpID("j"); err != nil || n != 0 {
+		t.Fatalf("CountByJumpID(unused) = %d, %v; want 0, nil", n, err)
+	}
+
+	jumpID := "j"
+	for _, id := range []string{"a", "b"} {
+		s := sample(id, id, "Prod")
+		s.JumpID = &jumpID
+		if err := r.Create(s); err != nil {
+			t.Fatalf("Create(%s) error = %v", id, err)
+		}
+	}
+
+	n, err := r.CountByJumpID("j")
+	if err != nil || n != 2 {
+		t.Fatalf("CountByJumpID = %d, %v; want 2, nil", n, err)
+	}
+}
+
 func TestGroupsAreDistinctSortedAndSkipEmpty(t *testing.T) {
 	r := newRepo(t)
 	for _, s := range []*domain.Server{
