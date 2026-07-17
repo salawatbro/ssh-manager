@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/salawat/sshmgr/internal/domain"
 )
@@ -44,8 +45,15 @@ func (r *ForwardRepo) Get(id string) (*domain.PortForward, error) {
 }
 
 // Create inserts a forward. The caller supplies the ID.
+//
+// Omit(clause.Associations) guards against GORM's belongs-to autosave: f.Server
+// exists only so AutoMigrate can wire the ON DELETE CASCADE FK and is never
+// meant to be written (json:"-", no caller populates it today). Without the
+// guard, a caller that ever sets f.Server would cause GORM to insert a
+// phantom row into servers and silently override f.ServerID with the
+// association's PK.
 func (r *ForwardRepo) Create(f *domain.PortForward) error {
-	if err := r.db.Create(f).Error; err != nil {
+	if err := r.db.Omit(clause.Associations).Create(f).Error; err != nil {
 		return fmt.Errorf(
 			"cannot save forward %s; check the database file is writable and not locked by another instance: %w", f.ID, err)
 	}

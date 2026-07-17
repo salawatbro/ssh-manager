@@ -140,6 +140,53 @@ func TestForwardCreateWithDanglingServerIDFails(t *testing.T) {
 	}
 }
 
+// TestForwardCreateIgnoresServerAssociation pins that ForwardRepo.Create
+// never triggers GORM's belongs-to autosave on PortForward.Server. That
+// field exists only so AutoMigrate can wire the ON DELETE CASCADE FK; it is
+// json:"-" and no caller populates it today, but a future caller might. If
+// Create ever stopped omitting associations, populating f.Server would (1)
+// silently write a phantom row into servers and (2) override the persisted
+// ServerID with the association's PK instead of the one the caller set.
+func TestForwardCreateIgnoresServerAssociation(t *testing.T) {
+	servers, forwards := newForwardRepos(t)
+	if err := servers.Create(sample("s1", "box", "Prod")); err != nil {
+		t.Fatalf("Create server error = %v", err)
+	}
+
+	f := sampleForward("f1", "s1")
+	f.Server = &domain.Server{
+		ID:       "ghost",
+		Name:     "ghost",
+		Host:     "h",
+		User:     "u",
+		Port:     22,
+		AuthType: domain.AuthAgent,
+	}
+	if err := forwards.Create(f); err != nil {
+		t.Fatalf("Create forward error = %v", err)
+	}
+
+	if _, err := servers.Get("ghost"); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Get(ghost) = %v, want domain.ErrNotFound (autosave must not write a phantom server row)", err)
+	}
+
+	got, err := forwards.Get("f1")
+	if err != nil {
+		t.Fatalf("Get error = %v", err)
+	}
+	if got.ServerID != "s1" {
+		t.Fatalf("Get(f1).ServerID = %q, want %q (autosave must not override ServerID)", got.ServerID, "s1")
+	}
+
+	list, err := forwards.List("s1")
+	if err != nil {
+		t.Fatalf("List error = %v", err)
+	}
+	if len(list) != 1 || list[0].ID != "f1" {
+		t.Fatalf("List(s1) = %v, want exactly [f1]", list)
+	}
+}
+
 // TestDeletingServerCascadesToItsForwards proves the ON DELETE CASCADE FK
 // from port_forwards.server_id to servers.id actually works end-to-end: a
 // PortForward carries no secret of its own (SEC-01), but a tunnel
