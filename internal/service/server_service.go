@@ -63,17 +63,66 @@ type Dialer interface {
 	DialChain(ctx context.Context, chain []sshx.Hop) (*sshx.Conn, error)
 }
 
+// forwardStopper stops any running tunnel for a forward id. ServerService uses
+// it so deleting a server also tears down its live tunnels (their rows CASCADE,
+// but the Manager holds the live runners). *forward.Manager satisfies it via
+// Stop — kept as a local interface (not an import of internal/forward) so
+// this package stays free of that dependency; Task 6 wires the concrete
+// *forward.Manager in via SetForwardDeps.
+type forwardStopper interface {
+	Stop(forwardID string) error
+}
+
 // ServerService is bound to the frontend as ServerService.
 type ServerService struct {
 	repo   *store.ServerRepo
 	secret secret.Store
 	dialer Dialer
+
+	// forwards and stopper are both nil until SetForwardDeps is called (or
+	// forever, for callers that never wire tunnels at all — see e.g. every
+	// existing test in this package and, until Task 6, main.go). Delete
+	// treats either being nil as "no tunnel teardown to do" rather than
+	// panicking, so the plain 3-arg NewServerService path keeps working
+	// unchanged.
+	forwards *store.ForwardRepo
+	stopper  forwardStopper
 }
 
 // NewServerService wires the service to its repository, the keychain and
 // the SSH dialer. *sshx.Dialer satisfies the Dialer interface.
+//
+// This intentionally stays a 3-arg constructor: it is called by every
+// existing test in this package plus main.go, and forcing a 4th parameter
+// here for the tunnel-teardown deps would mean editing every one of those
+// call sites for a capability most of them don't need. SetForwardDeps below
+// is the low-blast-radius way to add it — main.go's Task 6 wiring is the
+// only caller that needs it before v0.7 ships.
 func NewServerService(repo *store.ServerRepo, sec secret.Store, dialer Dialer) *ServerService {
 	return &ServerService{repo: repo, secret: sec, dialer: dialer}
+}
+
+// SetForwardDeps wires the forward lister and tunnel stopper Delete uses to
+// tear down a server's live tunnels before removing its row. Called once
+// from main.go's wiring (Task 6); left unset, Delete skips tunnel teardown
+// entirely (see the forwards/stopper doc on ServerService).
+//
+// Deliberately a package-level function, not a method on *ServerService:
+// main.go binds ServerService to the frontend with
+// application.NewService(serverService), which auto-generates a callable
+// frontend RPC binding for every EXPORTED METHOD of the bound type. A
+// SetForwardDeps *method* was tried first and confirmed (by building and
+// inspecting the regenerated frontend/bindings/.../serverservice.ts) to leak
+// exactly that: a spurious ServerService.SetForwardDeps() call the frontend
+// could invoke, wiring nothing usable (its params have no sane JS
+// construction) but bloating the public binding surface with an
+// internal-only Go wiring seam. A package-level function needs to stay
+// exported for main.go (a different package) to call it, but is invisible
+// to the generator, which only walks the bound type's method set — so this
+// keeps the capability without adding to the frontend-callable surface.
+func SetForwardDeps(s *ServerService, forwards *store.ForwardRepo, stopper forwardStopper) {
+	s.forwards = forwards
+	s.stopper = stopper
 }
 
 // List returns every server, ordered for the sidebar.
@@ -179,6 +228,21 @@ func (s *ServerService) Delete(id string) error {
 	if n > 0 {
 		return domain.NewError(domain.CodeValidation,
 			fmt.Sprintf("This server is used as a jump host by %d other server(s). Change those first.", n))
+	}
+
+	// Stop this server's live tunnels before the row (and its forward rows,
+	// via CASCADE) disappear. Deliberately after the RESTRICT guard above —
+	// a delete refused because the server is still in use as a jump host
+	// must stop NOTHING — and deliberately before repo.Delete, so the
+	// stopper still has a real forward id to key its runner lookup on. Both
+	// the list and each stop are best-effort: a listing error must not
+	// block the delete, and a runner that's already stopped (or was never
+	// started) is not a failure either.
+	if s.forwards != nil && s.stopper != nil {
+		fwds, _ := s.forwards.List(id)
+		for _, f := range fwds {
+			_ = s.stopper.Stop(f.ID)
+		}
 	}
 
 	if err := s.repo.Delete(id); err != nil {

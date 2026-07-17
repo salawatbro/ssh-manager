@@ -434,6 +434,105 @@ func TestDeleteJumpRestrict(t *testing.T) {
 	}
 }
 
+// fakeStopper records the forward ids it was asked to stop. When repo and
+// serverID are set, each Stop call also captures whether the server row was
+// still present in the database at that instant — the assertion that
+// actually proves ordering (see TestDeleteStopsTheServersTunnelsBeforeTheRowIsGone):
+// if Delete's stop loop ever ran AFTER s.repo.Delete, the row (and its
+// CASCADEd forward rows) would already be gone by the time Stop runs.
+type fakeStopper struct {
+	repo     *store.ServerRepo
+	serverID string
+
+	stopped          []string
+	rowPresentAtStop []bool
+}
+
+func (f *fakeStopper) Stop(id string) error {
+	f.stopped = append(f.stopped, id)
+	if f.repo != nil {
+		_, err := f.repo.Get(f.serverID)
+		f.rowPresentAtStop = append(f.rowPresentAtStop, err == nil)
+	}
+	return nil
+}
+
+// Deleting a server must stop every one of its saved forwards' live tunnels
+// — their rows CASCADE away, but the forward.Manager holds the running
+// runners independently of the database. The ordering matters: a stop that
+// ran after the row (and CASCADE) was already gone would be tearing down a
+// tunnel for a forward that, from the database's perspective, never
+// existed — harmless here since Stop is idempotent on an unknown id, but it
+// would mean a stop racing a real Manager could miss the runner if some
+// other path (e.g. a future re-list) depended on the row still being
+// present. fakeStopper.rowPresentAtStop is what proves the ordering rather
+// than merely asserting both ids got stopped.
+func TestDeleteStopsTheServersTunnelsBeforeTheRowIsGone(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "sshmgr.db"))
+	if err != nil {
+		t.Fatalf("store.Open error = %v", err)
+	}
+	repo := store.NewServerRepo(db)
+	forwards := store.NewForwardRepo(db)
+	svc := NewServerService(repo, secret.NewFake(), &fakeDialer{})
+
+	created, err := svc.Create(validInput())
+	if err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+
+	f1 := &domain.PortForward{
+		ID: "f1", ServerID: created.ID, Name: "web", Type: domain.ForwardLocal,
+		BindAddr: "127.0.0.1", BindPort: 8080, DestHost: "localhost", DestPort: 80,
+	}
+	f2 := &domain.PortForward{
+		ID: "f2", ServerID: created.ID, Name: "db", Type: domain.ForwardLocal,
+		BindAddr: "127.0.0.1", BindPort: 8081, DestHost: "localhost", DestPort: 5432,
+	}
+	if err := forwards.Create(f1); err != nil {
+		t.Fatalf("Create(f1) error = %v", err)
+	}
+	if err := forwards.Create(f2); err != nil {
+		t.Fatalf("Create(f2) error = %v", err)
+	}
+
+	fs := &fakeStopper{repo: repo, serverID: created.ID}
+	SetForwardDeps(svc, forwards, fs)
+
+	if err := svc.Delete(created.ID); err != nil {
+		t.Fatalf("Delete error = %v", err)
+	}
+
+	if len(fs.stopped) != 2 {
+		t.Fatalf("stopped = %v, want both forward ids stopped", fs.stopped)
+	}
+	got := map[string]bool{fs.stopped[0]: true, fs.stopped[1]: true}
+	if !got["f1"] || !got["f2"] {
+		t.Fatalf("stopped = %v, want {f1 f2}", fs.stopped)
+	}
+	for i, present := range fs.rowPresentAtStop {
+		if !present {
+			t.Errorf("stop #%d (%s) ran after the server row was already gone; stops must precede repo.Delete", i, fs.stopped[i])
+		}
+	}
+}
+
+// Delete must still work when the forward deps have never been wired in
+// (the plain 3-arg NewServerService path, e.g. every other test in this
+// file and main.go before Task 6) — forwards/stopper default to nil, and
+// the stop loop must treat that as a no-op rather than panic on a nil
+// interface or nil *store.ForwardRepo.
+func TestDeleteWorksWithNilForwardDeps(t *testing.T) {
+	svc := newService(t)
+	created, err := svc.Create(validInput())
+	if err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+	if err := svc.Delete(created.ID); err != nil {
+		t.Fatalf("Delete error = %v, want nil forwards/stopper deps to be a no-op", err)
+	}
+}
+
 // FR-01.9
 func TestSSHCommandRendersTheStoredServer(t *testing.T) {
 	svc := newService(t)
