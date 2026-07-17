@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { ForwardType } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { PortForward } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useForwards } from '../../stores/forwards'
+import { forwardDotStatus } from '../../lib/forwardStatus'
+import { StatusDot } from './StatusDot'
 import { ForwardForm } from './ForwardForm'
 
 interface Props {
@@ -85,30 +87,54 @@ function ForwardRow({
   // Mirrors ServerForm's confirmDelete: first click arms it, second confirms
   // — a saved forward has no undo, so a stray click must not remove it.
   const [confirm, setConfirm] = useState(false)
+  const status = useForwards((s) => s.statusById[forward.id])
+  const [toggleErr, setToggleErr] = useState<string | null>(null)
+  const running = status?.state === 'running'
+
+  async function onToggle() {
+    setToggleErr(null)
+    const err = running
+      ? await useForwards.getState().stop(forward.id)
+      : await useForwards.getState().start(forward.id)
+    if (err) setToggleErr(err)
+  }
 
   return (
-    <div className="flex items-center gap-[8px] rounded-[5px] border border-border px-[9px] py-[7px]">
-      <div className="flex min-w-0 flex-1 flex-col gap-[1px]">
-        <span className="truncate text-[12px] text-text">
-          {forward.name}
-          <span className="ml-[6px] text-[10px] font-medium text-textDim">
-            {forward.type === ForwardType.ForwardLocal ? 'Local' : 'Remote'}
+    <div className="flex flex-col gap-[3px]">
+      <div className="flex items-center gap-[8px] rounded-[5px] border border-border px-[9px] py-[7px]">
+        <span title={status?.state === 'error' ? status.detail : undefined} className="shrink-0">
+          <StatusDot status={forwardDotStatus(status?.state)} />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-[1px]">
+          <span className="truncate text-[12px] text-text">
+            {forward.name}
+            <span className="ml-[6px] text-[10px] font-medium text-textDim">
+              {forward.type === ForwardType.ForwardLocal ? 'Local' : 'Remote'}
+            </span>
           </span>
-        </span>
-        <span className="truncate font-mono text-[11px] text-textDim">
-          {forward.bindAddr}:{forward.bindPort} → {forward.destHost}:{forward.destPort}
-        </span>
+          <span className="truncate font-mono text-[11px] text-textDim">
+            {forward.bindAddr}:{forward.bindPort} → {forward.destHost}:{forward.destPort}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => void onToggle()}
+          className="shrink-0 text-[11px] text-textMuted"
+        >
+          {running ? 'Stop' : 'Start'}
+        </button>
+        <button type="button" onClick={onEdit} className="shrink-0 text-[11px] text-textMuted">
+          Edit
+        </button>
+        <button
+          type="button"
+          onClick={() => (confirm ? onDelete() : setConfirm(true))}
+          className={`shrink-0 text-[11px] ${confirm ? 'font-semibold text-stFailed' : 'text-textMuted'}`}
+        >
+          {confirm ? 'Confirm?' : 'Delete'}
+        </button>
       </div>
-      <button type="button" onClick={onEdit} className="shrink-0 text-[11px] text-textMuted">
-        Edit
-      </button>
-      <button
-        type="button"
-        onClick={() => (confirm ? onDelete() : setConfirm(true))}
-        className={`shrink-0 text-[11px] ${confirm ? 'font-semibold text-stFailed' : 'text-textMuted'}`}
-      >
-        {confirm ? 'Confirm?' : 'Delete'}
-      </button>
+      {toggleErr && <span className="px-[9px] text-[10.5px] text-stFailed">{toggleErr}</span>}
     </div>
   )
 }

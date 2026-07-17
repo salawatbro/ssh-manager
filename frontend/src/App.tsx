@@ -8,10 +8,12 @@ import { TerminalArea } from './components/terminal/TerminalArea'
 import { CommandPalette } from './components/palette/CommandPalette'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { ImportPreview } from './components/palette/ImportPreview'
+import { TunnelsPanel } from './components/forwards/TunnelsPanel'
 import { useAppKeymap } from './hooks/useAppKeymap'
 import { useServers } from './stores/servers'
 import { useHostKey } from './stores/hostkey'
 import { useSettings } from './stores/settings'
+import { useForwards } from './stores/forwards'
 
 export default function App() {
   const load = useServers((s) => s.load)
@@ -19,9 +21,13 @@ export default function App() {
   const selectedId = useServers((s) => s.selectedId)
   const select = useServers((s) => s.select)
   const [adding, setAdding] = useState(false)
+  const [tunnelsOpen, setTunnelsOpen] = useState(false)
 
   const hostKeyRequest = useHostKey((s) => s.request)
   const confirmHostKey = useHostKey((s) => s.confirm)
+  const runningTunnels = useForwards(
+    (s) => Object.values(s.statusById).filter((st) => st.state === 'running').length,
+  )
 
   useEffect(() => {
     void load()
@@ -31,6 +37,13 @@ export default function App() {
     // Register at mount so a hostkey:request emitted the instant a test
     // starts is never dropped for want of a listener.
     const off = useHostKey.getState().listen()
+    return off
+  }, [])
+
+  useEffect(() => {
+    // Same reasoning as hostkey's listen: a Start can begin emitting
+    // forward:status before any forward-owning view is mounted to hear it.
+    const off = useForwards.getState().listen()
     return off
   }, [])
 
@@ -87,6 +100,13 @@ export default function App() {
       {/* TZ 12.1: 26px status bar */}
       <div className="flex h-[26px] shrink-0 items-center border-t border-border bg-bg1b px-[12px] text-[11.5px] text-textDim">
         <span>{servers.length} servers</span>
+        <button
+          type="button"
+          onClick={() => setTunnelsOpen((v) => !v)}
+          className="ml-[14px] hover:text-text"
+        >
+          {runningTunnels} tunnels
+        </button>
       </div>
 
       {/* key={hostKeyRequest.requestID} remounts the modal per request, so a
@@ -101,9 +121,10 @@ export default function App() {
         <HostKeyChangedModal key={hostKeyRequest.requestID} request={hostKeyRequest} onConfirm={confirmHostKey} />
       )}
 
-      <CommandPalette onNewServer={openAdd} />
+      <CommandPalette onNewServer={openAdd} onOpenTunnels={() => setTunnelsOpen(true)} />
       <SettingsModal />
       <ImportPreview />
+      {tunnelsOpen && <TunnelsPanel onClose={() => setTunnelsOpen(false)} />}
     </div>
   )
 }

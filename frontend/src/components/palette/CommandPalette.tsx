@@ -8,7 +8,13 @@ import { PaletteRow } from './PaletteRow'
 // The ⌘K command palette (FR-08). Servers (fuzzy / recency) followed by app
 // commands (v0.4: New server). Enter opens a server's terminal or runs the
 // command; ↑↓ move; Esc / backdrop close.
-export function CommandPalette({ onNewServer }: { onNewServer: () => void }) {
+export function CommandPalette({
+  onNewServer,
+  onOpenTunnels,
+}: {
+  onNewServer: () => void
+  onOpenTunnels: () => void
+}) {
   const open = usePalette((s) => s.open)
   const hide = usePalette((s) => s.hide)
   const servers = useServers((s) => s.servers)
@@ -20,9 +26,10 @@ export function CommandPalette({ onNewServer }: { onNewServer: () => void }) {
     const ql = q.trim().toLowerCase()
     const commands: PaletteRowData[] = [
       { kind: 'command' as const, id: 'new-server', label: 'New server', run: onNewServer },
+      { kind: 'command' as const, id: 'tunnels', label: 'Tunnels', run: onOpenTunnels },
     ].filter((c) => !ql || c.label.toLowerCase().includes(ql))
     return [...serverRows, ...commands]
-  }, [servers, q, onNewServer])
+  }, [servers, q, onNewServer, onOpenTunnels])
 
   useEffect(() => {
     setI(0)

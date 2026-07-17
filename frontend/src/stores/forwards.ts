@@ -1,19 +1,36 @@
 import { create } from 'zustand'
+import { Events } from '@wailsio/runtime'
 import { ForwardService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import type { PortForward } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { ForwardInput } from '@bindings/github.com/salawat/sshmgr/internal/service'
+import type { Status } from '@bindings/github.com/salawat/sshmgr/internal/forward'
+
+// A forward's live state, keyed by forward id. Populated by the
+// forward:status event stream (see `listen` below) and read by
+// ForwardEditor's status dot and TunnelsPanel.
+export type ForwardStatus = { state: string; detail: string }
 
 interface ForwardsState {
   byServer: Record<string, PortForward[]>
+  statusById: Record<string, ForwardStatus>
 
   load: (serverID: string) => Promise<void>
   create: (input: ForwardInput) => Promise<string | null>
   update: (input: ForwardInput) => Promise<string | null>
   remove: (id: string, serverID: string) => Promise<string | null>
+  start: (id: string) => Promise<string | null>
+  stop: (id: string) => Promise<string | null>
+  // listen wires the forward:status event once, at app mount, and returns an
+  // unsubscribe — mirrors hostkey.ts's `listen`. Registering at mount (not
+  // inside ForwardEditor/TunnelsPanel) avoids the emit-before-listener drop:
+  // Start's tunnel can begin accepting, and emitting status, before any
+  // per-server view happens to be mounted to hear it.
+  listen: () => () => void
 }
 
 export const useForwards = create<ForwardsState>((set, get) => ({
   byServer: {},
+  statusById: {},
 
   // Best-effort like servers.ts's detectKeys: a failed load must not crash
   // the caller's useEffect — fall back to an empty list for that server so
@@ -59,4 +76,34 @@ export const useForwards = create<ForwardsState>((set, get) => ({
       return e instanceof Error ? e.message : String(e)
     }
   },
+
+  // Mirrors remove/create: unwrap .message for the RuntimeError-prefix
+  // reason. No optimistic statusById write here — the forward:status event
+  // this triggers on the backend drives the real state, so a Start error is
+  // just surfaced to the caller (e.g. ForwardEditor's row) as text.
+  start: async (id) => {
+    try {
+      await ForwardService.Start(id)
+      return null
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e)
+    }
+  },
+
+  stop: async (id) => {
+    try {
+      await ForwardService.Stop(id)
+      return null
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e)
+    }
+  },
+
+  listen: () =>
+    Events.On('forward:status', (ev) => {
+      const s = ev.data as Status
+      set((st) => ({
+        statusById: { ...st.statusById, [s.forwardId]: { state: s.state, detail: s.detail } },
+      }))
+    }),
 }))
