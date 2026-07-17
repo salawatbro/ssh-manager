@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -165,8 +166,20 @@ func (s *ServerService) Update(id string, input CreateServerInput) (*domain.Serv
 	return s.repo.Get(id)
 }
 
-// Delete removes a server and its keychain secrets (FR-01.3, FR-03.4).
+// Delete removes a server and its keychain secrets (FR-01.3, FR-03.4). A
+// server still referenced as another server's jump host is refused with a
+// clear validation error instead of letting the FK constraint fail the
+// delete (or the dependent's JumpID dangle).
 func (s *ServerService) Delete(id string) error {
+	n, err := s.repo.CountByJumpID(id)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return domain.NewError(domain.CodeValidation,
+			fmt.Sprintf("This server is used as a jump host by %d other server(s). Change those first.", n))
+	}
+
 	if err := s.repo.Delete(id); err != nil {
 		return err
 	}

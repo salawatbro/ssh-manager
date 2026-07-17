@@ -395,6 +395,32 @@ func TestDeleteRemovesTheServer(t *testing.T) {
 	}
 }
 
+// A server still referenced as another server's jump host cannot be
+// deleted (ON DELETE RESTRICT, enforced at the service layer with a clear
+// message before the repo delete runs) — deleting it out from under a
+// dependent would leave that server's JumpID dangling. An unused leaf
+// server deletes normally.
+func TestDeleteJumpRestrict(t *testing.T) {
+	svc, repo := newServiceWithRepo(t)
+	if err := repo.Create(&domain.Server{ID: "j", Name: "b", Host: "h", User: "u", Port: 22, AuthType: domain.AuthAgent}); err != nil {
+		t.Fatalf("Create(j) error = %v", err)
+	}
+	jid := "j"
+	if err := repo.Create(&domain.Server{ID: "a", Name: "a", Host: "h", User: "u", Port: 22, AuthType: domain.AuthAgent, JumpID: &jid}); err != nil {
+		t.Fatalf("Create(a) error = %v", err)
+	}
+
+	err := svc.Delete("j")
+	var de *domain.Error
+	if !errors.As(err, &de) || de.Code != domain.CodeValidation {
+		t.Fatalf("delete of in-use jump: got %v, want ERR_VALIDATION", err)
+	}
+
+	if err := svc.Delete("a"); err != nil { // leaf, deletable
+		t.Fatalf("delete of leaf failed: %v", err)
+	}
+}
+
 // FR-01.9
 func TestSSHCommandRendersTheStoredServer(t *testing.T) {
 	svc := newService(t)
