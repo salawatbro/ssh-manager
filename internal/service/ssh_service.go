@@ -89,3 +89,16 @@ func (s *SSHService) Resize(sessionID string, cols, rows int) error {
 func (s *SSHService) Close(sessionID string) error {
 	return s.mgr.Close(sessionID)
 }
+
+// Broadcast writes the same base64 payload to every listed session (FR-15). It
+// is best-effort: a write to a gone session doesn't stop the others; the first
+// error is returned so the UI can surface a partial failure.
+func (s *SSHService) Broadcast(sessionIDs []string, dataB64 string) error {
+	var first error
+	for _, id := range sessionIDs {
+		if err := s.mgr.Write(id, dataB64); err != nil && first == nil {
+			first = err
+		}
+	}
+	return first
+}

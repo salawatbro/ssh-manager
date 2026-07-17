@@ -144,3 +144,57 @@ func TestWriteResizeCloseDelegate(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Broadcast fans a single write out to every listed session id (FR-15). A
+// fully-known list writes to all of them and returns nil.
+func TestBroadcastWritesToEverySession(t *testing.T) {
+	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
+	ptyA, ptyB := newFakePTY(), newFakePTY()
+	mgr.Add("a", ptyA)
+	mgr.Add("b", ptyB)
+	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, mgr)
+
+	payload := base64.StdEncoding.EncodeToString([]byte("hi"))
+	if err := svc.Broadcast([]string{"a", "b"}, payload); err != nil {
+		t.Fatalf("Broadcast error = %v, want nil", err)
+	}
+
+	for name, p := range map[string]*fakePTY{"a": ptyA, "b": ptyB} {
+		p.mu.Lock()
+		written := string(p.written)
+		p.mu.Unlock()
+		if written != "hi" {
+			t.Errorf("session %q written = %q, want %q", name, written, "hi")
+		}
+	}
+}
+
+// An unknown session id in the list must not stop the fan-out to the others
+// — Broadcast is best-effort — and the method returns the FIRST error, not
+// an aggregate.
+func TestBroadcastUnknownSessionDoesNotAbortOthersAndReturnsFirstError(t *testing.T) {
+	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
+	ptyA, ptyC := newFakePTY(), newFakePTY()
+	mgr.Add("a", ptyA)
+	mgr.Add("c", ptyC)
+	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, mgr)
+
+	payload := base64.StdEncoding.EncodeToString([]byte("hi"))
+	err := svc.Broadcast([]string{"a", "ghost", "c"}, payload)
+	if err == nil {
+		t.Fatal("Broadcast error = nil, want the ghost session's error")
+	}
+	var de *domain.Error
+	if !errors.As(err, &de) || de.Code != domain.CodeNotFound {
+		t.Fatalf("Broadcast error = %v, want ERR_NOT_FOUND (the first — and only — error in the list)", err)
+	}
+
+	for name, p := range map[string]*fakePTY{"a": ptyA, "c": ptyC} {
+		p.mu.Lock()
+		written := string(p.written)
+		p.mu.Unlock()
+		if written != "hi" {
+			t.Errorf("session %q written = %q, want %q (unknown id must not abort the fan-out)", name, written, "hi")
+		}
+	}
+}
