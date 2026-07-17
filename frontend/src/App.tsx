@@ -4,6 +4,7 @@ import { ServerForm } from './components/server/ServerForm'
 import { EmptyState } from './components/EmptyState'
 import { HostKeyModal } from './components/modals/HostKeyModal'
 import { HostKeyChangedModal } from './components/modals/HostKeyChangedModal'
+import { GuardModal } from './components/modals/GuardModal'
 import { TerminalArea } from './components/terminal/TerminalArea'
 import { TabBar } from './components/terminal/TabBar'
 import { CommandPalette } from './components/palette/CommandPalette'
@@ -156,6 +157,10 @@ export default function App() {
       <CommandPalette onNewServer={openAdd} onOpenTunnels={openTunnelsFor} />
       <SettingsModal />
       <ImportPreview />
+      {/* Shared prod-guard modal (FR-14): one instance driven by stores/guard.ts,
+          reused by the manual buffer here and by the reliable/broadcast paths
+          (Tasks 8/9). GuardModal renders nothing itself when closed. */}
+      <GuardModal />
     </div>
   )
 }

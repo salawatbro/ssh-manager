@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
 import { SSHService } from '@bindings/github.com/salawat/sshmgr/internal/service'
+import { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { Terminal } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import { b64ToBytes, strToB64 } from '../lib/termbytes'
+import { createGuardBuffer, matchesDangerous, splitPatterns } from '../lib/guard'
+import { useServers } from '../stores/servers'
+import { useSettings } from '../stores/settings'
+import { useGuard } from '../stores/guard'
 
 // 'exited' is a clean shell exit (`exit`/Ctrl-D/`exit N`) — the pane closes
 // itself, no notice. 'closed' is an abnormal drop (dead peer, connection
@@ -38,6 +43,10 @@ export function useTerminalSession(serverId: string, term: Terminal | null, fit:
     const pending = new Map<number, Uint8Array>()
     const preBuffer: Array<{ sessionID: string; seq: number; data: string }> = []
     const statePreBuffer: Array<{ sessionID: string; state: string; code: string; message: string }> = []
+    // Manual prod guard (FR-14): an approximate, per-session view of the
+    // pending input line, fed from onData below. Buffer logic itself lives
+    // in lib/guard.ts so it stays framework-free and unit-testable.
+    const guardBuf = createGuardBuffer()
 
     setStatus('connecting')
     setMessage('')
@@ -53,7 +62,40 @@ export function useTerminalSession(serverId: string, term: Terminal | null, fit:
 
     const onData = term.onData((d) => {
       const id = sessionId.current
-      if (id) void SSHService.Write(id, strToB64(d)).catch(() => {})
+      if (!id) return
+      const lineBeforeEnter = guardBuf.feed(d)
+      if (lineBeforeEnter === null) {
+        void SSHService.Write(id, strToB64(d)).catch(() => {})
+        return
+      }
+      // d contains '\r' (Enter). Check the line as it stood right before it
+      // against the pane's server env + the guard settings.
+      const server = useServers.getState().servers.find((s) => s.id === serverId)
+      const settings = useSettings.getState().settings
+      const isProd = server?.environment === Environment.EnvProd
+      const patterns = settings ? splitPatterns(settings.guardPatterns) : []
+      const dangerous = settings?.guardEnabled && matchesDangerous(lineBeforeEnter, patterns)
+      if (isProd && dangerous && server) {
+        // Forward any pasted text before the held Enter (normally none — a
+        // real keypress sends '\r' alone), but hold the '\r' itself.
+        const head = d.slice(0, d.indexOf('\r'))
+        if (head) void SSHService.Write(id, strToB64(head)).catch(() => {})
+        useGuard.getState().requestGuard({
+          command: lineBeforeEnter,
+          targets: [{ host: server.name || server.host, env: server.environment }],
+          // Confirm sends the held Enter and clears the buffer. Cancel does
+          // neither (FR-14.11) — requestGuard's caller (GuardModal) never
+          // invokes this on cancel, so the buffer stays intact and a
+          // subsequent Enter re-triggers the guard.
+          onConfirm: () => {
+            guardBuf.clear()
+            void SSHService.Write(id, strToB64('\r')).catch(() => {})
+          },
+        })
+        return
+      }
+      guardBuf.clear() // a passed/normal Enter always clears the pending line
+      void SSHService.Write(id, strToB64(d)).catch(() => {})
     })
     const onResize = term.onResize(({ cols, rows }) => {
       const id = sessionId.current
