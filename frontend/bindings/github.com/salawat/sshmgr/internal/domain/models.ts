@@ -132,4 +132,14 @@ export interface Settings {
     "termCursor": string;
     "termBlink": boolean;
     "termScrollback": number;
+
+    /**
+     * Prod guard (FR-14): an ERGONOMIC barrier on dangerous commands typed
+     * against a prod-tagged server, not a security control (FR-14.9). The DB
+     * default for GuardPatterns is deliberately empty (multi-line text doesn't
+     * fit a single-line gorm default); the real default list lives in
+     * DefaultSettings() below and is what every first-run row actually gets.
+     */
+    "guardEnabled": boolean;
+    "guardPatterns": string;
 }

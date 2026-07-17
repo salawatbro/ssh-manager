@@ -21,6 +21,14 @@ type Settings struct {
 	TermCursor     string `gorm:"not null;default:'block'" json:"termCursor"` // block|bar|underline
 	TermBlink      bool   `gorm:"not null;default:true" json:"termBlink"`
 	TermScrollback int    `gorm:"not null;default:10000" json:"termScrollback"`
+
+	// Prod guard (FR-14): an ERGONOMIC barrier on dangerous commands typed
+	// against a prod-tagged server, not a security control (FR-14.9). The DB
+	// default for GuardPatterns is deliberately empty (multi-line text doesn't
+	// fit a single-line gorm default); the real default list lives in
+	// DefaultSettings() below and is what every first-run row actually gets.
+	GuardEnabled  bool   `gorm:"not null;default:true" json:"guardEnabled"`
+	GuardPatterns string `gorm:"not null;default:''" json:"guardPatterns"`
 }
 
 // DefaultSettings returns the first-run defaults. Kept in code (not only in
@@ -39,8 +47,22 @@ func DefaultSettings() Settings {
 		TermCursor:         "block",
 		TermBlink:          true,
 		TermScrollback:     10000,
+		GuardEnabled:       true,
+		GuardPatterns:      defaultGuardPatterns,
 	}
 }
+
+// defaultGuardPatterns is the newline-separated first-run value of
+// Settings.GuardPatterns (see SplitPatterns in guard.go).
+const defaultGuardPatterns = "rm -rf\n" +
+	"mkfs\n" +
+	"dd if=\n" +
+	"dd of=\n" +
+	"> /dev/sd\n" +
+	"chmod -R 777\n" +
+	"shutdown\n" +
+	"reboot\n" +
+	":(){ :|:& };:"
 
 // Sanitise clamps stored/incoming values to safe ranges so a corrupt row or a
 // hand-edited import can't drive the terminal or dialer into nonsense. It never
