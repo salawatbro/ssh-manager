@@ -7,6 +7,9 @@ import type { Events } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import type * as forward$0 from "../../../../salawat/sshmgr/internal/forward/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import type * as service$0 from "../../../../salawat/sshmgr/internal/service/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -15,6 +18,7 @@ import type * as term$0 from "../../../../salawat/sshmgr/internal/term/models.js
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "forward:status": forward$0.Status;
             "hostkey:request": service$0.HostKeyRequest;
             "session:state": term$0.State;
             "term:data": term$0.Output;

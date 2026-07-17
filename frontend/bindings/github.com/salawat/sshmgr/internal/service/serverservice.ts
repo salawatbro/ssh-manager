@@ -29,7 +29,10 @@ export function Create(input: $models.CreateServerInput): $CancellablePromise<do
 }
 
 /**
- * Delete removes a server and its keychain secrets (FR-01.3, FR-03.4).
+ * Delete removes a server and its keychain secrets (FR-01.3, FR-03.4). A
+ * server still referenced as another server's jump host is refused with a
+ * clear validation error instead of letting the FK constraint fail the
+ * delete (or the dependent's JumpID dangle).
  */
 export function Delete(id: string): $CancellablePromise<void> {
     return $Call.ByID(802376765, id);

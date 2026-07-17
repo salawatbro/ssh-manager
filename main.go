@@ -14,6 +14,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
+	"github.com/salawat/sshmgr/internal/forward"
 	"github.com/salawat/sshmgr/internal/platform"
 	"github.com/salawat/sshmgr/internal/secret"
 	"github.com/salawat/sshmgr/internal/service"
@@ -95,6 +96,16 @@ func main() {
 	}
 	dataService := &DataService{servers: serverService, db: db}
 
+	// forwardMgr's emit closure only runs at runtime, on a state transition
+	// well after app start (see appEmitter's comment above for why
+	// application.Get() is safe there but not at construction time) — the
+	// same deferred-lookup pattern termMgr uses via appEmitter.
+	forwardRepo := store.NewForwardRepo(db)
+	forwardMgr := forward.NewManager(func(st forward.Status) {
+		_ = application.Get().Event.Emit("forward:status", st)
+	})
+	forwardService := service.NewForwardService(forwardRepo, repo, kr, dialer, forwardMgr)
+
 	// FR-04.3: the Connection-timeout setting drives the dialer live — read at
 	// each dial rather than baked in at construction, so a Settings change
 	// takes effect on the very next connect. Falls back to 10s if the store
@@ -118,6 +129,7 @@ func main() {
 			application.NewService(settingsService),
 			application.NewService(importService),
 			application.NewService(dataService),
+			application.NewService(forwardService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -151,13 +163,20 @@ func main() {
 		ShouldQuit: func() bool {
 			s, err := settingsService.Get()
 			if err != nil || !s.ConfirmOnQuit || termMgr.SessionCount() == 0 {
+				// Real quit, no confirmation needed: best-effort tear down any
+				// live tunnels before the process goes away. forwardMgr.StopAll
+				// closes each tunnel's listener/conn and waits for its own
+				// goroutines only (not the whole app), so this stays prompt —
+				// the process exiting would clean these up anyway, this just
+				// makes it deterministic rather than relying on that.
+				forwardMgr.StopAll()
 				return true
 			}
 			quit := false
 			dialog := application.Get().Dialog.Question().
 				SetTitle("Quit SSH Manager?").
 				SetMessage(fmt.Sprintf("%d terminal session(s) are still open. Quit and close them?", termMgr.SessionCount()))
-			dialog.AddButton("Quit").OnClick(func() { quit = true })
+			dialog.AddButton("Quit").OnClick(func() { quit = true; forwardMgr.StopAll() })
 			dialog.AddButton("Cancel")
 			dialog.Show()
 			return quit
@@ -386,4 +405,5 @@ func init() {
 	application.RegisterEvent[service.HostKeyRequest]("hostkey:request")
 	application.RegisterEvent[term.Output]("term:data")
 	application.RegisterEvent[term.State]("session:state")
+	application.RegisterEvent[forward.Status]("forward:status")
 }

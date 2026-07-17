@@ -41,6 +41,40 @@ export enum Environment {
 };
 
 /**
+ * ForwardType is the tunnel direction. L = local (-L), R = remote (-R).
+ */
+export enum ForwardType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * The tunnel directions. ForwardLocal is an -L forward (local port to a remote
+     * destination); ForwardRemote is an -R forward (remote port to a local one).
+     */
+    ForwardLocal = "L",
+    ForwardRemote = "R",
+};
+
+/**
+ * PortForward is a saved tunnel definition attached to a server. It carries no
+ * secret (SEC-01) — it only names ports and hosts.
+ */
+export interface PortForward {
+    "id": string;
+    "serverId": string;
+    "name": string;
+    "type": ForwardType;
+    "bindAddr": string;
+    "bindPort": number;
+    "destHost": string;
+    "destPort": number;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
  * Server is a connection profile.
  * 
  * It carries no password or passphrase field, and must never grow one:

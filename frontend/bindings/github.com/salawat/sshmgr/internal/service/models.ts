@@ -32,6 +32,22 @@ export interface CreateServerInput {
 }
 
 /**
+ * ForwardInput is what the frontend sends to create or update a saved port
+ * forward. It mirrors CreateServerInput's shape: a plain JSON-tagged struct
+ * the service turns into a domain.PortForward and validates again (SEC-08).
+ */
+export interface ForwardInput {
+    "id": string;
+    "serverId": string;
+    "name": string;
+    "type": domain$0.ForwardType;
+    "bindAddr": string;
+    "destHost": string;
+    "bindPort": number;
+    "destPort": number;
+}
+
+/**
  * HostKeyRequest is the hostkey:request event payload (TZ 8). It mirrors
  * sshx.HostKeyRequest as a concrete named type so main.go's
  * application.RegisterEvent[HostKeyRequest] gives the binding generator a
