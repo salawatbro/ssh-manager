@@ -134,8 +134,13 @@ func newDualKeyTestServer(t *testing.T) (addr string, ed25519Key, rsaKey ssh.Pub
 
 // newTOTPTestServer starts an in-process SSH server whose ONLY accepted auth
 // is keyboard-interactive: it asks a single "Verification code: " question
-// and accepts only the exact TOTP code domain.TOTPCode computes for secret at
-// the moment it's checked. It exists to prove the whole path end to end —
+// and accepts the TOTP code domain.TOTPCode computes for secret at the
+// current 30s window OR the immediately preceding one. That one-window
+// tolerance mirrors what a real TOTP-verifying server (e.g.
+// google-authenticator) allows for exactly this reason: it closes the race
+// between the client computing its code and the server checking it a moment
+// later, without needing an injectable clock. It exists to prove the whole
+// path end to end —
 // Dialer.Dial appending ssh.KeyboardInteractive only because Server.TwoFactor
 // is true, and buildKIChallenge answering from creds.TOTPSecret with no
 // prompter call — not just buildKIChallenge in isolation.
@@ -158,11 +163,16 @@ func newTOTPTestServer(t *testing.T, secret string) (addr string, hostKey ssh.Pu
 			if len(answers) != 1 {
 				return nil, fmt.Errorf("want 1 answer, got %d", len(answers))
 			}
-			want, err := domain.TOTPCode(secret, time.Now())
+			now := time.Now()
+			cur, err := domain.TOTPCode(secret, now)
 			if err != nil {
 				return nil, err
 			}
-			if answers[0] != want {
+			prev, err := domain.TOTPCode(secret, now.Add(-30*time.Second))
+			if err != nil {
+				return nil, err
+			}
+			if answers[0] != cur && answers[0] != prev {
 				return nil, fmt.Errorf("bad verification code")
 			}
 			return nil, nil

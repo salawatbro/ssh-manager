@@ -51,16 +51,32 @@ func TestBuildKIChallengeTOTPPrompt(t *testing.T) {
 	creds := Credentials{TOTPSecret: testTOTPSecret}
 	challenge := buildKIChallenge("srv1", creds, prompter)
 
+	// Bracket the challenge call with the clock instead of computing the
+	// expectation from a single independent time.Now(): if a 30s TOTP
+	// window boundary is crossed between "before" and the challenge's own
+	// internal time.Now() call, the naive single-sample comparison would
+	// spuriously fail. Accepting either window's code removes that flake
+	// without needing an injectable clock; if before/after land in the same
+	// window (the overwhelming common case) wantBefore == wantAfter anyway.
+	before := time.Now()
 	answers, err := challenge("", "", []string{"Verification code: "}, []bool{false})
+	after := time.Now()
 	if err != nil {
 		t.Fatalf("challenge errored: %v", err)
 	}
-	want, wantErr := domain.TOTPCode(testTOTPSecret, time.Now())
-	if wantErr != nil {
-		t.Fatalf("domain.TOTPCode errored computing expectation: %v", wantErr)
+	wantBefore, err := domain.TOTPCode(testTOTPSecret, before)
+	if err != nil {
+		t.Fatalf("domain.TOTPCode errored computing expectation: %v", err)
 	}
-	if len(answers) != 1 || answers[0] != want {
-		t.Fatalf("answers = %v, want [%s]", answers, want)
+	wantAfter, err := domain.TOTPCode(testTOTPSecret, after)
+	if err != nil {
+		t.Fatalf("domain.TOTPCode errored computing expectation: %v", err)
+	}
+	if len(answers) != 1 {
+		t.Fatalf("answers = %v, want exactly 1", answers)
+	}
+	if answers[0] != wantBefore && answers[0] != wantAfter {
+		t.Fatalf("code %q matched neither window (%q / %q)", answers[0], wantBefore, wantAfter)
 	}
 	if len(prompter.seen) != 0 {
 		t.Fatalf("prompter was called %d times, want 0", len(prompter.seen))
