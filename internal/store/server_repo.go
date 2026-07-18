@@ -125,6 +125,36 @@ func (r *ServerRepo) BumpUsage(id string) error {
 	return nil
 }
 
+// SetPinned writes ONLY the pinned column, in a single UPDATE, so it never
+// races a concurrent form Update over any other field (same isolation reason
+// as BumpUsage). "pinned" is deliberately absent from updatableColumns, so a
+// form save can never clear a pin — SetPinned is its sole writer.
+func (r *ServerRepo) SetPinned(id string, pinned bool) error {
+	res := r.db.Model(&domain.Server{}).
+		Where("id = ?", id).
+		UpdateColumns(map[string]any{"pinned": pinned})
+	if res.Error != nil {
+		return fmt.Errorf(
+			"cannot update the pin state for server %s; check the database file is writable and not locked by another instance: %w", id, res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// CountPinned counts pinned servers. The service uses it to enforce the tray's
+// 5-pin cap before writing a new pin.
+func (r *ServerRepo) CountPinned() (int64, error) {
+	var n int64
+	err := r.db.Model(&domain.Server{}).Where("pinned = ?", true).Count(&n).Error
+	if err != nil {
+		return 0, fmt.Errorf(
+			"cannot count pinned servers; check the database file is readable and not locked by another instance: %w", err)
+	}
+	return n, nil
+}
+
 // CountByJumpID counts servers that use id as their jump host. Delete uses
 // this to enforce ON DELETE RESTRICT with a clear message before touching
 // the row (see TestDeleteRefusesWhenAnotherServerJumpsThroughIt).

@@ -57,6 +57,11 @@ type Server struct {
 	// keychain (SEC-01), keyed by this server's ID (secret.Store).
 	TwoFactor bool `gorm:"not null;default:false" json:"twoFactor"`
 
+	// Pinned marks a server for the menu-bar tray's quick-connect list. Not a
+	// secret; capped at 5 pins by the service, never written by a form Update
+	// (updatableColumns excludes it) — only by ServerService.SetPinned.
+	Pinned bool `gorm:"not null;default:false" json:"pinned"`
+
 	LastUsedAt *time.Time `gorm:"index" json:"lastUsedAt"`
 	UseCount   int        `gorm:"not null;default:0" json:"useCount"`
 	SortOrder  int        `gorm:"not null;default:0" json:"sortOrder"`

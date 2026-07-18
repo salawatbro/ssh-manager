@@ -435,3 +435,80 @@ func TestGroupsAreDistinctSortedAndSkipEmpty(t *testing.T) {
 		}
 	}
 }
+
+func TestSetPinnedPersistsAndClears(t *testing.T) {
+	r := newRepo(t)
+	if err := r.Create(sample("s1", "cbs-app-01", "Prod")); err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+
+	if err := r.SetPinned("s1", true); err != nil {
+		t.Fatalf("SetPinned(true) error = %v", err)
+	}
+	got, _ := r.Get("s1")
+	if !got.Pinned {
+		t.Fatal("Pinned = false after SetPinned(true), want true")
+	}
+
+	if err := r.SetPinned("s1", false); err != nil {
+		t.Fatalf("SetPinned(false) error = %v", err)
+	}
+	got, _ = r.Get("s1")
+	if got.Pinned {
+		t.Fatal("Pinned = true after SetPinned(false), want false")
+	}
+}
+
+func TestSetPinnedMissingReturnsErrNotFound(t *testing.T) {
+	r := newRepo(t)
+	if err := r.SetPinned("nope", true); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("SetPinned error = %v, want domain.ErrNotFound", err)
+	}
+}
+
+func TestCountPinned(t *testing.T) {
+	r := newRepo(t)
+	for _, s := range []*domain.Server{
+		sample("s1", "a", "Prod"), sample("s2", "b", "Prod"), sample("s3", "c", "Prod"),
+	} {
+		if err := r.Create(s); err != nil {
+			t.Fatalf("Create error = %v", err)
+		}
+	}
+	_ = r.SetPinned("s1", true)
+	_ = r.SetPinned("s3", true)
+
+	n, err := r.CountPinned()
+	if err != nil {
+		t.Fatalf("CountPinned error = %v", err)
+	}
+	if n != 2 {
+		t.Fatalf("CountPinned = %d, want 2", n)
+	}
+}
+
+// A form Update carries a Server whose Pinned is false (the form doesn't manage
+// pinning). updatableColumns must exclude "pinned" so that save never clears an
+// existing pin — mirrors the use_count/sort_order exclusion.
+func TestUpdateDoesNotClobberPinned(t *testing.T) {
+	r := newRepo(t)
+	if err := r.Create(sample("s1", "cbs-app-01", "Prod")); err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+	if err := r.SetPinned("s1", true); err != nil {
+		t.Fatalf("SetPinned error = %v", err)
+	}
+
+	edited := sample("s1", "renamed", "Prod") // Pinned defaults false
+	if err := r.Update(edited); err != nil {
+		t.Fatalf("Update error = %v", err)
+	}
+
+	got, _ := r.Get("s1")
+	if got.Name != "renamed" {
+		t.Fatalf("Name = %q, want renamed", got.Name)
+	}
+	if !got.Pinned {
+		t.Fatal("Update cleared Pinned; updatableColumns must exclude \"pinned\"")
+	}
+}
