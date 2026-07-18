@@ -12,6 +12,8 @@ interface Props {
   // Called for a folder's double-click only (FileRow itself gates on isDir,
   // so callers never have to re-check it).
   onOpen: (entry: FileEntry) => void
+  // Right-click on this row — the pane opens a row-specific menu at (x, y).
+  onContextMenu?: (entry: FileEntry, x: number, y: number) => void
 }
 
 function joinPath(base: string, name: string): string {
@@ -43,7 +45,7 @@ function formatModTime(iso: string): string {
 // panes — only basePath and what onOpen/onSelect do differs). Mirrors
 // ServerRow's row idiom: plain div + inner button-like click targets,
 // truncated name, dim secondary text.
-export function FileRow({ entry, basePath, selected, onSelect, onOpen }: Props) {
+export function FileRow({ entry, basePath, selected, onSelect, onOpen, onContextMenu }: Props) {
   const fullPath = joinPath(basePath, entry.name)
 
   function handleDragStart(e: DragEvent<HTMLDivElement>) {
@@ -57,6 +59,14 @@ export function FileRow({ entry, basePath, selected, onSelect, onOpen }: Props) 
       onDragStart={handleDragStart}
       onClick={() => onSelect(entry)}
       onDoubleClick={() => entry.isDir && onOpen(entry)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        // Stops the pane's background handler from ALSO firing for this
+        // click — a row right-click opens the row menu, not the empty-space one.
+        e.stopPropagation()
+        onSelect(entry)
+        onContextMenu?.(entry, e.clientX, e.clientY)
+      }}
       title={fullPath}
       className={`flex h-[26px] w-full shrink-0 cursor-default items-center gap-[7px] px-[10px] ${
         selected ? 'bg-bgSel' : 'hover:bg-bg2'

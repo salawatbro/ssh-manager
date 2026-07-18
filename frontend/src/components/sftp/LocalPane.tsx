@@ -2,6 +2,7 @@ import { useEffect, useState, type DragEvent } from 'react'
 import { CornerLeftUp } from 'lucide-react'
 import type { FileEntry } from '@bindings/github.com/salawat/sshmgr/internal/sftpx'
 import { useSftp } from '../../stores/sftp'
+import { ContextMenu, type MenuEntry } from '../ui/ContextMenu'
 import { FileRow } from './FileRow'
 import { Toolbar } from './Toolbar'
 
@@ -10,6 +11,9 @@ interface Props {
   // turns this into a download, after its own overwrite check against
   // localEntries.
   onDropPath?: (fullPath: string) => void
+  // Row menu's Upload action — SftpView turns this into an upload, after its
+  // own overwrite check against remoteEntries.
+  onUpload?: (entry: FileEntry) => void
 }
 
 // Local paths are always POSIX on this app's macOS-only target, so a plain
@@ -25,11 +29,12 @@ function parentOf(path: string): string {
 // Toolbar, entry list — reads localCwd/localEntries from the store and
 // drives navigation via navLocal. The whole pane is the download drop
 // target — dropping a remote item here means "download it into localCwd".
-export function LocalPane({ onDropPath }: Props) {
+export function LocalPane({ onDropPath, onUpload }: Props) {
   const cwd = useSftp((s) => s.localCwd)
   const entries = useSftp((s) => s.localEntries)
   const navLocal = useSftp((s) => s.navLocal)
   const [selected, setSelected] = useState<FileEntry | null>(null)
+  const [menu, setMenu] = useState<{ entry: FileEntry | null; x: number; y: number } | null>(null)
 
   // A stale selection pointing at an entry from the PREVIOUS directory would
   // silently arm Rename/Delete for something no longer listed.
@@ -65,8 +70,14 @@ export function LocalPane({ onDropPath }: Props) {
         </button>
         <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-textMuted">{cwd}</span>
       </div>
-      <Toolbar variant="local" selected={selected} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <Toolbar />
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setMenu({ entry: null, x: e.clientX, y: e.clientY })
+        }}
+      >
         {entries.length === 0 ? (
           <div className="px-[10px] py-[8px] text-[11.5px] text-textDim">Empty directory.</div>
         ) : (
@@ -78,10 +89,21 @@ export function LocalPane({ onDropPath }: Props) {
               selected={selected?.name === entry.name}
               onSelect={setSelected}
               onOpen={open}
+              onContextMenu={(entry, x, y) => setMenu({ entry, x, y })}
             />
           ))
         )}
       </div>
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={(menu.entry
+            ? [{ label: 'Upload', run: () => onUpload?.(menu.entry as FileEntry) }]
+            : [{ label: 'Refresh', run: () => void useSftp.getState().refresh() }]) satisfies MenuEntry[]}
+        />
+      )}
     </div>
   )
 }

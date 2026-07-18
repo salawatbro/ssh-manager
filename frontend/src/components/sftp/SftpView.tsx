@@ -18,6 +18,13 @@ function baseName(path: string): string {
   return idx >= 0 ? path.slice(idx + 1) : path
 }
 
+// Local paths are always POSIX on this app's macOS-only target (mirrors
+// FileRow's joinPath / LocalPane's parentOf) — used to build the full path
+// for a local entry the remote pane's Upload menu item fires on.
+function joinLocal(base: string, name: string): string {
+  return base.endsWith('/') ? `${base}${name}` : `${base}/${name}`
+}
+
 // SftpView: the dual-pane SFTP shell (Task 8) — drag upload/download between
 // the two panes (gated on an overwrite check), remote mkdir/rename/delete
 // via inline modals (never window.confirm/prompt/alert). Self-guards on the
@@ -30,6 +37,7 @@ export default function SftpView() {
   const sessionId = useSftp((s) => s.sessionId)
   const close = useSftp((s) => s.close)
   const remoteCwd = useSftp((s) => s.remoteCwd)
+  const localCwd = useSftp((s) => s.localCwd)
   const localEntries = useSftp((s) => s.localEntries)
   const remoteEntries = useSftp((s) => s.remoteEntries)
   const upload = useSftp((s) => s.upload)
@@ -134,9 +142,10 @@ export default function SftpView() {
       ) : (
         <>
           <div className="flex min-h-0 flex-1">
-            <LocalPane onDropPath={dropOnLocal} />
+            <LocalPane onDropPath={dropOnLocal} onUpload={(entry) => dropOnRemote(joinLocal(localCwd, entry.name))} />
             <RemotePane
               onDropPath={dropOnRemote}
+              onDownload={(entry) => dropOnLocal(joinRemote(remoteCwd, entry.name))}
               onMkdir={() => setMkdirOpen(true)}
               onRename={setPendingRename}
               onDelete={setPendingDelete}

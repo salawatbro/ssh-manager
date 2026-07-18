@@ -3,15 +3,20 @@ import { CornerLeftUp } from 'lucide-react'
 import type { FileEntry } from '@bindings/github.com/salawat/sshmgr/internal/sftpx'
 import { useSftp } from '../../stores/sftp'
 import { dirnameRemote, joinRemote } from '../../lib/remotePath'
+import { ContextMenu, type MenuEntry } from '../ui/ContextMenu'
 import { FileRow } from './FileRow'
 import { Toolbar } from './Toolbar'
 
 interface Props {
-  // Forwarded straight into Toolbar — SftpView supplies the mkdir/rename
-  // prompts and the delete confirm and passes them down when it mounts this.
+  // Wired into the row/background context menu — SftpView supplies the
+  // mkdir/rename prompts and the delete confirm and passes them down when it
+  // mounts this (Toolbar no longer takes these; it's refresh-only now).
   onMkdir?: () => void
   onRename?: (entry: FileEntry) => void
   onDelete?: (entry: FileEntry) => void
+  // Row menu's Download action — SftpView turns this into a download, after
+  // its own overwrite check against localEntries.
+  onDownload?: (entry: FileEntry) => void
   // Fired with the FULL path dragged in from the local pane (FileRow puts it
   // in the text/plain payload) — SftpView turns this into an upload, after
   // its own overwrite check against remoteEntries.
@@ -20,14 +25,15 @@ interface Props {
 
 // Right pane of SftpView: the remote filesystem over the open SFTP session.
 // Same shape as LocalPane (header + Toolbar + list) but wired to
-// remoteCwd/remoteEntries/navRemote, and the only pane whose Toolbar has
-// +Folder/Rename/Delete. The whole pane is the upload drop target — dropping
-// a local item here means "upload it into remoteCwd".
-export function RemotePane({ onMkdir, onRename, onDelete, onDropPath }: Props) {
+// remoteCwd/remoteEntries/navRemote. The whole pane is the upload drop
+// target — dropping a local item here means "upload it into remoteCwd".
+// New Folder/Rename/Delete/Download live in the right-click menu, not Toolbar.
+export function RemotePane({ onMkdir, onRename, onDelete, onDownload, onDropPath }: Props) {
   const cwd = useSftp((s) => s.remoteCwd)
   const entries = useSftp((s) => s.remoteEntries)
   const navRemote = useSftp((s) => s.navRemote)
   const [selected, setSelected] = useState<FileEntry | null>(null)
+  const [menu, setMenu] = useState<{ entry: FileEntry | null; x: number; y: number } | null>(null)
 
   // Same reasoning as LocalPane: never carry a selection across a directory
   // change — Rename/Delete would otherwise silently target a stale entry.
@@ -63,8 +69,14 @@ export function RemotePane({ onMkdir, onRename, onDelete, onDropPath }: Props) {
         </button>
         <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-textMuted">{cwd}</span>
       </div>
-      <Toolbar variant="remote" selected={selected} onMkdir={onMkdir} onRename={onRename} onDelete={onDelete} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <Toolbar />
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setMenu({ entry: null, x: e.clientX, y: e.clientY })
+        }}
+      >
         {entries.length === 0 ? (
           <div className="px-[10px] py-[8px] text-[11.5px] text-textDim">Empty directory.</div>
         ) : (
@@ -76,10 +88,30 @@ export function RemotePane({ onMkdir, onRename, onDelete, onDropPath }: Props) {
               selected={selected?.name === entry.name}
               onSelect={setSelected}
               onOpen={open}
+              onContextMenu={(entry, x, y) => setMenu({ entry, x, y })}
             />
           ))
         )}
       </div>
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={(menu.entry
+            ? [
+                { label: 'Download', run: () => onDownload?.(menu.entry as FileEntry) },
+                { label: 'Rename', run: () => onRename?.(menu.entry as FileEntry) },
+                { label: 'Delete', danger: true, run: () => onDelete?.(menu.entry as FileEntry) },
+                'separator',
+                { label: 'New Folder', run: () => onMkdir?.() },
+              ]
+            : [
+                { label: 'New Folder', run: () => onMkdir?.() },
+                { label: 'Refresh', run: () => void useSftp.getState().refresh() },
+              ]) satisfies MenuEntry[]}
+        />
+      )}
     </div>
   )
 }
