@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -119,6 +120,24 @@ func seedUsage(t *testing.T, repo *store.ServerRepo, id string, useCount int) *d
 		t.Fatalf("repo.Get error = %v", err)
 	}
 	return srv
+}
+
+// sample builds a domain.Server with a caller-chosen id, mirroring
+// store.sample (internal/store/server_repo_test.go) — this package cannot
+// import that unexported test-only helper across packages, so it is
+// duplicated here for the pin tests, which need repo.Create with a known id
+// rather than validInput's service.Create (which assigns its own uuid).
+func sample(id, name, group string) *domain.Server {
+	return &domain.Server{
+		ID:          id,
+		Name:        name,
+		Host:        "10.0.1.20",
+		Port:        22,
+		User:        "deploy",
+		AuthType:    domain.AuthAgent,
+		GroupName:   group,
+		Environment: domain.EnvProd,
+	}
 }
 
 func validInput() CreateServerInput {
@@ -1048,5 +1067,106 @@ func TestTOTPCodesReturnsEmptySliceNotNilWhenNoMatches(t *testing.T) {
 	}
 	if len(codes) != 0 {
 		t.Fatalf("TOTPCodes() = %+v, want empty", codes)
+	}
+}
+
+func TestSetPinnedEnforcesLimit(t *testing.T) {
+	svc, repo := newServiceWithRepo(t)
+	for i := 0; i < maxPinned; i++ {
+		id := "s" + strconv.Itoa(i)
+		if err := repo.Create(sample(id, "srv-"+id, "Prod")); err != nil {
+			t.Fatalf("Create error = %v", err)
+		}
+		if err := svc.SetPinned(id, true); err != nil {
+			t.Fatalf("SetPinned(%s) error = %v", id, err)
+		}
+	}
+	if err := repo.Create(sample("extra", "srv-extra", "Prod")); err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+
+	err := svc.SetPinned("extra", true)
+	var de *domain.Error
+	if !errors.As(err, &de) || de.Code != domain.CodeValidation {
+		t.Fatalf("SetPinned over cap error = %v, want CodeValidation", err)
+	}
+}
+
+func TestSetPinnedRepinAtCapIsAllowed(t *testing.T) {
+	svc, repo := newServiceWithRepo(t)
+	for i := 0; i < maxPinned; i++ {
+		id := "s" + strconv.Itoa(i)
+		_ = repo.Create(sample(id, "srv-"+id, "Prod"))
+		_ = svc.SetPinned(id, true)
+	}
+	// Re-pinning an already-pinned server at the cap must not be refused.
+	if err := svc.SetPinned("s0", true); err != nil {
+		t.Fatalf("re-pin at cap error = %v, want nil", err)
+	}
+}
+
+func TestSetPinnedUnpinAlwaysAllowed(t *testing.T) {
+	svc, repo := newServiceWithRepo(t)
+	for i := 0; i < maxPinned; i++ {
+		id := "s" + strconv.Itoa(i)
+		_ = repo.Create(sample(id, "srv-"+id, "Prod"))
+		_ = svc.SetPinned(id, true)
+	}
+	if err := svc.SetPinned("s0", false); err != nil {
+		t.Fatalf("unpin at cap error = %v, want nil", err)
+	}
+}
+
+func TestSetPinnedNotifiesServersChanged(t *testing.T) {
+	svc, repo := newServiceWithRepo(t)
+	_ = repo.Create(sample("s1", "a", "Prod"))
+	calls := 0
+	SetOnServersChanged(svc, func() { calls++ })
+
+	if err := svc.SetPinned("s1", true); err != nil {
+		t.Fatalf("SetPinned error = %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("onServersChanged calls = %d, want 1", calls)
+	}
+}
+
+func TestUpdateAndDeleteNotifyServersChanged(t *testing.T) {
+	svc, repo := newServiceWithRepo(t)
+	_ = repo.Create(sample("s1", "a", "Prod"))
+	calls := 0
+	SetOnServersChanged(svc, func() { calls++ })
+
+	if _, err := svc.Update("s1", validInput()); err != nil {
+		t.Fatalf("Update error = %v", err)
+	}
+	if err := svc.Delete("s1"); err != nil {
+		t.Fatalf("Delete error = %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("onServersChanged calls = %d, want 2 (Update + Delete)", calls)
+	}
+}
+
+func TestPinnedForTrayFiltersAndCaps(t *testing.T) {
+	servers := []domain.Server{
+		{ID: "a", Name: "a", Pinned: true},
+		{ID: "b", Name: "b", Pinned: false},
+		{ID: "c", Name: "c", Pinned: true},
+		{ID: "d", Name: "d", Pinned: true},
+		{ID: "e", Name: "e", Pinned: true},
+		{ID: "f", Name: "f", Pinned: true},
+		{ID: "g", Name: "g", Pinned: true}, // 6th pinned — must be dropped
+	}
+	got := PinnedForTray(servers)
+	if len(got) != maxPinned {
+		t.Fatalf("len = %d, want %d (cap)", len(got), maxPinned)
+	}
+	// Order preserved, unpinned skipped: a, c, d, e, f.
+	wantIDs := []string{"a", "c", "d", "e", "f"}
+	for i, id := range wantIDs {
+		if got[i].ID != id {
+			t.Fatalf("got[%d].ID = %q, want %q", i, got[i].ID, id)
+		}
 	}
 }

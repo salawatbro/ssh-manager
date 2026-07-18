@@ -26,3 +26,13 @@ type CodeRequest struct {
 	Prompt     string `json:"prompt"`
 	Echo       bool   `json:"echo"` // whether the typed answer should be visible
 }
+
+// TrayConnect is the tray:connect event payload: the id of the pinned server
+// whose menu-bar entry was clicked. main.go emits it (after showing the window)
+// and the frontend opens or focuses that server. Named here — like
+// HostKeyRequest/CodeRequest — so main.go's application.RegisterEvent[TrayConnect]
+// gives the binding generator a type for typed TypeScript, while
+// internal/service stays cgo-free.
+type TrayConnect struct {
+	ServerID string `json:"serverID"`
+}
