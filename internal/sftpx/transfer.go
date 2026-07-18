@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 )
 
 // Progress reports transfer state as bytes flow. Total is fixed up front (the
@@ -105,6 +106,13 @@ func (s *Session) downloadDir(ctx context.Context, remoteDir, localDir string, p
 		return fmt.Errorf("cannot list %s: %w", remoteDir, err)
 	}
 	for _, info := range infos {
+		if !safeEntryName(info.Name()) {
+			// A malicious server could return a traversal name (e.g. "..") in a
+			// ReadDir response; pkg/sftp's ReadDir already base-normalizes, but
+			// this belt-and-suspenders check keeps a file manager from ever
+			// writing outside the chosen download dir.
+			continue
+		}
 		rp := path.Join(remoteDir, info.Name())
 		lp := filepath.Join(localDir, info.Name())
 		if info.IsDir() {
@@ -174,6 +182,22 @@ func localTreeSize(root string) (int64, error) {
 		return nil
 	})
 	return total, err
+}
+
+// safeEntryName reports whether name is safe to use as a single path segment
+// under a caller-chosen download directory: not empty, not "." or "..", and
+// containing no path separator (either OS's) that could escape that directory.
+func safeEntryName(name string) bool {
+	if name == "" || name == "." || name == ".." {
+		return false
+	}
+	if strings.ContainsRune(name, '/') {
+		return false
+	}
+	if os.PathSeparator != '/' && strings.ContainsRune(name, os.PathSeparator) {
+		return false
+	}
+	return true
 }
 
 func (s *Session) remoteTreeSize(root string) (int64, error) {

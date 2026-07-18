@@ -59,6 +59,24 @@ func TestUploadRecursiveDirectory(t *testing.T) {
 	}
 }
 
+func TestSafeEntryName(t *testing.T) {
+	cases := []struct {
+		name string
+		want bool
+	}{
+		{"a.txt", true},
+		{"..", false},
+		{"a/b", false},
+		{".", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := safeEntryName(c.name); got != c.want {
+			t.Errorf("safeEntryName(%q) = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 func TestUploadHonorsCancel(t *testing.T) {
 	s, root := newTestSession(t)
 	local := filepath.Join(t.TempDir(), "big.bin")

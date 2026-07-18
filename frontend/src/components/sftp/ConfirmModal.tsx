@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 interface Props {
   title: string
   message: string
@@ -16,6 +18,19 @@ interface Props {
 // bg-bg2 panel). Used by SftpView for the overwrite and delete confirms so
 // neither has to fall back to window.confirm.
 export function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onCancel }: Props) {
+  // Esc cancels — mirrors PromptModal's convention so both sftp overlays
+  // dismiss the same way.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !e.isComposing) {
+        e.preventDefault()
+        onCancel()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onCancel])
+
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="w-[380px] rounded-[9px] border border-borderStrong bg-bg2 p-[20px] shadow-[0_20px_60px_rgba(0,0,0,.45)]">

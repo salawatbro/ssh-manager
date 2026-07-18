@@ -64,7 +64,7 @@ func (s *Session) Rename(oldPath, newPath string) error {
 // no RemoveAll, so directories are walked depth-first: children first, then the
 // now-empty directory. A plain file takes the fast path.
 func (s *Session) Remove(path string) error {
-	fi, err := s.client.Stat(path)
+	fi, err := s.client.Lstat(path)
 	if err != nil {
 		return fmt.Errorf("cannot stat %s: %w", path, err)
 	}

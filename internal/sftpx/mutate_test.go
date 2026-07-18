@@ -43,3 +43,33 @@ func TestRemoveFileAndRecursiveDir(t *testing.T) {
 		t.Fatalf("tree still exists after recursive Remove: %v", err)
 	}
 }
+
+// TestRemoveDoesNotFollowSymlinks guards against a recursive Remove that Stats
+// (follows symlinks) instead of Lstats (does not): if a symlink-to-directory
+// sits inside the deleted tree, following it would make IsDir() true and the
+// recursion would descend into and delete the LINK TARGET's contents, which
+// live outside the confirmed tree entirely.
+func TestRemoveDoesNotFollowSymlinks(t *testing.T) {
+	s, root := newTestSession(t)
+
+	outside := filepath.Join(root, "outside")
+	_ = os.MkdirAll(outside, 0o755)
+	outsideFile := filepath.Join(outside, "keepme.txt")
+	_ = os.WriteFile(outsideFile, []byte("do not delete"), 0o644)
+
+	tree := filepath.Join(root, "tree")
+	_ = os.MkdirAll(tree, 0o755)
+	if err := os.Symlink(outside, filepath.Join(tree, "link")); err != nil {
+		t.Fatalf("Symlink error = %v", err)
+	}
+
+	if err := s.Remove(tree); err != nil {
+		t.Fatalf("Remove error = %v", err)
+	}
+	if _, err := os.Stat(tree); !os.IsNotExist(err) {
+		t.Fatalf("tree still exists after Remove: %v", err)
+	}
+	if _, err := os.Stat(outsideFile); err != nil {
+		t.Fatalf("outside file was deleted (symlink target followed): %v", err)
+	}
+}

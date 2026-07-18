@@ -55,6 +55,10 @@ export const useSftp = create<SftpState>((set, get) => ({
 
   openFor: async (server) => {
     set({ error: null })
+    // Close any already-open session first (fire-and-forget) so re-opening the
+    // browser doesn't leak the previous backend SFTP channel + SSH connection.
+    const prev = get().sessionId
+    if (prev) void SftpService.Close(prev).catch(() => {})
     try {
       const sessionId = await SftpService.Open(server.id)
       const [localCwd, remoteCwd] = await Promise.all([SftpService.LocalHome(), SftpService.RemoteHome(sessionId)])
