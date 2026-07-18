@@ -394,8 +394,10 @@ func (s *ServerService) TOTPCodes() ([]TOTPCodeView, error) {
 		if err != nil {
 			continue // ErrNotStored or a keychain fault — skip (best-effort)
 		}
+		// secret is a local read only by TOTPCode and never retained past this
+		// iteration (Go can't scrub an immutable string's bytes anyway); it goes
+		// out of scope here and is GC'd — no copy is kept.
 		code, err := domain.TOTPCode(secret, now)
-		secret = "" // drop the plaintext seed (SEC-10 spirit)
 		if err != nil {
 			continue
 		}
