@@ -189,6 +189,19 @@ func TestAuthMethodsAgentUnavailableSockUnset(t *testing.T) {
 	}
 }
 
+// Credentials.TOTPSecret must not change AuthMethods' behavior: a non-2FA
+// password server still yields exactly the one primary password method.
+// TOTP is applied only via the keyboard-interactive method client.go appends
+// when Server.TwoFactor is true — AuthMethods itself is unchanged (Task 3
+// brief).
+func TestAuthMethodsUnchangedWithTOTPSecretPresent(t *testing.T) {
+	srv := domain.Server{AuthType: domain.AuthPassword}
+	ms, err := AuthMethods(srv, Credentials{Password: "pw", TOTPSecret: "GEZDGNBVGY3TQOJQ"})
+	if err != nil || len(ms) != 1 {
+		t.Fatalf("methods=%d err=%v", len(ms), err)
+	}
+}
+
 // SEC-06: a wrong-passphrase error must never interpolate the passphrase
 // itself into the message — only the key path may appear.
 func TestAuthMethodsWrongPassphraseNeverLogsSecret(t *testing.T) {

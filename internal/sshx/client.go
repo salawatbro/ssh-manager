@@ -40,7 +40,20 @@ type Dialer struct {
 	// default) keeps NewDialer's dialTimeout in force — see
 	// SetDialTimeoutProvider.
 	dialTimeoutFn func() time.Duration
+	// codePrompter answers a keyboard-interactive prompt a TwoFactor
+	// server's questions can't already be resolved from Credentials (see
+	// buildKIChallenge). nil until SetCodePrompter is called; a nil
+	// prompter only matters if such a question is actually asked, in which
+	// case buildKIChallenge turns it into a coded error rather than a
+	// nil-interface panic.
+	codePrompter CodePrompter
 }
+
+// SetCodePrompter wires the interactive TOTP/2FA code-prompt UI (mirrors
+// SetDialTimeoutProvider's live-wiring pattern). It is consulted only for a
+// TwoFactor server, and only for prompts creds.Password/creds.TOTPSecret
+// cannot answer on their own.
+func (d *Dialer) SetCodePrompter(p CodePrompter) { d.codePrompter = p }
 
 // SetDialTimeoutProvider makes the TCP-connect timeout live: fn is read at each
 // dial, so a change to the Connection-timeout setting takes effect on the next
@@ -91,6 +104,9 @@ func (d *Dialer) Dial(ctx context.Context, srv domain.Server, creds Credentials)
 	methods, err := AuthMethods(srv, creds)
 	if err != nil {
 		return nil, err // already coded
+	}
+	if srv.TwoFactor {
+		methods = append(methods, ssh.KeyboardInteractive(buildKIChallenge(serverDisplayName(srv), creds, d.codePrompter)))
 	}
 	addr := net.JoinHostPort(srv.Host, strconv.Itoa(srv.Port))
 
@@ -319,6 +335,9 @@ func (d *Dialer) clientConfig(hop Hop) (*ssh.ClientConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+	if hop.Server.TwoFactor {
+		methods = append(methods, ssh.KeyboardInteractive(buildKIChallenge(serverDisplayName(hop.Server), hop.Creds, d.codePrompter)))
+	}
 	addr := net.JoinHostPort(hop.Server.Host, strconv.Itoa(hop.Server.Port))
 	cfg := &ssh.ClientConfig{User: hop.Server.User, Auth: methods, HostKeyCallback: d.verifier.Callback()}
 	if algos := d.verifier.HostKeyAlgorithms(addr); len(algos) > 0 {
@@ -329,12 +348,19 @@ func (d *Dialer) clientConfig(hop Hop) (*ssh.ClientConfig, error) {
 
 // jumpError wraps a hop failure with the hop's name for the UI.
 func jumpError(chain []Hop, i int, err error) error {
-	name := chain[i].Server.Name
-	if name == "" {
-		name = chain[i].Server.Host
-	}
 	return domain.NewError(domain.CodeJumpFailed,
-		fmt.Sprintf("Could not connect to jump host %q: %v", name, err))
+		fmt.Sprintf("Could not connect to jump host %q: %v", serverDisplayName(chain[i].Server), err))
+}
+
+// serverDisplayName returns srv's Name if set, else its Host — used to label
+// a server in a user-facing prompt (a jump-failure message, or a
+// CodeRequest.ServerName) when a human-readable name is preferable to the
+// bare address.
+func serverDisplayName(srv domain.Server) string {
+	if srv.Name != "" {
+		return srv.Name
+	}
+	return srv.Host
 }
 
 // classifyDialError maps a dial/handshake failure to a coded domain error.

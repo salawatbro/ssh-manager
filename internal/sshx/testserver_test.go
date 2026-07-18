@@ -6,15 +6,19 @@ import (
 	"crypto/rsa"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
+
+	"github.com/salawat/sshmgr/internal/domain"
 )
 
 // newTestServer starts an in-process SSH server that accepts any auth and
@@ -126,6 +130,75 @@ func newDualKeyTestServer(t *testing.T) (addr string, ed25519Key, rsaKey ssh.Pub
 		}
 	}()
 	return ln.Addr().String(), edSigner.PublicKey(), rsaSigner.PublicKey()
+}
+
+// newTOTPTestServer starts an in-process SSH server whose ONLY accepted auth
+// is keyboard-interactive: it asks a single "Verification code: " question
+// and accepts only the exact TOTP code domain.TOTPCode computes for secret at
+// the moment it's checked. It exists to prove the whole path end to end —
+// Dialer.Dial appending ssh.KeyboardInteractive only because Server.TwoFactor
+// is true, and buildKIChallenge answering from creds.TOTPSecret with no
+// prompter call — not just buildKIChallenge in isolation.
+func newTOTPTestServer(t *testing.T, secret string) (addr string, hostKey ssh.PublicKey) {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromSigner(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := &ssh.ServerConfig{
+		KeyboardInteractiveCallback: func(_ ssh.ConnMetadata, client ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+			answers, err := client("", "", []string{"Verification code: "}, []bool{false})
+			if err != nil {
+				return nil, err
+			}
+			if len(answers) != 1 {
+				return nil, fmt.Errorf("want 1 answer, got %d", len(answers))
+			}
+			want, err := domain.TOTPCode(secret, time.Now())
+			if err != nil {
+				return nil, err
+			}
+			if answers[0] != want {
+				return nil, fmt.Errorf("bad verification code")
+			}
+			return nil, nil
+		},
+	}
+	cfg.AddHostKey(signer)
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				sc, chans, reqs, err := ssh.NewServerConn(c, cfg)
+				if err != nil {
+					_ = c.Close()
+					return
+				}
+				go ssh.DiscardRequests(reqs)
+				go func() {
+					for ch := range chans {
+						_ = ch.Reject(ssh.Prohibited, "test server")
+					}
+				}()
+				_ = sc.Wait()
+			}()
+		}
+	}()
+	return ln.Addr().String(), signer.PublicKey()
 }
 
 // newJumpTestServer starts an in-process SSH server that behaves as a bastion:

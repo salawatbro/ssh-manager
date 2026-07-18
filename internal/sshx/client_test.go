@@ -402,6 +402,41 @@ func TestDialChainMiddleHopFailureIsJumpFailed(t *testing.T) {
 	}
 }
 
+// A TwoFactor server authenticates through keyboard-interactive: Dial only
+// appends the KI method because srv.TwoFactor is true, and buildKIChallenge
+// answers the server's "Verification code: " prompt straight from
+// creds.TOTPSecret with no prompter wired at all. This exercises the full
+// gate added in client.go, not just buildKIChallenge in isolation.
+func TestDialTwoFactorServerAutoFillsTOTP(t *testing.T) {
+	const secret = "GEZDGNBVGY3TQOJQ"
+	addr, _ := newTOTPTestServer(t, secret)
+	host, port := splitHostPort(t, addr)
+	srv := domain.Server{Host: host, Port: port, User: "x", AuthType: domain.AuthPassword, TwoFactor: true}
+	creds := Credentials{Password: "pw", TOTPSecret: secret}
+
+	res, err := dialerFor(t, true).Test(context.Background(), srv, creds)
+	if err != nil {
+		t.Fatalf("Test errored (TOTP auto-fill via keyboard-interactive failed): %v", err)
+	}
+	if !strings.Contains(res.Banner, "SSH-2.0") {
+		t.Fatalf("banner = %q", res.Banner)
+	}
+}
+
+// A non-2FA server's ClientConfig is unaffected by the TwoFactor gate: with
+// srv.TwoFactor left false (the zero value), the same password-only server
+// that newTestServer's NoClientAuth accepts still connects — pinning that
+// ordinary (non-2FA) behavior is byte-identical to before this feature.
+func TestDialNonTwoFactorServerUnaffected(t *testing.T) {
+	addr, _ := newTestServer(t)
+	host, port := splitHostPort(t, addr)
+	srv := domain.Server{Host: host, Port: port, User: "x", AuthType: domain.AuthPassword}
+	_, err := dialerFor(t, true).Test(context.Background(), srv, Credentials{Password: "pw"})
+	if err != nil {
+		t.Fatalf("Test errored for a non-2FA server: %v", err)
+	}
+}
+
 func assertCode(t *testing.T, err error, code string) {
 	t.Helper()
 	var de *domain.Error

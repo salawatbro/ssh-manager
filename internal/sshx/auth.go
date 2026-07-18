@@ -18,6 +18,11 @@ import (
 type Credentials struct {
 	Password   string
 	Passphrase string
+	// TOTPSecret is the base32 TOTP seed for a TwoFactor server, pulled from
+	// the keychain by the service layer (never from Server — SEC-01). Used
+	// only by buildKIChallenge's keyboard-interactive answering (client.go),
+	// not by AuthMethods below.
+	TOTPSecret string
 }
 
 // AuthMethods builds the ordered auth methods for a server. The secrets
