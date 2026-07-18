@@ -175,3 +175,25 @@ func TestSettingsServiceUpdatePersistsEvenIfLoginFails(t *testing.T) {
 		t.Fatal("settings row was not persisted despite the login-agent error")
 	}
 }
+
+func TestSettingsServiceUpdatePersistsTourSeen(t *testing.T) {
+	svc := newSettingsService(t)
+	cur, err := svc.Get()
+	if err != nil {
+		t.Fatalf("Get error = %v", err)
+	}
+	if cur.TourSeen {
+		t.Fatal("TourSeen should default to false on a fresh settings row")
+	}
+	cur.TourSeen = true
+	if _, err := svc.Update(*cur); err != nil {
+		t.Fatalf("Update error = %v", err)
+	}
+	got, err := svc.Get()
+	if err != nil {
+		t.Fatalf("Get error = %v", err)
+	}
+	if !got.TourSeen {
+		t.Fatal("TourSeen was not persisted by Update")
+	}
+}

@@ -27,6 +27,11 @@ type Settings struct {
 	// DefaultSettings() below and is what every first-run row actually gets.
 	GuardEnabled  bool   `gorm:"not null;default:true" json:"guardEnabled"`
 	GuardPatterns string `gorm:"not null;default:''" json:"guardPatterns"`
+
+	// TourSeen is set true once the first-run welcome tour has been shown (or
+	// skipped); false on a fresh install so the tour auto-opens exactly once.
+	// Not a secret — a plain onboarding flag.
+	TourSeen bool `gorm:"not null;default:false" json:"tourSeen"`
 }
 
 // DefaultSettings returns the first-run defaults. Kept in code (not only in

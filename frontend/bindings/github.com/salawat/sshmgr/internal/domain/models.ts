@@ -158,6 +158,13 @@ export interface Settings {
      */
     "guardEnabled": boolean;
     "guardPatterns": string;
+
+    /**
+     * TourSeen is set true once the first-run welcome tour has been shown (or
+     * skipped); false on a fresh install so the tour auto-opens exactly once.
+     * Not a secret — a plain onboarding flag.
+     */
+    "tourSeen": boolean;
 }
 
 /**
