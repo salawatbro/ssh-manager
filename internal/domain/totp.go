@@ -2,7 +2,7 @@ package domain
 
 import (
 	"crypto/hmac"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // G505: HMAC-SHA1 is mandated by RFC 6238 TOTP; SHA-1 inside HMAC is not the collision-weakness gosec warns about, and it is required for interop with real 2FA servers.
 	"encoding/base32"
 	"encoding/binary"
 	"fmt"
@@ -23,7 +23,7 @@ func TOTPCode(secretBase32 string, t time.Time) (string, error) {
 	if len(key) == 0 {
 		return "", fmt.Errorf("totp: empty secret")
 	}
-	counter := uint64(t.Unix()) / 30
+	counter := uint64(t.Unix()) / 30 //nolint:gosec // G115: t.Unix() is the current wall-clock time (always well after the 1970 epoch), so the int64→uint64 conversion never overflows in practice.
 	var buf [8]byte
 	binary.BigEndian.PutUint64(buf[:], counter)
 	mac := hmac.New(sha1.New, key)
