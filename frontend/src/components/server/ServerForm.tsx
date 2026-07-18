@@ -41,6 +41,12 @@ function emptyForm() {
     // writes `password`; `passphrase` gets its input in Task 11.
     password: '',
     passphrase: '',
+    // '' means "do not write / leave unchanged", same contract as
+    // password/passphrase above. The 2FA UI (checkbox + secret input) is
+    // Task 6's job — these defaults just keep CreateServerInput satisfied
+    // until then.
+    totpSecret: '',
+    twoFactor: false,
     group: '',
     environment: Environment.EnvNone as Environment,
     tags: [] as string[],
@@ -90,6 +96,11 @@ export function ServerForm({ serverId, onClose }: Props) {
             // there is nothing to prefill. Empty means "leave unchanged".
             password: '',
             passphrase: '',
+            totpSecret: '',
+            // Unlike the secret, twoFactor IS a normal row column (SEC-01
+            // comment on domain.Server.TwoFactor) — carry it over like
+            // group/environment below, not reset like the secret fields.
+            twoFactor: existing.twoFactor,
             group: existing.group,
             environment: existing.environment,
             tags: existing.tags ? existing.tags.split(',') : [],

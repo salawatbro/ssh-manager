@@ -6,6 +6,24 @@
 import * as domain$0 from "../domain/models.js";
 
 /**
+ * CodeRequest is the code:request event payload (TZ 8 TOTP/2FA addendum).
+ * It mirrors sshx.CodeRequest as a concrete named type so main.go's
+ * application.RegisterEvent[CodeRequest] gives the binding generator a type
+ * to turn into typed TypeScript. This file imports nothing from Wails, so
+ * internal/service stays cgo-free.
+ */
+export interface CodeRequest {
+    "requestID": string;
+    "serverName": string;
+    "prompt": string;
+
+    /**
+     * whether the typed answer should be visible
+     */
+    "echo": boolean;
+}
+
+/**
  * CreateServerInput is what the frontend sends to create or update a server.
  */
 export interface CreateServerInput {
@@ -24,6 +42,18 @@ export interface CreateServerInput {
      */
     "password": string;
     "passphrase": string;
+
+    /**
+     * TOTPSecret, like Password/Passphrase, goes to the OS keychain and
+     * NEVER into the database (SEC-01): toServer() does not read it, and
+     * writeSecrets normalises/validates it through domain.ParseTOTPSecret
+     * before storing. An empty value means "do not write / leave
+     * unchanged" (same rule as Password). TwoFactor marks the server as
+     * requiring a code at connect time and IS a normal row column (unlike
+     * the secret itself) — see domain.Server.TwoFactor.
+     */
+    "totpSecret": string;
+    "twoFactor": boolean;
     "jumpId": string | null;
     "group": string;
     "environment": domain$0.Environment;

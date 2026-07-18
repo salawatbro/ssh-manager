@@ -73,12 +73,12 @@ func main() {
 	// TwoFactor server's auto-fill (buildKIChallenge, driven by the
 	// keychain-stored TOTP secret credsFor attaches) could not resolve on
 	// its own — same event/channel pattern as prompter above, just a typed
-	// code instead of a yes/no. Registering the code:request event for the
-	// binding generator (so the frontend gets typed TypeScript for it) is
-	// left for the TOTP frontend wiring task; the prompter itself must be
-	// wired into both the dialer and SSHService now; a nil codePrompter on
-	// the dialer would make any 2FA connect needing the interactive
-	// fallback fail outright.
+	// code instead of a yes/no. The code:request event is registered below
+	// (see the init func near the hostkey:request registration) so the
+	// binding generator gives the frontend typed TypeScript for it; the
+	// prompter itself is wired into both the dialer and SSHService here —
+	// a nil codePrompter on the dialer would make any 2FA connect needing
+	// the interactive fallback fail outright.
 	codePrompter := service.NewCodePrompter(appEmitter{})
 	verifier, err := sshx.NewVerifier(knownHostsPath, prompter)
 	if err != nil {
@@ -426,6 +426,7 @@ func (appEmitter) Emit(name string, data ...any) bool {
 // static analysis reasons about it.
 func init() {
 	application.RegisterEvent[service.HostKeyRequest]("hostkey:request")
+	application.RegisterEvent[service.CodeRequest]("code:request")
 	application.RegisterEvent[term.Output]("term:data")
 	application.RegisterEvent[term.State]("session:state")
 	application.RegisterEvent[forward.Status]("forward:status")

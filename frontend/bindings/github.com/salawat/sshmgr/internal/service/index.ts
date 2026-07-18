@@ -17,6 +17,7 @@ export {
 };
 
 export type {
+    CodeRequest,
     CreateServerInput,
     ForwardInput,
     HostKeyRequest,

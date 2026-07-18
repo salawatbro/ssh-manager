@@ -99,6 +99,14 @@ export interface Server {
     "environment": Environment;
     "tags": string;
     "notes": string;
+
+    /**
+     * TwoFactor marks a server as requiring a TOTP code at connect time.
+     * The code and its secret NEVER live here or anywhere in the DB/JSON
+     * export — only this flag does. The secret itself lives in the OS
+     * keychain (SEC-01), keyed by this server's ID (secret.Store).
+     */
+    "twoFactor": boolean;
     "lastUsedAt": string | null;
     "useCount": number;
     "sortOrder": number;

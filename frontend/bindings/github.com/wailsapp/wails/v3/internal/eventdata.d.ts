@@ -18,6 +18,7 @@ import type * as term$0 from "../../../../salawat/sshmgr/internal/term/models.js
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "code:request": service$0.CodeRequest;
             "forward:status": forward$0.Status;
             "hostkey:request": service$0.HostKeyRequest;
             "session:state": term$0.State;
