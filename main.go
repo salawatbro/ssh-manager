@@ -285,8 +285,15 @@ func main() {
 			application.Get().Event.Emit("tray:connect", service.TrayConnect{ServerID: id})
 		}))
 	}
-	rebuildTray()
-	service.SetOnServersChanged(serverService, rebuildTray)
+	rebuildTray() // initial build: setup-time, on the main thread — direct call is safe
+	// Live rebuilds fire from the SetPinned/Update/Delete bound-method
+	// goroutines, which run off the main thread after app.Run(). Mutating the
+	// AppKit tray menu (tray.SetMenu) off the main thread can crash on macOS, so
+	// marshal each live rebuild onto the main thread. InvokeAsync's
+	// dispatchOnMainThread has an isOnMainThread fast path, so this stays cheap.
+	service.SetOnServersChanged(serverService, func() {
+		application.InvokeAsync(rebuildTray)
+	})
 
 	// SEC-05 & NFR-04: this is what lets SQLite checkpoint the WAL back into
 	// sshmgr.db and remove the "-wal"/"-shm" side files on a clean quit.
