@@ -26,7 +26,7 @@ func TestUninstallClearsSecretsLoginAndData(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dataDir, "sshmgr.db"), []byte("x"), 0o644)
 	logDir := t.TempDir()
 
-	svc := NewUninstallService(repo, sec, login, dataDir, logDir)
+	svc := NewUninstallService(repo, sec, login, dataDir, logDir, true)
 	called := 0
 	SetOnUninstalled(svc, func() { called++ })
 
@@ -48,5 +48,43 @@ func TestUninstallClearsSecretsLoginAndData(t *testing.T) {
 	// MoveAppBundleToTrash is a no-op for the test binary → success → quit fires.
 	if called != 1 {
 		t.Errorf("onUninstalled calls = %d, want 1", called)
+	}
+}
+
+// TestUninstallNoopWhenNotPackaged is the dev-safety guard: `wails3 dev` wires
+// UninstallService to the REAL DataDir/LogDir/keyring (see main.go), so if
+// Uninstall ran its data-deletion path whenever NOT packaged, a developer who
+// types UNINSTALL in dev would lose their real dev DB, Keychain secrets and
+// LaunchAgent. With packaged=false, Uninstall must do NOTHING destructive.
+func TestUninstallNoopWhenNotPackaged(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "u.db"))
+	if err != nil {
+		t.Fatalf("store.Open error = %v", err)
+	}
+	repo := store.NewServerRepo(db)
+	_ = repo.Create(sample("s1", "a", "Prod"))
+	sec := secret.NewFake()
+	_ = sec.SetPassword("s1", "pw1")
+	login := &fakeLoginAgent{}
+	dataDir := t.TempDir()
+	marker := filepath.Join(dataDir, "sshmgr.db")
+	_ = os.WriteFile(marker, []byte("x"), 0o644)
+	logDir := t.TempDir()
+
+	svc := NewUninstallService(repo, sec, login, dataDir, logDir, false)
+	called := 0
+	SetOnUninstalled(svc, func() { called++ })
+
+	if err := svc.Uninstall(); err == nil {
+		t.Fatal("Uninstall() error = nil, want a non-nil error when not packaged")
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Errorf("data dir file was removed even though not packaged: %v", err)
+	}
+	if called != 0 {
+		t.Errorf("onUninstalled calls = %d, want 0 (dev/test must never quit-uninstall)", called)
+	}
+	if _, err := sec.GetPassword("s1"); errors.Is(err, secret.ErrNotStored) {
+		t.Error("s1 keychain secret was deleted even though not packaged")
 	}
 }

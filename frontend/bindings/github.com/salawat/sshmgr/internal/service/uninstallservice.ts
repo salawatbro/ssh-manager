@@ -20,6 +20,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
  * gone). If the bundle can't be trashed the data is still gone, so it returns
  * that error WITHOUT quitting, letting the UI tell the user to trash the app by
  * hand. On full success it fires onUninstalled (quit) and returns nil.
+ * 
+ * It is a full no-op — nothing is touched, no callback fires — unless
+ * s.packaged is true, i.e. unless it is running from an installed .app.
  */
 export function Uninstall(): $CancellablePromise<void> {
     return $Call.ByID(3331619939);

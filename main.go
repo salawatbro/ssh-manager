@@ -123,7 +123,7 @@ func main() {
 
 	uninstallDataDir, _ := platform.DataDir()
 	uninstallLogDir, _ := platform.LogDir()
-	uninstallService := service.NewUninstallService(repo, kr, platform.NewLoginAgent(), uninstallDataDir, uninstallLogDir)
+	uninstallService := service.NewUninstallService(repo, kr, platform.NewLoginAgent(), uninstallDataDir, uninstallLogDir, platform.RunningFromAppBundle())
 
 	// Wires forwardRepo + forwardMgr into serverService so Delete tears down a
 	// server's live tunnels first (Task 4's deviation: a package-level func,

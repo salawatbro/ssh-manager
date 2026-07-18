@@ -15,10 +15,16 @@ export function UninstallModal({ onClose }: Props) {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !e.isComposing) onClose()
+      if (e.key !== 'Escape' || e.isComposing) return
+      // Capture-phase + stopImmediatePropagation: SettingsModal's own Escape
+      // listener is bubble-phase on the same document target, so without
+      // intercepting during capture (before the event ever reaches the
+      // bubble phase) it would still fire and close Settings too.
+      e.stopImmediatePropagation()
+      onClose()
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
   }, [onClose])
 
   async function run() {
