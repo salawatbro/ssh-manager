@@ -195,7 +195,7 @@ tasks:
   dmg:
     summary: Builds a drag-to-install DMG from the ad-hoc-signed .app (macOS only)
     vars:
-      VERSION: "1.0.0"        # keep in sync with build/config.yml `version`
+      VERSION: "1.1.0"        # keep in sync with build/config.yml `version`
       VOLNAME: "SSH Manager"
       STAGING: "{{.BIN_DIR}}/dmg-staging"
       DMG_OUT: "{{.BIN_DIR}}/SSH Manager-{{.VERSION}}.dmg"
@@ -207,7 +207,7 @@ tasks:
   dmg:build:
     internal: true
     vars:
-      VERSION: "1.0.0"
+      VERSION: "1.1.0"
       VOLNAME: "SSH Manager"
       STAGING: "{{.BIN_DIR}}/dmg-staging"
       DMG_OUT: "{{.BIN_DIR}}/SSH Manager-{{.VERSION}}.dmg"

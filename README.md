@@ -11,7 +11,7 @@ multi-tab, split-pane terminal — all from one native desktop app.
 
 ## Install
 
-1. Download `SSH Manager-1.0.0.dmg`.
+1. Download `SSH Manager-1.1.0.dmg`.
 2. Open the DMG and drag **SSH Manager** into **Applications**.
 3. **First launch:** right-click (or Control-click) the app → **Open** →
    **Open** again. The app is ad-hoc signed but not notarized, so macOS asks
@@ -183,7 +183,7 @@ Produces a macOS application bundle (`SSH Manager`, bundle id
 task darwin:dmg
 ```
 
-Produces `bin/SSH Manager-1.0.0.dmg`. The app inside is ad-hoc signed but not
+Produces `bin/SSH Manager-1.1.0.dmg`. The app inside is ad-hoc signed but not
 notarized, so recipients need to right-click → **Open** on first launch (see
 [Install](#install)).
 
@@ -246,6 +246,13 @@ those platforms are not yet runtime-tested.
 ---
 
 ## Project status
+
+**v1.1** — SFTP dual-pane file transfer (upload/download files and folders,
+progress and cancel); native right-click menus everywhere (terminal
+copy/paste, per-file download/rename/delete, sidebar); menu-bar tray
+quick-connect (pin up to five servers); TOTP / 2FA keyboard-interactive
+auto-fill plus a live Authenticator panel; a first-run welcome tour; and a
+terminal scrolling fix.
 
 **v1.0** — first release. Server management, keychain-backed connections, the
 terminal, command palette / global hotkey / tray, `~/.ssh/config` import and a
