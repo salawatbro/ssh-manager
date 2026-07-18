@@ -18,15 +18,16 @@ function baseName(path: string): string {
   return idx >= 0 ? path.slice(idx + 1) : path
 }
 
-// SftpView: the dual-pane SFTP shell (Task 8), wired end-to-end here —
-// drag upload/download between the two panes (each gated on an overwrite
-// check against the DESTINATION pane's current listing), remote
-// mkdir/rename/delete, all through inline modals (never window.confirm/
-// prompt/alert). TransferBar sits pinned under the grid. Self-guards on the
+// SftpView: the dual-pane SFTP shell (Task 8) — drag upload/download between
+// the two panes (gated on an overwrite check), remote mkdir/rename/delete
+// via inline modals (never window.confirm/prompt/alert). Self-guards on the
 // store's `open` flag so App.tsx can mount it unconditionally.
 export default function SftpView() {
   const open = useSftp((s) => s.open)
+  const connecting = useSftp((s) => s.connecting)
+  const error = useSftp((s) => s.error)
   const serverId = useSftp((s) => s.serverId)
+  const sessionId = useSftp((s) => s.sessionId)
   const close = useSftp((s) => s.close)
   const remoteCwd = useSftp((s) => s.remoteCwd)
   const localEntries = useSftp((s) => s.localEntries)
@@ -42,16 +43,13 @@ export default function SftpView() {
   const [pendingDelete, setPendingDelete] = useState<FileEntry | null>(null)
   const [pendingRename, setPendingRename] = useState<FileEntry | null>(null)
   const [mkdirOpen, setMkdirOpen] = useState(false)
-  // Any one of the four modals owns Escape while it's open — without this,
-  // dismissing an overwrite/delete/rename/mkdir prompt with Escape would
-  // also close the whole SFTP view underneath it.
+  // One of the four modals owns Escape while open, else it'd also close the view.
   const modalOpen = !!pendingOverwrite || !!pendingDelete || !!pendingRename || mkdirOpen
 
   useEffect(() => {
     if (!open) return
     function onKeyDown(e: KeyboardEvent) {
-      // isComposing guards against an IME commit keystroke closing the view
-      // mid-composition — same reasoning as TunnelsPanel's Escape handler.
+      // isComposing guards against an IME commit keystroke closing the view.
       if (e.key === 'Escape' && !e.isComposing && !modalOpen) close()
     }
     document.addEventListener('keydown', onKeyDown)
@@ -60,11 +58,8 @@ export default function SftpView() {
 
   if (!open) return null
 
-  // Dropping onto a pane means "bring the dragged item HERE": the remote
-  // pane uploads a dropped local path, the local pane downloads a dropped
-  // remote path. Each checks the DESTINATION's current listing for a
-  // same-named entry first; if found, the transfer waits on the overwrite
-  // modal's Overwrite button instead of running immediately.
+  // Dropping onto a pane means "bring the dragged item HERE"; each checks the
+  // DESTINATION's listing first and waits on the overwrite modal if it collides.
   function dropOnRemote(localPath: string) {
     if (remoteEntries.some((e) => e.name === baseName(localPath))) {
       setPendingOverwrite({ kind: 'upload', path: localPath })
@@ -106,9 +101,7 @@ export default function SftpView() {
   }
 
   return (
-    // relative: scopes the confirm/prompt modals' `absolute inset-0` to this
-    // pane (they cover the dual-pane grid + TransferBar, not the sidebar or
-    // title bar) rather than falling through to the viewport.
+    // relative: scopes the modals' `absolute inset-0` to this pane, not the viewport.
     <div className="relative flex min-h-0 flex-1 flex-col bg-bg1b">
       <div className="flex h-[42px] shrink-0 items-center gap-[8px] border-b border-border px-[14px]">
         <span className="shrink-0 text-[13px] font-semibold">SFTP</span>
@@ -126,17 +119,33 @@ export default function SftpView() {
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-1">
-        <LocalPane onDropPath={dropOnLocal} />
-        <RemotePane
-          onDropPath={dropOnRemote}
-          onMkdir={() => setMkdirOpen(true)}
-          onRename={setPendingRename}
-          onDelete={setPendingDelete}
-        />
-      </div>
+      {connecting ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center text-[13px] text-textMuted">
+          Connecting to the server…
+        </div>
+      ) : !sessionId ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[10px] px-[24px] text-center">
+          <span className="text-[13.5px] font-semibold text-text">Could not connect</span>
+          {error && <span className="max-w-[360px] text-[12.5px] text-textMuted">{error}</span>}
+          <button type="button" onClick={close} className="no-drag mt-[4px] h-[28px] rounded-[6px] border border-border px-[14px] text-[12.5px] font-medium text-text hover:bg-bg2">
+            Close
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex min-h-0 flex-1">
+            <LocalPane onDropPath={dropOnLocal} />
+            <RemotePane
+              onDropPath={dropOnRemote}
+              onMkdir={() => setMkdirOpen(true)}
+              onRename={setPendingRename}
+              onDelete={setPendingDelete}
+            />
+          </div>
 
-      <TransferBar />
+          <TransferBar />
+        </>
+      )}
 
       {pendingOverwrite && (
         <ConfirmModal

@@ -5,9 +5,7 @@ import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain
 import { joinRemote, dirnameRemote } from '../lib/remotePath'
 
 // Mirrors the sftp:progress event payload (service/models.ts SftpProgress)
-// minus the terminal-only `finished`/`error` fields, which applyProgress
-// takes separately — a finished transfer is removed from `transfers`
-// rather than kept around with those fields set.
+// minus the terminal-only `finished`/`error` fields (see applyProgress).
 export interface TransferProgress {
   transferID: string
   direction: string
@@ -18,6 +16,7 @@ export interface TransferProgress {
 
 interface SftpState {
   open: boolean
+  connecting: boolean
   serverId: string | null
   sessionId: string | null
   localCwd: string
@@ -44,6 +43,7 @@ interface SftpState {
 
 export const useSftp = create<SftpState>((set, get) => ({
   open: false,
+  connecting: false,
   serverId: null,
   sessionId: null,
   localCwd: '',
@@ -54,11 +54,14 @@ export const useSftp = create<SftpState>((set, get) => ({
   error: null,
 
   openFor: async (server) => {
-    set({ error: null })
-    // Close any already-open session first (fire-and-forget) so re-opening the
-    // browser doesn't leak the previous backend SFTP channel + SSH connection.
+    // Close any prior session (fire-and-forget) so re-opening doesn't leak it.
     const prev = get().sessionId
     if (prev) void SftpService.Close(prev).catch(() => {})
+    // Show the panel right away in a connecting state (worse with 2FA prompts).
+    set({
+      open: true, connecting: true, error: null, serverId: server.id,
+      sessionId: null, localCwd: '', remoteCwd: '', localEntries: [], remoteEntries: [],
+    })
     try {
       const sessionId = await SftpService.Open(server.id)
       const [localCwd, remoteCwd] = await Promise.all([SftpService.LocalHome(), SftpService.RemoteHome(sessionId)])
@@ -67,8 +70,7 @@ export const useSftp = create<SftpState>((set, get) => ({
         SftpService.ListRemote(sessionId, remoteCwd),
       ])
       set({
-        open: true,
-        serverId: server.id,
+        connecting: false,
         sessionId,
         localCwd,
         remoteCwd,
@@ -76,17 +78,18 @@ export const useSftp = create<SftpState>((set, get) => ({
         remoteEntries: remoteEntries ?? [],
       })
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) })
+      // Keep open:true so SftpView renders the error; sessionId stays null.
+      set({ connecting: false, error: e instanceof Error ? e.message : String(e) })
     }
   },
 
-  // Fire-and-forget: the panel is already gone by the time this settles, so
-  // there is nothing left to update on failure (mirrors copySSHCommand).
+  // Fire-and-forget: the panel is gone by the time this settles (mirrors copySSHCommand).
   close: () => {
     const { sessionId } = get()
     if (sessionId) void SftpService.Close(sessionId).catch(() => {})
     set({
       open: false,
+      connecting: false,
       serverId: null,
       sessionId: null,
       localCwd: '',
@@ -123,9 +126,7 @@ export const useSftp = create<SftpState>((set, get) => ({
     await Promise.all([get().navLocal(localCwd), get().navRemote(remoteCwd)])
   },
 
-  // The transfer itself is tracked via sftp:progress (applyProgress), not the
-  // returned transferID here — the backend starts the copy in a goroutine and
-  // returns immediately.
+  // Tracked via sftp:progress (applyProgress); the backend copies in a goroutine.
   upload: async (localPath) => {
     const { sessionId, remoteCwd } = get()
     if (!sessionId) return
@@ -193,8 +194,7 @@ export const useSftp = create<SftpState>((set, get) => ({
           ],
       error: p.error || state.error,
     }))
-    // A finished transfer (success or failure) may have added/left a partial
-    // file — refresh both panels so whichever side changed reflects it.
+    // A finished transfer may leave a partial file — refresh both panels.
     if (p.finished) void get().refresh()
   },
 }))
