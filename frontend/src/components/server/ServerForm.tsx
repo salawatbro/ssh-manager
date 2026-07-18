@@ -35,16 +35,9 @@ function emptyForm() {
     // v0.1 has no keychain, so agent is the only auth method that can work.
     authType: AuthType.AuthAgent as AuthType,
     keyPath: '',
-    // '' means "do not write / leave unchanged" per CreateServerInput's
-    // contract (SEC-01) — never omit these, an agent server is expected to
-    // send them empty. ServerFormAuth's password field is the only UI that
-    // writes `password`; `passphrase` gets its input in Task 11.
+    // '' = do not write / leave unchanged (SEC-01) — password/passphrase/totpSecret alike.
     password: '',
     passphrase: '',
-    // '' means "do not write / leave unchanged", same contract as
-    // password/passphrase above. The 2FA UI (checkbox + secret input) is
-    // Task 6's job — these defaults just keep CreateServerInput satisfied
-    // until then.
     totpSecret: '',
     twoFactor: false,
     group: '',
@@ -92,14 +85,11 @@ export function ServerForm({ serverId, onClose }: Props) {
             user: existing.user,
             authType: existing.authType,
             keyPath: existing.keyPath,
-            // A stored server never comes back with its secret (SEC-01) —
-            // there is nothing to prefill. Empty means "leave unchanged".
+            // Secrets never come back (SEC-01) — empty means "leave unchanged".
             password: '',
             passphrase: '',
             totpSecret: '',
-            // Unlike the secret, twoFactor IS a normal row column (SEC-01
-            // comment on domain.Server.TwoFactor) — carry it over like
-            // group/environment below, not reset like the secret fields.
+            // twoFactor is a normal row column (not a secret) — carry it over.
             twoFactor: existing.twoFactor,
             group: existing.group,
             environment: existing.environment,
