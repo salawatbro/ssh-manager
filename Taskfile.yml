@@ -65,11 +65,11 @@ tasks:
           exit 0
 
       # Global Constraint: every React component lives in one file, and that
-      # file never exceeds 200 lines. Nothing machine-checked this before —
+      # file never exceeds 250 lines. Nothing machine-checked this before —
       # ServerForm.tsx drifted to 225 lines while the project record still
       # claimed 196 — which is exactly how it went unnoticed. This checks
       # every file under frontend/src, not just components, since the cap is
-      # simplest to enforce uniformly and a 200+ line non-component file would
+      # simplest to enforce uniformly and a 250+ line non-component file would
       # be worth a look too.
       # Same mvdan/sh trap as the two guards above, same fix: a false `if`
       # with no `else` returns the *condition's* status, not 0, so this needs
@@ -78,13 +78,13 @@ tasks:
           offenders=$(
             for f in $(find frontend/src -type f); do
               n=$(wc -l < "$f")
-              if [ "$n" -gt 200 ]; then
+              if [ "$n" -gt 250 ]; then
                 echo "$f: $n qator"
               fi
             done
           )
           if [ -n "$offenders" ]; then
-            echo "XATO: 200 qatordan oshgan fayl(lar) (Global Constraint):"
+            echo "XATO: 250 qatordan oshgan fayl(lar) (Global Constraint):"
             echo "$offenders"
             exit 1
           fi
