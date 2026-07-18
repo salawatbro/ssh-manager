@@ -121,6 +121,10 @@ func main() {
 	forwardService := service.NewForwardService(forwardRepo, repo, kr, dialer, forwardMgr)
 	sftpService := service.NewSftpService(repo, kr, dialer, appEmitter{})
 
+	uninstallDataDir, _ := platform.DataDir()
+	uninstallLogDir, _ := platform.LogDir()
+	uninstallService := service.NewUninstallService(repo, kr, platform.NewLoginAgent(), uninstallDataDir, uninstallLogDir)
+
 	// Wires forwardRepo + forwardMgr into serverService so Delete tears down a
 	// server's live tunnels first (Task 4's deviation: a package-level func,
 	// not a method — see SetForwardDeps' doc comment in server_service.go for
@@ -155,6 +159,7 @@ func main() {
 			application.NewService(forwardService),
 			application.NewService(snippetService),
 			application.NewService(sftpService),
+			application.NewService(uninstallService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -296,6 +301,10 @@ func main() {
 	service.SetOnServersChanged(serverService, func() {
 		application.InvokeAsync(rebuildTray)
 	})
+
+	// Uninstall wipes the DB/keychain/log dirs and then must quit the app —
+	// there is nothing left for the UI to show once the data is gone.
+	service.SetOnUninstalled(uninstallService, func() { app.Quit() })
 
 	// SEC-05 & NFR-04: this is what lets SQLite checkpoint the WAL back into
 	// sshmgr.db and remove the "-wal"/"-shm" side files on a clean quit.

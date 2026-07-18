@@ -8,6 +8,7 @@ import * as ServerService from "./serverservice.js";
 import * as SettingsService from "./settingsservice.js";
 import * as SftpService from "./sftpservice.js";
 import * as SnippetService from "./snippetservice.js";
+import * as UninstallService from "./uninstallservice.js";
 export {
     ForwardService,
     ImportService,
@@ -15,7 +16,8 @@ export {
     ServerService,
     SettingsService,
     SftpService,
-    SnippetService
+    SnippetService,
+    UninstallService
 };
 
 export type {
