@@ -36,3 +36,15 @@ type CodeRequest struct {
 type TrayConnect struct {
 	ServerID string `json:"serverID"`
 }
+
+// SftpProgress is the sftp:progress event payload: one update for an in-flight
+// transfer (or its terminal Finished/Error state). Carries no secret (SEC-01).
+type SftpProgress struct {
+	TransferID  string `json:"transferID"`
+	Direction   string `json:"direction"` // "upload" | "download"
+	CurrentFile string `json:"currentFile"`
+	Done        int64  `json:"done"`
+	Total       int64  `json:"total"`
+	Finished    bool   `json:"finished"`
+	Error       string `json:"error"` // non-empty on failure
+}
