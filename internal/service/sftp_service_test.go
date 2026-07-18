@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/salawat/sshmgr/internal/secret"
 	"github.com/salawat/sshmgr/internal/sftpx"
@@ -66,13 +69,31 @@ func inject(s *SftpService, id string, fs sftpSession) {
 	s.mu.Unlock()
 }
 
-type capEmitterS struct{ events []any }
+// capEmitterS is -race-safe: the transfer goroutine calls Emit concurrently
+// with the test goroutine's polling reads, so events is guarded by mu and
+// only ever read back through snapshot()'s copy.
+type capEmitterS struct {
+	mu     sync.Mutex
+	events []any
+}
 
 func (c *capEmitterS) Emit(_ string, data ...any) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if len(data) > 0 {
 		c.events = append(c.events, data[0])
 	}
 	return true
+}
+
+// snapshot returns a copy of the captured events so callers never read the
+// raw, mutex-guarded slice directly.
+func (c *capEmitterS) snapshot() []any {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make([]any, len(c.events))
+	copy(out, c.events)
+	return out
 }
 
 func TestSftpOpenUnknownServer(t *testing.T) {
@@ -126,4 +147,80 @@ func TestSftpCloseClearsSession(t *testing.T) {
 	if _, err := svc.ListRemote("sid", "/"); err == nil {
 		t.Fatal("session still present after Close")
 	}
+}
+
+func TestSftpUploadEmitsProgressAndFinishes(t *testing.T) {
+	svc, _, em := newSftpService(t)
+	fs := &fakeSession{progress: []sftpx.Progress{
+		{CurrentFile: "a", Done: 5, Total: 10},
+		{CurrentFile: "a", Done: 10, Total: 10},
+	}}
+	inject(svc, "sid", fs)
+
+	id, err := svc.Upload("sid", "/local/a", "/remote")
+	if err != nil {
+		t.Fatalf("Upload error = %v", err)
+	}
+	if id == "" {
+		t.Fatal("Upload returned empty transferID")
+	}
+	// The transfer runs in a goroutine; wait for the terminal event.
+	waitForFinished(t, em)
+
+	var finished *SftpProgress
+	for _, ev := range em.snapshot() {
+		if p, ok := ev.(SftpProgress); ok && p.Finished {
+			p := p
+			finished = &p
+		}
+	}
+	if finished == nil {
+		t.Fatal("no Finished sftp:progress emitted")
+	}
+	if finished.TransferID != id || finished.Direction != "upload" || finished.Error != "" {
+		t.Fatalf("final event = %+v, want id=%s upload no-error", *finished, id)
+	}
+}
+
+func TestSftpUploadEmitsErrorOnFailure(t *testing.T) {
+	svc, _, em := newSftpService(t)
+	fs := &fakeSession{transErr: errors.New("disk full")}
+	inject(svc, "sid", fs)
+	_, err := svc.Upload("sid", "/local/a", "/remote")
+	if err != nil {
+		t.Fatalf("Upload (async) should not return the transfer error synchronously: %v", err)
+	}
+	waitForFinished(t, em)
+	var got *SftpProgress
+	for _, ev := range em.snapshot() {
+		if p, ok := ev.(SftpProgress); ok && p.Finished {
+			p := p
+			got = &p
+		}
+	}
+	if got == nil || got.Error == "" {
+		t.Fatalf("want a Finished event carrying Error, got %+v", got)
+	}
+}
+
+func TestSftpCancelUnknownTransfer(t *testing.T) {
+	svc, _, _ := newSftpService(t)
+	if err := svc.CancelTransfer("nope"); err == nil {
+		t.Fatal("CancelTransfer on unknown id returned nil error")
+	}
+}
+
+// waitForFinished polls the captured emitter for a terminal event, up to ~2s,
+// so the goroutine-run transfer is observed without a fixed sleep.
+func waitForFinished(t *testing.T, em *capEmitterS) {
+	t.Helper()
+	for i := 0; i < 200; i++ {
+		for _, ev := range em.snapshot() {
+			if p, ok := ev.(SftpProgress); ok && p.Finished {
+				return
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("timed out waiting for a Finished sftp:progress event")
 }

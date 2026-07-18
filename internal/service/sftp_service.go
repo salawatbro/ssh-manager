@@ -26,6 +26,11 @@ type sftpSession interface {
 	Close() error
 }
 
+// var _ sftpSession = (*sftpx.Session)(nil) is a compile-time check that
+// *sftpx.Session still satisfies sftpSession: a future signature drift fails
+// right here with a clear message, instead of surfacing elsewhere.
+var _ sftpSession = (*sftpx.Session)(nil)
+
 // sftpConn pairs the SFTP session with the SSH connection it rides on; both are
 // closed together. conn is nil in tests (Close guards it).
 type sftpConn struct {
@@ -159,3 +164,74 @@ func (s *SftpService) ListLocal(dir string) ([]sftpx.FileEntry, error) { return 
 
 // LocalHome needs no session — the left pane is the local FS.
 func (s *SftpService) LocalHome() (string, error) { return sftpx.LocalHome() }
+
+// Upload streams localPath to remoteDir on the session and returns a transferID
+// immediately; the copy runs in a goroutine, emitting sftp:progress as it goes
+// and a terminal Finished (with Error, if any). CancelTransfer(transferID) aborts it.
+func (s *SftpService) Upload(sessionID, localPath, remoteDir string) (string, error) {
+	sess, err := s.get(sessionID)
+	if err != nil {
+		return "", err
+	}
+	return s.run("upload", func(ctx context.Context, id string) error {
+		return sess.Upload(ctx, localPath, remoteDir, s.progressFn(id, "upload"))
+	}), nil
+}
+
+// Download is Upload's mirror: remotePath -> localDir.
+func (s *SftpService) Download(sessionID, remotePath, localDir string) (string, error) {
+	sess, err := s.get(sessionID)
+	if err != nil {
+		return "", err
+	}
+	return s.run("download", func(ctx context.Context, id string) error {
+		return sess.Download(ctx, remotePath, localDir, s.progressFn(id, "download"))
+	}), nil
+}
+
+// CancelTransfer aborts an in-flight transfer.
+func (s *SftpService) CancelTransfer(transferID string) error {
+	s.mu.Lock()
+	cancel, ok := s.transfers[transferID]
+	s.mu.Unlock()
+	if !ok {
+		return domain.NewError(domain.CodeValidation, "That transfer is no longer running.")
+	}
+	cancel()
+	return nil
+}
+
+// run registers a cancellable transfer, launches fn in a goroutine, and emits a
+// terminal Finished event (with Error on failure) before deregistering.
+func (s *SftpService) run(direction string, fn func(ctx context.Context, id string) error) string {
+	ctx, cancel := context.WithCancel(context.Background())
+	id := uuid.NewString()
+	s.mu.Lock()
+	s.transfers[id] = cancel
+	s.mu.Unlock()
+	go func() {
+		err := fn(ctx, id)
+		s.mu.Lock()
+		delete(s.transfers, id)
+		s.mu.Unlock()
+		cancel()
+		fin := SftpProgress{TransferID: id, Direction: direction, Finished: true}
+		if err != nil {
+			fin.Error = err.Error()
+		}
+		s.emitter.Emit("sftp:progress", fin)
+	}()
+	return id
+}
+
+// progressFn adapts sftpx.Progress into throttled sftp:progress events. It emits
+// on every callback; sftpx already batches per copy chunk (~32KB), so this stays
+// cheap without extra time-based throttling.
+func (s *SftpService) progressFn(id, direction string) func(sftpx.Progress) {
+	return func(p sftpx.Progress) {
+		s.emitter.Emit("sftp:progress", SftpProgress{
+			TransferID: id, Direction: direction,
+			CurrentFile: p.CurrentFile, Done: p.Done, Total: p.Total,
+		})
+	}
+}
