@@ -11,6 +11,7 @@ import { useSettings } from '../../stores/settings'
 import { useSessions } from '../../stores/sessions'
 import { PaneNotice } from './PaneNotice'
 import { FindBar } from './FindBar'
+import { ContextMenu, type MenuEntry } from '../ui/ContextMenu'
 
 interface Props {
   paneId: string
@@ -26,6 +27,7 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
   const [term, setTerm] = useState<XTerm | null>(null)
   const [fit, setFit] = useState<FitAddon | null>(null)
   const [findOpen, setFindOpen] = useState(false)
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const cfg = useSettings((st) => st.settings)
 
   useEffect(() => {
@@ -164,12 +166,25 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
       className={`relative h-full w-full bg-bg0 ${focused ? 'shadow-[inset_0_0_0_1px_var(--color-accent)]' : ''}`}
       onMouseDown={onFocus}
       onContextMenu={(e) => {
-        // Right-click pastes (user decision).
         e.preventDefault()
-        if (term) void navigator.clipboard.readText().then((txt) => term.paste(txt)).catch(() => {})
+        setMenu({ x: e.clientX, y: e.clientY })
       }}
     >
       <div ref={hostRef} className="h-full w-full p-[6px]" />
+      {menu && term && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={[
+            { label: 'Copy', disabled: !term.hasSelection(), run: () => void navigator.clipboard.writeText(term.getSelection()).catch(() => {}) },
+            { label: 'Paste', run: () => void navigator.clipboard.readText().then((t) => term.paste(t)).catch(() => {}) },
+            'separator',
+            { label: 'Select All', run: () => term.selectAll() },
+            { label: 'Clear', run: () => term.clear() },
+          ] satisfies MenuEntry[]}
+        />
+      )}
       {findOpen && <FindBar onFind={find} onClose={() => setFindOpen(false)} />}
       {(session.status === 'error' || session.status === 'closed') && (
         <PaneNotice
