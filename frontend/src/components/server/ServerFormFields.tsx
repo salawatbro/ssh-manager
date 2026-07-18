@@ -6,6 +6,7 @@ import type { ServerFormValues } from './ServerForm'
 import { ServerFormAuth } from './ServerFormAuth'
 import { ServerFormGroup } from './ServerFormGroup'
 import { TagsEditor } from './TagsEditor'
+import { TwoFactorFields } from './TwoFactorFields'
 
 interface Props {
   form: ServerFormValues
@@ -28,8 +29,8 @@ const label = 'text-[11px] font-medium text-textMuted'
 // (header, save/delete footer, state wiring) stays under the 200-line cap
 // while this file absorbs new fields. Field order mirrors the design
 // (dizayn manbasi: MainWindow.dc.html's Edit/Add server panel): Name →
-// Host/Port → User → Auth method (+ Key file/Password) → Group/Environment
-// → Tags → Jump host.
+// Host/Port → User → Auth method (+ Key file/Password) → 2FA toggle (+ TOTP
+// secret) → Group/Environment → Tags → Jump host.
 export function ServerFormFields({ form, setForm, error, detectedKeys, serverId }: Props) {
   const servers = useServers((s) => s.servers)
   // Deduped, sorted distinct group names already in use — populates the
@@ -80,6 +81,8 @@ export function ServerFormFields({ form, setForm, error, detectedKeys, serverId 
       </div>
 
       <ServerFormAuth form={form} setForm={setForm} detectedKeys={detectedKeys} />
+
+      <TwoFactorFields form={form} setForm={setForm} editing={serverId !== null} />
 
       <div className="flex gap-[9px]">
         <ServerFormGroup form={form} setForm={setForm} groups={groups} />

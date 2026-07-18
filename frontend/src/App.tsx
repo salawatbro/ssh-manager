@@ -4,6 +4,7 @@ import { ServerForm } from './components/server/ServerForm'
 import { EmptyState } from './components/EmptyState'
 import { HostKeyModal } from './components/modals/HostKeyModal'
 import { HostKeyChangedModal } from './components/modals/HostKeyChangedModal'
+import { CodeModal } from './components/modals/CodeModal'
 import { GuardModal } from './components/modals/GuardModal'
 import { TerminalArea } from './components/terminal/TerminalArea'
 import { TabBar } from './components/terminal/TabBar'
@@ -16,6 +17,7 @@ import { StatusBar } from './components/layout/StatusBar'
 import { useAppKeymap } from './hooks/useAppKeymap'
 import { useServers } from './stores/servers'
 import { useHostKey } from './stores/hostkey'
+import { useCodePrompt } from './stores/codeprompt'
 import { useSettings } from './stores/settings'
 import { useForwards } from './stores/forwards'
 
@@ -32,6 +34,9 @@ export default function App() {
 
   const hostKeyRequest = useHostKey((s) => s.request)
   const confirmHostKey = useHostKey((s) => s.confirm)
+  const codeRequest = useCodePrompt((s) => s.request)
+  const submitCode = useCodePrompt((s) => s.submit)
+  const cancelCode = useCodePrompt((s) => s.cancel)
 
   useEffect(() => {
     void load()
@@ -41,6 +46,13 @@ export default function App() {
     // Register at mount so a hostkey:request emitted the instant a test
     // starts is never dropped for want of a listener.
     const off = useHostKey.getState().listen()
+    return off
+  }, [])
+
+  useEffect(() => {
+    // Same reasoning as hostkey's listen: a code:request can be emitted the
+    // instant a keyboard-interactive 2FA challenge starts.
+    const off = useCodePrompt.getState().listen()
     return off
   }, [])
 
@@ -153,6 +165,14 @@ export default function App() {
       )}
       {hostKeyRequest && hostKeyRequest.isChanged && (
         <HostKeyChangedModal key={hostKeyRequest.requestID} request={hostKeyRequest} onConfirm={confirmHostKey} />
+      )}
+
+      {/* Manual code prompt (TOTP or an unrecognised keyboard-interactive
+          question) — driven by stores/codeprompt.ts, same one-instance
+          pattern as HostKeyModal above. key remounts per request so a NEW
+          challenge always starts with an empty input. */}
+      {codeRequest && (
+        <CodeModal key={codeRequest.requestID} request={codeRequest} onSubmit={submitCode} onCancel={cancelCode} />
       )}
 
       <CommandPalette onNewServer={openAdd} onOpenTunnels={openTunnelsFor} />
