@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/ssh"
@@ -965,5 +966,87 @@ func TestCreateWithoutSecretWritesNothing(t *testing.T) {
 	})
 	if _, err := store.GetPassword(srv.ID); !errors.Is(err, secret.ErrNotStored) {
 		t.Fatal("agent server should store no password")
+	}
+}
+
+// TOTPCodes is the authenticator panel's one call: it must return exactly
+// the servers that are both TwoFactor AND have a secret actually stored in
+// the keychain — a 2FA server whose secret write never happened (or whose
+// keychain read fails) is skipped rather than failing the whole list
+// (best-effort), and a non-2FA server is never even asked for a secret. The
+// returned view carries the DERIVED code only (SEC-01) — never the secret.
+func TestTOTPCodesReturnsOnlyTwoFactorServersWithSecrets(t *testing.T) {
+	svc, sec := newServiceWithSecrets(t, &fakeDialer{})
+
+	// s1: 2FA + stored secret → included
+	s1, err := svc.Create(CreateServerInput{
+		Name: "prod", Host: "h1", Port: 22, User: "u", AuthType: domain.AuthAgent,
+		TwoFactor: true, TOTPSecret: "GEZDGNBVGY3TQOJQ",
+	})
+	if err != nil {
+		t.Fatalf("Create(s1) error = %v", err)
+	}
+	// s2: 2FA, NO stored secret → omitted
+	if _, err := svc.Create(CreateServerInput{
+		Name: "nosecret", Host: "h2", Port: 22, User: "u", AuthType: domain.AuthAgent,
+		TwoFactor: true,
+	}); err != nil {
+		t.Fatalf("Create(s2) error = %v", err)
+	}
+	// s3: non-2FA → omitted
+	if _, err := svc.Create(CreateServerInput{
+		Name: "plain", Host: "h3", Port: 22, User: "u", AuthType: domain.AuthAgent,
+	}); err != nil {
+		t.Fatalf("Create(s3) error = %v", err)
+	}
+
+	codes, err := svc.TOTPCodes()
+	if err != nil {
+		t.Fatalf("TOTPCodes error = %v", err)
+	}
+	if len(codes) != 1 {
+		t.Fatalf("got %d codes, want 1 (only the 2FA server with a stored secret)", len(codes))
+	}
+	got := codes[0]
+	if got.ServerID != s1.ID || got.ServerName != "prod" {
+		t.Errorf("entry = %+v, want s1/prod", got)
+	}
+	// 30s-window tolerance (same as the KI challenge tests): the code must
+	// match the current or the immediately-adjacent window computed here.
+	storedSecret, err := sec.GetTOTPSecret(s1.ID)
+	if err != nil {
+		t.Fatalf("GetTOTPSecret error = %v", err)
+	}
+	now := time.Now()
+	wantNow, _ := domain.TOTPCode(storedSecret, now)
+	wantPrev, _ := domain.TOTPCode(storedSecret, now.Add(-30*time.Second))
+	wantNext, _ := domain.TOTPCode(storedSecret, now.Add(30*time.Second))
+	if got.Code != wantNow && got.Code != wantPrev && got.Code != wantNext {
+		t.Errorf("Code = %q, matched no adjacent window", got.Code)
+	}
+	if got.ExpiresIn < 1 || got.ExpiresIn > 30 {
+		t.Errorf("ExpiresIn = %d, want 1..30", got.ExpiresIn)
+	}
+}
+
+// An empty result must be a non-nil, zero-length slice — not nil — so the
+// frontend binding serialises it as JSON `[]`, not `null`.
+func TestTOTPCodesReturnsEmptySliceNotNilWhenNoMatches(t *testing.T) {
+	svc, _ := newServiceWithSecrets(t, &fakeDialer{})
+	if _, err := svc.Create(CreateServerInput{
+		Name: "plain", Host: "h1", Port: 22, User: "u", AuthType: domain.AuthAgent,
+	}); err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+
+	codes, err := svc.TOTPCodes()
+	if err != nil {
+		t.Fatalf("TOTPCodes error = %v", err)
+	}
+	if codes == nil {
+		t.Fatal("TOTPCodes() = nil, want a non-nil empty slice")
+	}
+	if len(codes) != 0 {
+		t.Fatalf("TOTPCodes() = %+v, want empty", codes)
 	}
 }

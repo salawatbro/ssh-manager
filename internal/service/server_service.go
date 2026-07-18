@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
@@ -360,6 +361,52 @@ func (s *ServerService) SSHCommand(id string) (string, error) {
 // Groups returns the distinct group names in use, for the sidebar headers.
 func (s *ServerService) Groups() ([]string, error) {
 	return s.repo.Groups()
+}
+
+// TOTPCodeView is one server's current verification code for the authenticator
+// panel. It carries the DERIVED code only — never the secret (SEC-01).
+type TOTPCodeView struct {
+	ServerID   string `json:"serverId"`
+	ServerName string `json:"serverName"`
+	Code       string `json:"code"`      // 6 digits
+	ExpiresIn  int    `json:"expiresIn"` // seconds until the 30s window rolls (1..30)
+}
+
+// TOTPCodes returns the current TOTP code for every server that has 2FA enabled
+// and a stored secret. Secrets stay in the keychain — only the derived codes are
+// returned (SEC-01). It is best-effort: a server whose secret is missing or
+// unreadable, or whose code fails to compute, is skipped rather than failing the
+// whole list.
+func (s *ServerService) TOTPCodes() ([]TOTPCodeView, error) {
+	servers, err := s.repo.List()
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	expiresIn := 30 - int(now.Unix()%30)
+	out := []TOTPCodeView{}
+	for i := range servers {
+		srv := servers[i]
+		if !srv.TwoFactor {
+			continue
+		}
+		secret, err := s.secret.GetTOTPSecret(srv.ID)
+		if err != nil {
+			continue // ErrNotStored or a keychain fault — skip (best-effort)
+		}
+		code, err := domain.TOTPCode(secret, now)
+		secret = "" // drop the plaintext seed (SEC-10 spirit)
+		if err != nil {
+			continue
+		}
+		out = append(out, TOTPCodeView{
+			ServerID:   srv.ID,
+			ServerName: srv.Name,
+			Code:       code,
+			ExpiresIn:  expiresIn,
+		})
+	}
+	return out, nil
 }
 
 // TestConnection opens a connection to verify the server works (FR-04),
