@@ -38,8 +38,8 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
 
   const rows = items.filter((it) => it !== 'separator').length
   const height = rows * ITEM_H + (items.length - rows) * SEP_H + 8
-  const left = Math.min(x, window.innerWidth - MENU_WIDTH - 4)
-  const top = Math.min(y, window.innerHeight - height - 4)
+  const left = Math.max(4, Math.min(x, window.innerWidth - MENU_WIDTH - 4))
+  const top = Math.max(4, Math.min(y, window.innerHeight - height - 4))
 
   return (
     <>
