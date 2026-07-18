@@ -97,7 +97,7 @@ func TestOpenMissingPasswordDoesNotDial(t *testing.T) {
 	passwordServer(t, repo)
 	dialer := &fakeDialer{}
 	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
-	svc := NewSSHService(nil, repo, secret.NewFake(), dialer, mgr)
+	svc := NewSSHService(nil, repo, secret.NewFake(), dialer, mgr, nil)
 
 	_, err := svc.Open("s1", 80, 24)
 	var de *domain.Error
@@ -116,7 +116,7 @@ func TestOpenDialFailurePropagates(t *testing.T) {
 	sec := secret.NewFake()
 	_ = sec.SetPassword("s1", "pw")
 	dialer := &fakeDialer{dialErr: domain.NewError(domain.CodeConnRefused, "Connection refused.")}
-	svc := NewSSHService(nil, repo, sec, dialer, term.NewManager(nopEmitter{}, time.Hour, time.Hour))
+	svc := NewSSHService(nil, repo, sec, dialer, term.NewManager(nopEmitter{}, time.Hour, time.Hour), nil)
 
 	_, err := svc.Open("s1", 80, 24)
 	var de *domain.Error
@@ -125,12 +125,41 @@ func TestOpenDialFailurePropagates(t *testing.T) {
 	}
 }
 
+// SubmitCode delegates to the wired CodePrompter's Resolve: a pending
+// Prompt blocked on the prompter's channel unblocks with the submitted code.
+func TestSubmitCodeDelegatesToPrompterResolve(t *testing.T) {
+	cp := NewCodePrompter(&fakeCodeEmitter{})
+	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, term.NewManager(nopEmitter{}, time.Hour, time.Hour), cp)
+
+	go func() {
+		// Wait until Prompt has registered its channel, then submit.
+		time.Sleep(20 * time.Millisecond)
+		if err := svc.SubmitCode("r1", "123456"); err != nil {
+			t.Errorf("SubmitCode: %v", err)
+		}
+	}()
+	code, err := cp.Prompt(sshx.CodeRequest{RequestID: "r1"})
+	if err != nil || code != "123456" {
+		t.Fatalf("code=%q err=%v", code, err)
+	}
+}
+
+// SubmitCode for an unknown request id is an error (stale submit after
+// timeout, or a code prompter with nothing pending at all).
+func TestSubmitCodeUnknownRequestErrors(t *testing.T) {
+	cp := NewCodePrompter(&fakeCodeEmitter{})
+	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, term.NewManager(nopEmitter{}, time.Hour, time.Hour), cp)
+	if err := svc.SubmitCode("ghost", "123456"); err == nil {
+		t.Fatal("SubmitCode on an unknown request id should error")
+	}
+}
+
 // Write/Resize/Close delegate to the manager.
 func TestWriteResizeCloseDelegate(t *testing.T) {
 	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
 	pty := newFakePTY()
 	mgr.Add("sX", pty)
-	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, mgr)
+	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, mgr, nil)
 
 	if err := svc.Write("sX", base64.StdEncoding.EncodeToString([]byte("hi"))); err != nil {
 		t.Fatal(err)
@@ -161,7 +190,7 @@ func TestBroadcastWritesToEverySession(t *testing.T) {
 	ptyA, ptyB := newFakePTY(), newFakePTY()
 	mgr.Add("a", ptyA)
 	mgr.Add("b", ptyB)
-	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, mgr)
+	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, mgr, nil)
 
 	payload := base64.StdEncoding.EncodeToString([]byte("hi"))
 	if err := svc.Broadcast([]string{"a", "b"}, payload); err != nil {
@@ -186,7 +215,7 @@ func TestBroadcastUnknownSessionDoesNotAbortOthersAndReturnsFirstError(t *testin
 	ptyA, ptyC := newFakePTY(), newFakePTY()
 	mgr.Add("a", ptyA)
 	mgr.Add("c", ptyC)
-	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, mgr)
+	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, mgr, nil)
 
 	payload := base64.StdEncoding.EncodeToString([]byte("hi"))
 	err := svc.Broadcast([]string{"a", "ghost", "c"}, payload)
@@ -242,7 +271,7 @@ func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
 	}
 	dialer := sshx.NewDialer(v, 5*time.Second, 20*time.Second)
 	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
-	svc := NewSSHService(nil, repo, sec, dialer, mgr)
+	svc := NewSSHService(nil, repo, sec, dialer, mgr, nil)
 
 	sessionID, err := svc.Open("s1", 120, 40)
 	if err != nil {

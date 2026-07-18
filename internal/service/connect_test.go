@@ -147,9 +147,120 @@ func TestResolveChainLoadsPerHopCreds(t *testing.T) {
 }
 
 func TestZeroChainCredsWipesSecrets(t *testing.T) {
-	chain := []sshx.Hop{{Creds: sshx.Credentials{Password: "p", Passphrase: "q"}}}
+	chain := []sshx.Hop{{Creds: sshx.Credentials{Password: "p", Passphrase: "q", TOTPSecret: "r"}}}
 	zeroChainCreds(chain)
-	if chain[0].Creds.Password != "" || chain[0].Creds.Passphrase != "" {
+	if chain[0].Creds.Password != "" || chain[0].Creds.Passphrase != "" || chain[0].Creds.TOTPSecret != "" {
 		t.Fatalf("creds not wiped: %+v", chain[0].Creds)
+	}
+}
+
+// TOTP is orthogonal to the primary auth method: a TwoFactor password server
+// with a stored TOTP secret gets BOTH the password and the TOTP secret in
+// its creds — TOTP never replaces the primary auth.
+func TestCredsForAttachesStoredTOTPSecret(t *testing.T) {
+	repo := newRepo(t)
+	sec := secret.NewFake()
+	srv := &domain.Server{ID: "t", Name: "t", Host: "h", User: "u", Port: 22, AuthType: domain.AuthPassword, TwoFactor: true}
+	if err := repo.Create(srv); err != nil {
+		t.Fatal(err)
+	}
+	if err := sec.SetPassword("t", "pw"); err != nil {
+		t.Fatal(err)
+	}
+	if err := sec.SetTOTPSecret("t", "GEZDGNBVGY3TQOJQ"); err != nil {
+		t.Fatal(err)
+	}
+
+	creds, err := credsFor(sec, srv)
+	if err != nil {
+		t.Fatalf("credsFor: %v", err)
+	}
+	if creds.TOTPSecret != "GEZDGNBVGY3TQOJQ" {
+		t.Fatalf("TOTPSecret = %q, want the stored secret", creds.TOTPSecret)
+	}
+	if creds.Password != "pw" {
+		t.Fatalf("Password = %q, want pw (TOTP must not replace the primary auth creds)", creds.Password)
+	}
+}
+
+// A TwoFactor server with 2FA turned on but no TOTP secret stored yet (the
+// user hasn't entered one) must not fail the whole connect — credsFor
+// tolerates ErrNotStored and leaves TOTPSecret empty, letting the
+// keyboard-interactive challenge fall back to the interactive CodePrompter.
+func TestCredsForTOTPMissingSecretIsNotAnError(t *testing.T) {
+	repo := newRepo(t)
+	sec := secret.NewFake()
+	srv := &domain.Server{ID: "t", Name: "t", Host: "h", User: "u", Port: 22, AuthType: domain.AuthPassword, TwoFactor: true}
+	if err := repo.Create(srv); err != nil {
+		t.Fatal(err)
+	}
+	if err := sec.SetPassword("t", "pw"); err != nil {
+		t.Fatal(err)
+	}
+	// No TOTP secret stored.
+
+	creds, err := credsFor(sec, srv)
+	if err != nil {
+		t.Fatalf("credsFor: %v", err)
+	}
+	if creds.TOTPSecret != "" {
+		t.Fatalf("TOTPSecret = %q, want empty when nothing is stored", creds.TOTPSecret)
+	}
+}
+
+// A non-2FA server must never pick up a TOTP secret, even one sitting in the
+// keychain under its id (e.g. left over from 2FA having been turned off).
+func TestCredsForNonTwoFactorServerUnaffected(t *testing.T) {
+	repo := newRepo(t)
+	sec := secret.NewFake()
+	srv := &domain.Server{ID: "t", Name: "t", Host: "h", User: "u", Port: 22, AuthType: domain.AuthPassword}
+	if err := repo.Create(srv); err != nil {
+		t.Fatal(err)
+	}
+	if err := sec.SetPassword("t", "pw"); err != nil {
+		t.Fatal(err)
+	}
+	if err := sec.SetTOTPSecret("t", "GEZDGNBVGY3TQOJQ"); err != nil {
+		t.Fatal(err)
+	}
+
+	creds, err := credsFor(sec, srv)
+	if err != nil {
+		t.Fatalf("credsFor: %v", err)
+	}
+	if creds.TOTPSecret != "" {
+		t.Fatalf("TOTPSecret = %q, want empty for a non-2FA server", creds.TOTPSecret)
+	}
+}
+
+// resolveChain must apply the TOTP-secret attach to whichever hop actually
+// has TwoFactor set — here the target, with a plain jump host in front of
+// it — and leave every other hop's TOTPSecret empty.
+func TestResolveChainAttachesTOTPSecretToTheHopThatNeedsIt(t *testing.T) {
+	repo := newRepo(t)
+	sec := secret.NewFake()
+
+	mkServer(t, repo, "root", nil) // agent auth, no 2FA
+	tgt := &domain.Server{ID: "t", Name: "t", Host: "h", User: "u", Port: 22, AuthType: domain.AuthPassword, TwoFactor: true, JumpID: strptr("root")}
+	if err := repo.Create(tgt); err != nil {
+		t.Fatal(err)
+	}
+	if err := sec.SetPassword("t", "pw"); err != nil {
+		t.Fatal(err)
+	}
+	if err := sec.SetTOTPSecret("t", "GEZDGNBVGY3TQOJQ"); err != nil {
+		t.Fatal(err)
+	}
+
+	chain, err := resolveChain(repo, sec, tgt)
+	if err != nil {
+		t.Fatalf("resolveChain: %v", err)
+	}
+	last := chain[len(chain)-1]
+	if last.Server.ID != "t" || last.Creds.TOTPSecret != "GEZDGNBVGY3TQOJQ" {
+		t.Fatalf("target hop creds = %+v; want TOTPSecret set", last)
+	}
+	if chain[0].Creds.TOTPSecret != "" {
+		t.Fatalf("root hop (non-2FA) TOTPSecret = %q, want empty", chain[0].Creds.TOTPSecret)
 	}
 }

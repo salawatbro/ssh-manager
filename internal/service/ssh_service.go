@@ -16,23 +16,33 @@ import (
 // and, from v0.3, the terminal session lifecycle: Open dials + starts a PTY +
 // registers it with the term.Manager; Write/Resize/Close delegate to it.
 type SSHService struct {
-	prompter *HostKeyPrompter
-	repo     *store.ServerRepo
-	secret   secret.Store
-	dialer   Dialer
-	mgr      *term.Manager
+	prompter     *HostKeyPrompter
+	repo         *store.ServerRepo
+	secret       secret.Store
+	dialer       Dialer
+	mgr          *term.Manager
+	codePrompter *CodePrompter
 }
 
 // NewSSHService wires the service to the shared host-key prompter, the
-// repository, the keychain, the dialer and the terminal manager.
-func NewSSHService(p *HostKeyPrompter, repo *store.ServerRepo, sec secret.Store, dialer Dialer, mgr *term.Manager) *SSHService {
-	return &SSHService{prompter: p, repo: repo, secret: sec, dialer: dialer, mgr: mgr}
+// repository, the keychain, the dialer, the terminal manager and the shared
+// TOTP/2FA code prompter.
+func NewSSHService(p *HostKeyPrompter, repo *store.ServerRepo, sec secret.Store, dialer Dialer, mgr *term.Manager, codePrompter *CodePrompter) *SSHService {
+	return &SSHService{prompter: p, repo: repo, secret: sec, dialer: dialer, mgr: mgr, codePrompter: codePrompter}
 }
 
 // ConfirmHostKey delivers the user's decision for a pending host-key prompt.
 // The blocking Test/Open dial is waiting on this.
 func (s *SSHService) ConfirmHostKey(requestID string, accept bool) error {
 	return s.prompter.Resolve(requestID, accept)
+}
+
+// SubmitCode delivers the user's typed 2FA code for a pending code:request
+// (TOTP or an unrecognised keyboard-interactive question). The blocking
+// Open dial — inside the keyboard-interactive challenge — is waiting on
+// this.
+func (s *SSHService) SubmitCode(requestID, code string) error {
+	return s.codePrompter.Resolve(requestID, code)
 }
 
 // Open connects to a server and starts an interactive PTY, returning the new

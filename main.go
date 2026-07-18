@@ -69,6 +69,17 @@ func main() {
 	// is defined in package main (below) because it imports application, which
 	// is cgo-gated and must not be pulled into internal/service.
 	prompter := service.NewHostKeyPrompter(appEmitter{})
+	// codePrompter answers a TOTP/2FA keyboard-interactive question a
+	// TwoFactor server's auto-fill (buildKIChallenge, driven by the
+	// keychain-stored TOTP secret credsFor attaches) could not resolve on
+	// its own — same event/channel pattern as prompter above, just a typed
+	// code instead of a yes/no. Registering the code:request event for the
+	// binding generator (so the frontend gets typed TypeScript for it) is
+	// left for the TOTP frontend wiring task; the prompter itself must be
+	// wired into both the dialer and SSHService now; a nil codePrompter on
+	// the dialer would make any 2FA connect needing the interactive
+	// fallback fail outright.
+	codePrompter := service.NewCodePrompter(appEmitter{})
 	verifier, err := sshx.NewVerifier(knownHostsPath, prompter)
 	if err != nil {
 		fatalStartup("cannot open known_hosts", err)
@@ -78,6 +89,7 @@ func main() {
 	// prompt budget with margin — see the Dialer field comments in
 	// internal/sshx/client.go for why the two must differ.
 	dialer := sshx.NewDialer(verifier, 10*time.Second, 75*time.Second)
+	dialer.SetCodePrompter(codePrompter)
 
 	// term.Manager runs the PTY pump. 16ms flush caps term:data at ~60/s (no
 	// backpressure); 30s keep-alive detects a dead peer (dizayn manbasi).
@@ -87,7 +99,7 @@ func main() {
 	repo := store.NewServerRepo(db)
 	kr := secret.NewKeyring()
 	serverService := service.NewServerService(repo, kr, dialer)
-	sshService := service.NewSSHService(prompter, repo, kr, dialer, termMgr)
+	sshService := service.NewSSHService(prompter, repo, kr, dialer, termMgr, codePrompter)
 	settingsRepo := store.NewSettingsRepo(db)
 	settingsService := service.NewSettingsService(settingsRepo, platform.NewLoginAgent())
 	importService, err := service.NewImportService(repo)

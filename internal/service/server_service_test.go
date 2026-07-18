@@ -823,6 +823,92 @@ func TestCreateRollsBackWhenKeychainFails(t *testing.T) {
 	}
 }
 
+// Create with TwoFactor + a TOTP secret stores the NORMALISED secret in the
+// keychain under the new server's id and marks the row TwoFactor — mirrors
+// how Password is handled (SEC-01: write-only, never round-trips through
+// the row's own serialisation).
+func TestCreateWithTwoFactorStoresTOTPSecret(t *testing.T) {
+	svc, store := newServiceWithSecrets(t, &fakeDialer{})
+	srv, err := svc.Create(CreateServerInput{
+		Name: "box", Host: "10.0.1.20", Port: 22, User: "deploy",
+		AuthType: domain.AuthPassword, Password: "pw",
+		TwoFactor: true, TOTPSecret: "gezd gnbv gy3t qojq",
+	})
+	if err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+	if !srv.TwoFactor {
+		t.Fatal("srv.TwoFactor = false, want true")
+	}
+	got, err := store.GetTOTPSecret(srv.ID)
+	if err != nil {
+		t.Fatalf("GetTOTPSecret error = %v", err)
+	}
+	if got != "GEZDGNBVGY3TQOJQ" {
+		t.Fatalf("stored TOTP secret = %q, want the normalised form", got)
+	}
+	// SEC-01: the secret must never leak into the row's own serialisation.
+	reloaded, _ := svc.Get(srv.ID)
+	blob, _ := json.Marshal(reloaded)
+	if strings.Contains(string(blob), "GEZDGNBVGY3TQOJQ") || strings.Contains(strings.ToLower(string(blob)), "gezd") {
+		t.Fatal("TOTP secret leaked into the server row")
+	}
+}
+
+// An invalid TOTP secret is rejected with a validation error, and Create's
+// existing rollback (the same one Password/Passphrase failures already
+// exercise) leaves no row behind.
+func TestCreateWithInvalidTOTPSecretFails(t *testing.T) {
+	svc := newService(t)
+	_, err := svc.Create(CreateServerInput{
+		Name: "box", Host: "10.0.1.20", Port: 22, User: "deploy",
+		AuthType: domain.AuthPassword, Password: "pw",
+		TwoFactor: true, TOTPSecret: "not-base32!!!",
+	})
+	if err == nil {
+		t.Fatal("Create() = nil error, want a validation error for a bad TOTP secret")
+	}
+	var de *domain.Error
+	if !errors.As(err, &de) || de.Code != domain.CodeValidation {
+		t.Fatalf("Create error = %v, want ERR_VALIDATION", err)
+	}
+	list, _ := svc.List()
+	if len(list) != 0 {
+		t.Fatalf("rolled-back create left %d servers", len(list))
+	}
+}
+
+// Update with an empty TOTPSecret leaves whatever is already stored
+// untouched — mirrors the Password rule (an edit that didn't touch the
+// secret sends it back empty rather than clearing it).
+func TestUpdateWithEmptyTOTPSecretLeavesStoredSecretUnchanged(t *testing.T) {
+	svc, store := newServiceWithSecrets(t, &fakeDialer{})
+	srv, err := svc.Create(CreateServerInput{
+		Name: "box", Host: "10.0.1.20", Port: 22, User: "deploy",
+		AuthType: domain.AuthPassword, Password: "pw",
+		TwoFactor: true, TOTPSecret: "GEZDGNBVGY3TQOJQ",
+	})
+	if err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+
+	in := CreateServerInput{
+		Name: "box", Host: "10.0.1.20", Port: 22, User: "deploy",
+		AuthType: domain.AuthPassword, TwoFactor: true, // TOTPSecret left empty
+	}
+	if _, err := svc.Update(srv.ID, in); err != nil {
+		t.Fatalf("Update error = %v", err)
+	}
+
+	got, err := store.GetTOTPSecret(srv.ID)
+	if err != nil {
+		t.Fatalf("GetTOTPSecret error = %v", err)
+	}
+	if got != "GEZDGNBVGY3TQOJQ" {
+		t.Fatalf("stored TOTP secret = %q, want unchanged", got)
+	}
+}
+
 // ImportJSON must dedup against entries created EARLIER IN THE SAME FILE, not
 // only against what was already in the database before the import started.
 // Two entries sharing host/port/user is the same "duplicate" the pre-existing

@@ -16,6 +16,7 @@ import (
 // dials-and-closes) and SSHService.Open (which keeps the client) so the two
 // never drift on which secret an auth type needs.
 func credsFor(sec secret.Store, srv *domain.Server) (sshx.Credentials, error) {
+	var creds sshx.Credentials
 	switch srv.AuthType {
 	case domain.AuthPassword:
 		pw, err := sec.GetPassword(srv.ID)
@@ -25,19 +26,36 @@ func credsFor(sec secret.Store, srv *domain.Server) (sshx.Credentials, error) {
 			}
 			return sshx.Credentials{}, err // ERR_KEYCHAIN
 		}
-		return sshx.Credentials{Password: pw}, nil
+		creds.Password = pw
 	case domain.AuthKey:
 		phrase, err := sec.GetPassphrase(srv.ID)
-		if err != nil {
-			if errors.Is(err, secret.ErrNotStored) {
-				return sshx.Credentials{}, nil // unencrypted key — no passphrase
-			}
+		switch {
+		case err == nil:
+			creds.Passphrase = phrase
+		case errors.Is(err, secret.ErrNotStored):
+			// unencrypted key — no passphrase, not an error
+		default:
 			return sshx.Credentials{}, err
 		}
-		return sshx.Credentials{Passphrase: phrase}, nil
 	default:
-		return sshx.Credentials{}, nil // agent needs no stored secret
+		// agent needs no stored secret
 	}
+
+	// TOTP is orthogonal to the primary auth method built above: a password
+	// OR key server can ALSO require a 2FA code (TZ 8 addendum). A
+	// TwoFactor server with no TOTP secret stored yet (2FA turned on, but
+	// the user hasn't entered a secret) is tolerated here — the
+	// keyboard-interactive challenge falls back to the interactive
+	// CodePrompter for that hop instead of failing the whole connect.
+	if srv.TwoFactor {
+		if totp, err := sec.GetTOTPSecret(srv.ID); err == nil {
+			creds.TOTPSecret = totp
+		} else if !errors.Is(err, secret.ErrNotStored) {
+			return sshx.Credentials{}, err // ERR_KEYCHAIN
+		}
+	}
+
+	return creds, nil
 }
 
 // maxJumpDepth bounds how many hops resolveChain will walk before giving up —
@@ -92,5 +110,6 @@ func zeroChainCreds(chain []sshx.Hop) {
 	for i := range chain {
 		chain[i].Creds.Password = ""
 		chain[i].Creds.Passphrase = ""
+		chain[i].Creds.TOTPSecret = ""
 	}
 }

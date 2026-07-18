@@ -30,8 +30,17 @@ type CreateServerInput struct {
 	// database (SEC-01). toServer() does not read them, so they cannot leak
 	// into a domain.Server. An empty value means "do not write / leave
 	// unchanged" (an agent server, or an edit that didn't touch the secret).
-	Password    string             `json:"password"`
-	Passphrase  string             `json:"passphrase"`
+	Password   string `json:"password"`
+	Passphrase string `json:"passphrase"`
+	// TOTPSecret, like Password/Passphrase, goes to the OS keychain and
+	// NEVER into the database (SEC-01): toServer() does not read it, and
+	// writeSecrets normalises/validates it through domain.ParseTOTPSecret
+	// before storing. An empty value means "do not write / leave
+	// unchanged" (same rule as Password). TwoFactor marks the server as
+	// requiring a code at connect time and IS a normal row column (unlike
+	// the secret itself) — see domain.Server.TwoFactor.
+	TOTPSecret  string             `json:"totpSecret"`
+	TwoFactor   bool               `json:"twoFactor"`
 	JumpID      *string            `json:"jumpId"`
 	Group       string             `json:"group"`
 	Environment domain.Environment `json:"environment"`
@@ -177,6 +186,16 @@ func (s *ServerService) writeSecrets(id string, input CreateServerInput) error {
 	}
 	if input.Passphrase != "" {
 		if err := s.secret.SetPassphrase(id, input.Passphrase); err != nil {
+			return err
+		}
+	}
+	if input.TOTPSecret != "" {
+		normalised, err := domain.ParseTOTPSecret(input.TOTPSecret)
+		if err != nil {
+			return domain.NewError(domain.CodeValidation,
+				"The TOTP secret is not valid. Check it was copied correctly.")
+		}
+		if err := s.secret.SetTOTPSecret(id, normalised); err != nil {
 			return err
 		}
 	}
@@ -472,6 +491,7 @@ func (in CreateServerInput) toServer() *domain.Server {
 		User:        strings.TrimSpace(in.User),
 		AuthType:    auth,
 		KeyPath:     strings.TrimSpace(in.KeyPath),
+		TwoFactor:   in.TwoFactor,
 		JumpID:      in.JumpID,
 		GroupName:   strings.TrimSpace(in.Group),
 		Environment: env,
