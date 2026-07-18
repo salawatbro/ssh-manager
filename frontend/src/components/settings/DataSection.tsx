@@ -3,6 +3,7 @@ import { DataService } from '@bindings/github.com/salawat/sshmgr'
 import { useServers } from '../../stores/servers'
 import { useImport } from '../../stores/import'
 import { Row } from './Row'
+import { UninstallModal } from './UninstallModal'
 
 // A small action button, right-aligned in a Row.
 function Btn({ label, onClick }: { label: string; onClick: () => void }) {
@@ -21,6 +22,7 @@ export function DataSection() {
   const reload = useServers((s) => s.load)
   const openImport = useImport((s) => s.show)
   const [msg, setMsg] = useState('')
+  const [showUninstall, setShowUninstall] = useState(false)
 
   return (
     <div className="flex flex-col">
@@ -43,13 +45,17 @@ export function DataSection() {
           }
         />
       </Row>
-      <Row label="Back up database" hint="Copy the SQLite file somewhere safe." last>
+      <Row label="Back up database" hint="Copy the SQLite file somewhere safe.">
         <div className="flex items-center gap-[10px]">
           {msg && <span className="text-[11.5px] text-textDim">{msg}</span>}
           <Btn label="Back up…" onClick={() => void DataService.BackupDatabase().catch(() => {})} />
           <Btn label="Reveal folder" onClick={() => void DataService.RevealDataFolder().catch(() => {})} />
         </div>
       </Row>
+      <Row label="Uninstall SSH Manager" hint="Remove all data and move the app to the Trash. This cannot be undone." last>
+        <Btn label="Uninstall…" onClick={() => setShowUninstall(true)} />
+      </Row>
+      {showUninstall && <UninstallModal onClose={() => setShowUninstall(false)} />}
     </div>
   )
 }
