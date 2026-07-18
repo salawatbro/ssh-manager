@@ -70,7 +70,7 @@ func (r *ServerRepo) Create(s *domain.Server) error {
 // on s.
 var updatableColumns = []string{
 	"name", "host", "port", "user",
-	"auth_type", "key_path", "jump_id",
+	"auth_type", "key_path", "two_factor", "jump_id",
 	"group_name", "environment", "tags", "notes",
 	"updated_at",
 }

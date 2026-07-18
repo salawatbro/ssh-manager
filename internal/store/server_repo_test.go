@@ -150,6 +150,31 @@ func TestUpdateChangesFields(t *testing.T) {
 	}
 }
 
+// Editing an existing server to enable 2FA must persist the flag. Regression:
+// two_factor was missing from updatableColumns, so Update silently dropped it
+// and the toggle reverted to off on reopen.
+func TestUpdatePersistsTwoFactor(t *testing.T) {
+	r := newRepo(t)
+	s := sample("s1", "srv", "Prod")
+	s.TwoFactor = false
+	if err := r.Create(s); err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+
+	s.TwoFactor = true
+	if err := r.Update(s); err != nil {
+		t.Fatalf("Update error = %v", err)
+	}
+
+	got, err := r.Get("s1")
+	if err != nil {
+		t.Fatalf("Get error = %v", err)
+	}
+	if !got.TwoFactor {
+		t.Error("after Update, TwoFactor = false, want true (two_factor must be an updatable column)")
+	}
+}
+
 // GORM skips zero values when Updates receives a struct. Without an explicit
 // column list, emptying a note would silently do nothing — the UI would
 // show the change and the database would not have it.
