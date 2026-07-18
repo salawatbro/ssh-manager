@@ -23,6 +23,7 @@ declare module "@wailsio/runtime" {
             "hostkey:request": service$0.HostKeyRequest;
             "session:state": term$0.State;
             "term:data": term$0.Output;
+            "tray:connect": service$0.TrayConnect;
         }
     }
 }

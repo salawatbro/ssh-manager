@@ -99,6 +99,16 @@ export function SSHCommand(id: string): $CancellablePromise<string> {
 }
 
 /**
+ * SetPinned pins or unpins a server for the menu-bar tray. Pinning is capped at
+ * maxPinned; the next pin is refused with a validation error the frontend
+ * surfaces. Re-pinning an already-pinned server and unpinning are always
+ * allowed. A successful change fires onServersChanged so the tray rebuilds.
+ */
+export function SetPinned(id: string, pinned: boolean): $CancellablePromise<void> {
+    return $Call.ByID(2336406732, id, pinned);
+}
+
+/**
  * TOTPCodes returns the current TOTP code for every server that has 2FA enabled
  * and a stored secret. Secrets stay in the keychain — only the derived codes are
  * returned (SEC-01). It is best-effort: a server whose secret is missing or

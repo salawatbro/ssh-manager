@@ -272,11 +272,21 @@ func main() {
 	tray.SetLabel("SSH")
 	tray.OnClick(func() { toggleMainWindow() })
 
-	trayMenu := app.NewMenu()
-	trayMenu.Add("Show SSH Manager").OnClick(func(*application.Context) { showMainWindow() })
-	trayMenu.AddSeparator()
-	trayMenu.Add("Quit").OnClick(func(*application.Context) { app.Quit() })
-	tray.SetMenu(trayMenu)
+	// The tray's server list mirrors the pinned set. rebuildTray refreshes it
+	// from the live list; SetOnServersChanged (below) reruns it whenever a
+	// server is pinned/renamed/deleted. Building it once here is the initial menu.
+	rebuildTray := func() {
+		servers, err := serverService.List()
+		if err != nil {
+			servers = nil // best-effort: an unreadable list just yields no pinned section
+		}
+		tray.SetMenu(buildTrayMenu(app, service.PinnedForTray(servers), func(id string) {
+			showMainWindow()
+			application.Get().Event.Emit("tray:connect", service.TrayConnect{ServerID: id})
+		}))
+	}
+	rebuildTray()
+	service.SetOnServersChanged(serverService, rebuildTray)
 
 	// SEC-05 & NFR-04: this is what lets SQLite checkpoint the WAL back into
 	// sshmgr.db and remove the "-wal"/"-shm" side files on a clean quit.
@@ -430,4 +440,5 @@ func init() {
 	application.RegisterEvent[term.Output]("term:data")
 	application.RegisterEvent[term.State]("session:state")
 	application.RegisterEvent[forward.Status]("forward:status")
+	application.RegisterEvent[service.TrayConnect]("tray:connect")
 }

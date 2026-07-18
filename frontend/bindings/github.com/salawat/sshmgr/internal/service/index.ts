@@ -25,5 +25,6 @@ export type {
     ImportPreview,
     SnippetInput,
     TOTPCodeView,
-    TestResult
+    TestResult,
+    TrayConnect
 } from "./models.js";
