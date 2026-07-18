@@ -4,6 +4,7 @@ import { usePalette, type PaletteRowData } from '../../stores/palette'
 import { useServers } from '../../stores/servers'
 import { useSessions, tabStatus } from '../../stores/sessions'
 import { useAuthenticator } from '../../stores/authenticator'
+import { useTour } from '../../stores/tour'
 import { useSftp } from '../../stores/sftp'
 import type { Status } from '../../lib/status'
 import { searchServers } from '../../lib/fuzzy'
@@ -46,6 +47,7 @@ export function CommandPalette({
     const ql = q.trim().toLowerCase()
     const commands: PaletteRowData[] = [
       { kind: 'command' as const, id: 'new-server', label: 'New server', run: onNewServer },
+      { kind: 'command' as const, id: 'welcome-tour', label: 'Welcome tour', run: () => useTour.getState().show() },
       ...(selectedId
         ? [
             { kind: 'command' as const, id: 'tunnels', label: 'Tunnels', run: () => onOpenTunnels(selectedId) },

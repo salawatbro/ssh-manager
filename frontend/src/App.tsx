@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Sidebar } from './components/layout/Sidebar'
 import { MainContent } from './components/layout/MainContent'
 import { ServerForm } from './components/server/ServerForm'
@@ -10,6 +10,7 @@ import { TabBar } from './components/terminal/TabBar'
 import { CommandPalette } from './components/palette/CommandPalette'
 import { SnippetPalette } from './components/snippets/SnippetPalette'
 import { AuthenticatorPanel } from './components/authenticator/AuthenticatorPanel'
+import { WelcomeTour } from './components/tour/WelcomeTour'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { ImportPreview } from './components/palette/ImportPreview'
 import { TunnelsPanel } from './components/forwards/TunnelsPanel'
@@ -21,6 +22,7 @@ import { useServers } from './stores/servers'
 import { useHostKey } from './stores/hostkey'
 import { useCodePrompt } from './stores/codeprompt'
 import { useSettings } from './stores/settings'
+import { useTour } from './stores/tour'
 import { useForwards } from './stores/forwards'
 
 export default function App() {
@@ -69,6 +71,16 @@ export default function App() {
     // ever shown still read live font-size/cursor/blink/scrollback values.
     void useSettings.getState().load()
   }, [])
+
+  const settings = useSettings((s) => s.settings)
+  const tourChecked = useRef(false)
+  useEffect(() => {
+    // Open the welcome tour once, the first time settings load with tourSeen
+    // false. The ref guards against reopening on any later settings refresh.
+    if (tourChecked.current || !settings) return
+    tourChecked.current = true
+    if (!settings.tourSeen) useTour.getState().show()
+  }, [settings])
 
   // Adding wins over the selection, so "Add server" always opens a blank form.
   const formOpen = adding || selectedId !== null
@@ -189,6 +201,10 @@ export default function App() {
           same one-instance-in-App.tsx, renders-null-when-closed pattern as
           SnippetPalette/GuardModal above. */}
       <AuthenticatorPanel />
+      {/* First-run welcome tour (Task 2): shown once via the auto-open effect
+          above, reopenable from ⌘K — same renders-null-when-closed pattern as
+          AuthenticatorPanel/SnippetPalette/GuardModal. */}
+      <WelcomeTour onAddServer={openAdd} />
       <SettingsModal />
       <ImportPreview />
       {/* Shared prod-guard modal (FR-14): one instance driven by stores/guard.ts,
