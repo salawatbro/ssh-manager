@@ -16,6 +16,7 @@ import { ImportPreview } from './components/palette/ImportPreview'
 import { TunnelsPanel } from './components/forwards/TunnelsPanel'
 import { StatusBar } from './components/layout/StatusBar'
 import { useAppKeymap } from './hooks/useAppKeymap'
+import { useTrayConnect } from './hooks/useTrayConnect'
 import { useServers } from './stores/servers'
 import { useHostKey } from './stores/hostkey'
 import { useCodePrompt } from './stores/codeprompt'
@@ -98,6 +99,7 @@ export default function App() {
   }
 
   useAppKeymap(openAdd)
+  useTrayConnect()
 
   return (
     // pb lifts the bottom status bar clear of macOS Tahoe's large rounded

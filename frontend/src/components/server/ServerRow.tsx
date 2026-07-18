@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Terminal } from 'lucide-react'
+import { ArrowLeftRight, Pin, Terminal } from 'lucide-react'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { StatusDot } from './StatusDot'
 import { useServers } from '../../stores/servers'
@@ -55,7 +55,12 @@ export function ServerRow({ server, selected, onSelect, onContextMenu, onTunnels
             never collide on a single row either. */}
         <StatusDot status="disc" />
         <span className="flex min-w-0 flex-1 flex-col gap-[1px]">
-          <span className="truncate text-text">{server.name}</span>
+          <span className="flex items-center gap-[5px]">
+            <span className="truncate text-text">{server.name}</span>
+            {server.pinned && (
+              <Pin size={10} className="shrink-0 text-textDim" fill="currentColor" />
+            )}
+          </span>
           <span className="truncate font-mono text-[11px] text-textDim">{target}</span>
         </span>
       </button>

@@ -26,6 +26,7 @@ export function ServerContextMenu({ server, x, y, onClose, onEdit, onTunnels }: 
   const duplicate = useServers((s) => s.duplicate)
   const copySSHCommand = useServers((s) => s.copySSHCommand)
   const remove = useServers((s) => s.remove)
+  const setPinned = useServers((s) => s.setPinned)
   const openSession = useSessions((s) => s.open)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -51,6 +52,13 @@ export function ServerContextMenu({ server, x, y, onClose, onEdit, onTunnels }: 
       label: 'Open terminal',
       run: () => {
         openSession(server)
+        onClose()
+      },
+    },
+    {
+      label: server.pinned ? 'Unpin from tray' : 'Pin to tray',
+      run: () => {
+        void setPinned(server.id, !server.pinned)
         onClose()
       },
     },
