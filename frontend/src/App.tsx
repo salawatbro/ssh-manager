@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Sidebar } from './components/layout/Sidebar'
+import { MainContent } from './components/layout/MainContent'
 import { ServerForm } from './components/server/ServerForm'
-import { EmptyState } from './components/EmptyState'
 import { HostKeyModal } from './components/modals/HostKeyModal'
 import { HostKeyChangedModal } from './components/modals/HostKeyChangedModal'
 import { CodeModal } from './components/modals/CodeModal'
 import { GuardModal } from './components/modals/GuardModal'
-import { TerminalArea } from './components/terminal/TerminalArea'
 import { TabBar } from './components/terminal/TabBar'
 import { CommandPalette } from './components/palette/CommandPalette'
 import { SnippetPalette } from './components/snippets/SnippetPalette'
@@ -17,6 +16,7 @@ import { TunnelsPanel } from './components/forwards/TunnelsPanel'
 import { StatusBar } from './components/layout/StatusBar'
 import { useAppKeymap } from './hooks/useAppKeymap'
 import { useTrayConnect } from './hooks/useTrayConnect'
+import { useSftpProgress } from './hooks/useSftpProgress'
 import { useServers } from './stores/servers'
 import { useHostKey } from './stores/hostkey'
 import { useCodePrompt } from './stores/codeprompt'
@@ -25,7 +25,6 @@ import { useForwards } from './stores/forwards'
 
 export default function App() {
   const load = useServers((s) => s.load)
-  const servers = useServers((s) => s.servers)
   const selectedId = useServers((s) => s.selectedId)
   const select = useServers((s) => s.select)
   const [adding, setAdding] = useState(false)
@@ -100,6 +99,10 @@ export default function App() {
 
   useAppKeymap(openAdd)
   useTrayConnect()
+  // Subscribes to sftp:progress for the whole app's lifetime, same as the
+  // other mount-once hooks above — SftpView itself never mounts/unmounts
+  // fast enough to be a reliable place to own this listener.
+  useSftpProgress()
 
   return (
     // pb lifts the bottom status bar clear of macOS Tahoe's large rounded
@@ -134,11 +137,9 @@ export default function App() {
             search box, "No servers yet" placeholder, "+ Add server" footer),
             only the content area swaps to the centered hero. */}
         <Sidebar onAdd={openAdd} onOpenTunnels={openTunnelsFor} />
-        {servers.length === 0 && !formOpen ? (
-          <EmptyState onAdd={openAdd} />
-        ) : (
-          <TerminalArea />
-        )}
+        {/* Empty/SFTP/terminal three-way swap: extracted to MainContent to
+            keep this file under its 200-line budget. */}
+        <MainContent formOpen={formOpen} onAdd={openAdd} />
         {/* key remounts the form whenever the target server changes, so its
             internal state (including confirmDelete) always starts fresh —
             see ServerForm's effect comment for why this matters. */}

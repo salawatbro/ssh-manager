@@ -1,9 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type DragEvent } from 'react'
 import { CornerLeftUp } from 'lucide-react'
 import type { FileEntry } from '@bindings/github.com/salawat/sshmgr/internal/sftpx'
 import { useSftp } from '../../stores/sftp'
 import { FileRow } from './FileRow'
 import { Toolbar } from './Toolbar'
+
+interface Props {
+  // Fired with the FULL path dragged in from the remote pane — SftpView
+  // turns this into a download, after its own overwrite check against
+  // localEntries.
+  onDropPath?: (fullPath: string) => void
+}
 
 // Local paths are always POSIX on this app's macOS-only target, so a plain
 // slash split is enough for the ".." parent. Kept separate from
@@ -16,9 +23,9 @@ function parentOf(path: string): string {
 
 // Left pane of SftpView: the local filesystem. Header (cwd + ".." button),
 // Toolbar, entry list — reads localCwd/localEntries from the store and
-// drives navigation via navLocal. Task 9 turns this into an upload
-// drop-target; nothing here blocks that.
-export function LocalPane() {
+// drives navigation via navLocal. The whole pane is the download drop
+// target — dropping a remote item here means "download it into localCwd".
+export function LocalPane({ onDropPath }: Props) {
   const cwd = useSftp((s) => s.localCwd)
   const entries = useSftp((s) => s.localEntries)
   const navLocal = useSftp((s) => s.navLocal)
@@ -34,8 +41,18 @@ export function LocalPane() {
     void navLocal(cwd.endsWith('/') ? `${cwd}${entry.name}` : `${cwd}/${entry.name}`)
   }
 
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    const path = e.dataTransfer.getData('text/plain')
+    if (path) onDropPath?.(path)
+  }
+
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col border-r border-border bg-bg1">
+    <div
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleDrop}
+      className="flex min-h-0 min-w-0 flex-1 flex-col border-r border-border bg-bg1"
+    >
       <div className="flex h-[34px] shrink-0 items-center gap-[6px] border-b border-border px-[10px]">
         <button
           type="button"

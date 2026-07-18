@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useServers } from '../../stores/servers'
 import { useSessions } from '../../stores/sessions'
+import { useSftp } from '../../stores/sftp'
 
 interface Props {
   server: Server
@@ -52,6 +53,13 @@ export function ServerContextMenu({ server, x, y, onClose, onEdit, onTunnels }: 
       label: 'Open terminal',
       run: () => {
         openSession(server)
+        onClose()
+      },
+    },
+    {
+      label: 'Browse files (SFTP)',
+      run: () => {
+        void useSftp.getState().openFor(server)
         onClose()
       },
     },

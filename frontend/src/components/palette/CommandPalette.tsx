@@ -4,6 +4,7 @@ import { usePalette, type PaletteRowData } from '../../stores/palette'
 import { useServers } from '../../stores/servers'
 import { useSessions, tabStatus } from '../../stores/sessions'
 import { useAuthenticator } from '../../stores/authenticator'
+import { useSftp } from '../../stores/sftp'
 import type { Status } from '../../lib/status'
 import { searchServers } from '../../lib/fuzzy'
 import { PaletteRow } from './PaletteRow'
@@ -46,7 +47,21 @@ export function CommandPalette({
     const commands: PaletteRowData[] = [
       { kind: 'command' as const, id: 'new-server', label: 'New server', run: onNewServer },
       ...(selectedId
-        ? [{ kind: 'command' as const, id: 'tunnels', label: 'Tunnels', run: () => onOpenTunnels(selectedId) }]
+        ? [
+            { kind: 'command' as const, id: 'tunnels', label: 'Tunnels', run: () => onOpenTunnels(selectedId) },
+            {
+              kind: 'command' as const,
+              id: 'sftp',
+              label: 'Browse files (SFTP)',
+              // Mirrors the Tunnels command above: SFTP is per-server, so it
+              // only appears (and only has a target) once a server is
+              // selected in the sidebar.
+              run: () => {
+                const server = servers.find((s) => s.id === selectedId)
+                if (server) void useSftp.getState().openFor(server)
+              },
+            },
+          ]
         : []),
       { kind: 'command' as const, id: 'authenticator', label: 'Authenticator', run: () => useAuthenticator.getState().show() },
     ].filter((c) => !ql || c.label.toLowerCase().includes(ql))
