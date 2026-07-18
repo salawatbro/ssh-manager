@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import { usePalette, type PaletteRowData } from '../../stores/palette'
 import { useServers } from '../../stores/servers'
 import { useSessions, tabStatus } from '../../stores/sessions'
+import { useAuthenticator } from '../../stores/authenticator'
 import type { Status } from '../../lib/status'
 import { searchServers } from '../../lib/fuzzy'
 import { PaletteRow } from './PaletteRow'
@@ -47,6 +48,7 @@ export function CommandPalette({
       ...(selectedId
         ? [{ kind: 'command' as const, id: 'tunnels', label: 'Tunnels', run: () => onOpenTunnels(selectedId) }]
         : []),
+      { kind: 'command' as const, id: 'authenticator', label: 'Authenticator', run: () => useAuthenticator.getState().show() },
     ].filter((c) => !ql || c.label.toLowerCase().includes(ql))
     return [...serverRows, ...commands]
   }, [servers, q, onNewServer, onOpenTunnels, selectedId, tabs, paneStatus])

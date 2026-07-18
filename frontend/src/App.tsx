@@ -10,6 +10,7 @@ import { TerminalArea } from './components/terminal/TerminalArea'
 import { TabBar } from './components/terminal/TabBar'
 import { CommandPalette } from './components/palette/CommandPalette'
 import { SnippetPalette } from './components/snippets/SnippetPalette'
+import { AuthenticatorPanel } from './components/authenticator/AuthenticatorPanel'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { ImportPreview } from './components/palette/ImportPreview'
 import { TunnelsPanel } from './components/forwards/TunnelsPanel'
@@ -180,6 +181,11 @@ export default function App() {
           server, driven by stores/snippets.ts — same one-instance-in-App.tsx
           pattern as CommandPalette/GuardModal. */}
       <SnippetPalette />
+      {/* ⌘K → "Authenticator" command (Task 2): live TOTP codes for every
+          server with a saved 2FA secret, driven by stores/authenticator.ts —
+          same one-instance-in-App.tsx, renders-null-when-closed pattern as
+          SnippetPalette/GuardModal above. */}
+      <AuthenticatorPanel />
       <SettingsModal />
       <ImportPreview />
       {/* Shared prod-guard modal (FR-14): one instance driven by stores/guard.ts,

@@ -99,6 +99,17 @@ export function SSHCommand(id: string): $CancellablePromise<string> {
 }
 
 /**
+ * TOTPCodes returns the current TOTP code for every server that has 2FA enabled
+ * and a stored secret. Secrets stay in the keychain — only the derived codes are
+ * returned (SEC-01). It is best-effort: a server whose secret is missing or
+ * unreadable, or whose code fails to compute, is skipped rather than failing the
+ * whole list.
+ */
+export function TOTPCodes(): $CancellablePromise<$models.TOTPCodeView[] | null> {
+    return $Call.ByID(2104572211);
+}
+
+/**
  * TestConnection opens a connection to verify the server works (FR-04),
  * running the full host-key flow, then closes it. A connection outcome
  * (refused, auth failed, host key declined, keychain locked) is a normal

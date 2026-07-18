@@ -24,5 +24,6 @@ export type {
     ImportItem,
     ImportPreview,
     SnippetInput,
+    TOTPCodeView,
     TestResult
 } from "./models.js";

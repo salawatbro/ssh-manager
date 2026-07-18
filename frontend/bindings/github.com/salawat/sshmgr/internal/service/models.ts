@@ -134,6 +134,25 @@ export interface SnippetInput {
 }
 
 /**
+ * TOTPCodeView is one server's current verification code for the authenticator
+ * panel. It carries the DERIVED code only — never the secret (SEC-01).
+ */
+export interface TOTPCodeView {
+    "serverId": string;
+    "serverName": string;
+
+    /**
+     * 6 digits
+     */
+    "code": string;
+
+    /**
+     * seconds until the 30s window rolls (1..30)
+     */
+    "expiresIn": number;
+}
+
+/**
  * TestResult is the outcome of TestConnection (FR-04). A connection outcome
  * (refused, timed out, auth failed, host key declined, keychain locked) is a
  * normal OK:false result carrying Code — not a thrown error — so the
