@@ -384,8 +384,10 @@ func (s *ServerService) TestConnection(id string) (*TestResult, error) {
 	}
 
 	res, dialErr := s.dialer.Test(context.Background(), *srv, creds)
-	// SEC-10: do not keep the plaintext secrets around after use.
-	creds.Password, creds.Passphrase = "", ""
+	// SEC-10: do not keep the plaintext secrets around after use. TOTPSecret
+	// too — credsFor attaches it for a 2FA server, and it is the longest-lived
+	// of the three seeds (mirrors zeroChainCreds on the Open path).
+	creds.Password, creds.Passphrase, creds.TOTPSecret = "", "", ""
 	if dialErr != nil {
 		return failResult(dialErr), nil
 	}
