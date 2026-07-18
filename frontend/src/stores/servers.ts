@@ -16,6 +16,7 @@ interface ServersState {
   remove: (id: string) => Promise<string | null>
   duplicate: (id: string) => Promise<string | null>
   copySSHCommand: (id: string) => Promise<void>
+  setPinned: (id: string, pinned: boolean) => Promise<void>
   select: (id: string | null) => void
   detectKeys: () => Promise<KeyInfo[]>
   testConnection: (id: string) => Promise<TestResult | null>
@@ -78,6 +79,17 @@ export const useServers = create<ServersState>((set, get) => ({
       return null
     } catch (e) {
       return e instanceof Error ? e.message : String(e)
+    }
+  },
+
+  // Tray quick-connect: pin/unpin, then reload so the row indicator and the
+  // menu-bar list both reflect it. A cap error (6th pin) surfaces via `error`.
+  setPinned: async (id, pinned) => {
+    try {
+      await ServerService.SetPinned(id, pinned)
+      await get().load()
+    } catch (e) {
+      set({ error: String(e) })
     }
   },
 

@@ -46,6 +46,7 @@ interface SessionsState {
   setPaneSession: (paneId: string, sessionId: string) => void
   clearPaneSession: (paneId: string) => void
   open: (server: Server) => void
+  openOrFocus: (server: Server) => void
   closeTab: (tabId: string) => void
   selectTab: (tabId: string) => void
   nextTab: () => void
@@ -119,6 +120,19 @@ export const useSessions = create<SessionsState>((set, get) => ({
       startedAt: Date.now(),
     }
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
+  },
+
+  // Tray quick-connect: focus an existing tab for this server if one is open,
+  // otherwise start a fresh session. Stops a menu-bar click from stacking
+  // duplicate tabs on the same server. Takes the full Server (App.tsx resolves
+  // it from the servers store) so this store needs no cross-store import.
+  openOrFocus: (server) => {
+    const existing = get().tabs.find((t) => t.serverId === server.id)
+    if (existing) {
+      set({ activeTabId: existing.id })
+      return
+    }
+    get().open(server)
   },
 
   // Removing the tab unmounts its terminals, whose cleanup calls
