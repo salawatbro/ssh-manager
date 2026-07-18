@@ -44,6 +44,51 @@ func (s *Session) Home() (string, error) {
 	return wd, nil
 }
 
+// Mkdir creates a single directory.
+func (s *Session) Mkdir(path string) error {
+	if err := s.client.Mkdir(path); err != nil {
+		return fmt.Errorf("cannot create %s: %w", path, err)
+	}
+	return nil
+}
+
+// Rename moves/renames a path.
+func (s *Session) Rename(oldPath, newPath string) error {
+	if err := s.client.Rename(oldPath, newPath); err != nil {
+		return fmt.Errorf("cannot rename %s to %s: %w", oldPath, newPath, err)
+	}
+	return nil
+}
+
+// Remove deletes a file, or a directory and everything under it. pkg/sftp has
+// no RemoveAll, so directories are walked depth-first: children first, then the
+// now-empty directory. A plain file takes the fast path.
+func (s *Session) Remove(path string) error {
+	fi, err := s.client.Stat(path)
+	if err != nil {
+		return fmt.Errorf("cannot stat %s: %w", path, err)
+	}
+	if !fi.IsDir() {
+		if err := s.client.Remove(path); err != nil {
+			return fmt.Errorf("cannot remove %s: %w", path, err)
+		}
+		return nil
+	}
+	infos, err := s.client.ReadDir(path)
+	if err != nil {
+		return fmt.Errorf("cannot list %s for removal: %w", path, err)
+	}
+	for _, child := range infos {
+		if err := s.Remove(path + "/" + child.Name()); err != nil {
+			return err
+		}
+	}
+	if err := s.client.RemoveDirectory(path); err != nil {
+		return fmt.Errorf("cannot remove directory %s: %w", path, err)
+	}
+	return nil
+}
+
 func toEntries(infos []os.FileInfo) []FileEntry {
 	out := make([]FileEntry, 0, len(infos))
 	for _, fi := range infos {
