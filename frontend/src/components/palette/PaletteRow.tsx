@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { envClassOf } from '../../lib/env'
 import { formatRecency } from '../../lib/relativeTime'
 import { StatusDot } from '../server/StatusDot'
@@ -16,8 +17,20 @@ export function PaletteRow({
   onChoose: () => void
   onHover: () => void
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Keyboard ↑↓ only moves the active index; the scroll container doesn't
+  // follow on its own, so a selection past the fold would highlight an
+  // off-screen row. Pull the active row into view. block:'nearest' makes it a
+  // no-op when the row is already visible (e.g. mouse hover sets active), so it
+  // never fights the pointer.
+  useEffect(() => {
+    if (active) ref.current?.scrollIntoView({ block: 'nearest' })
+  }, [active])
+
   return (
     <div
+      ref={ref}
       onMouseDown={(e) => {
         e.preventDefault()
         onChoose()
