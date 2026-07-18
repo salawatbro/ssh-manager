@@ -22,6 +22,11 @@ const Service = "uz.salawat.sshmgr" //nolint:gosec // G101 false positive: keych
 // same server (TZ 5.6: account = "{serverID}:passphrase").
 const passphraseSuffix = ":passphrase"
 
+// totpSuffix distinguishes a TOTP secret from a password/passphrase for the
+// same server (TZ 5.6: account = "{serverID}:totp"). SEC-01: this is the
+// ONLY place a TOTP secret is ever stored — never the DB, never JSON export.
+const totpSuffix = ":totp"
+
 // maxSecretBytes caps a stored secret. macOS allows ~2982 bytes for our
 // service/account lengths; Windows Credential Manager caps the blob at
 // 2560. Use the smaller so a secret that saves on macOS also saves on
@@ -46,6 +51,8 @@ type Store interface {
 	GetPassword(serverID string) (string, error)
 	SetPassphrase(serverID, passphrase string) error
 	GetPassphrase(serverID string) (string, error)
+	SetTOTPSecret(serverID, secret string) error
+	GetTOTPSecret(serverID string) (string, error)
 	Delete(serverID string) error
 }
 
@@ -76,6 +83,13 @@ func (keyringStore) SetPassphrase(serverID, passphrase string) error {
 	return mapSetErr(keyring.Set(Service, serverID+passphraseSuffix, passphrase))
 }
 
+func (keyringStore) SetTOTPSecret(serverID, secret string) error {
+	if err := checkSize(secret); err != nil {
+		return err
+	}
+	return mapSetErr(keyring.Set(Service, serverID+totpSuffix, secret))
+}
+
 func (keyringStore) GetPassword(serverID string) (string, error) {
 	return getWithTimeout(serverID)
 }
@@ -84,14 +98,21 @@ func (keyringStore) GetPassphrase(serverID string) (string, error) {
 	return getWithTimeout(serverID + passphraseSuffix)
 }
 
-// Delete removes both the password and the passphrase (FR-03.4). A missing
-// entry is not an error — deleting a server that only had a password must
-// not fail on the absent passphrase.
+func (keyringStore) GetTOTPSecret(serverID string) (string, error) {
+	return getWithTimeout(serverID + totpSuffix)
+}
+
+// Delete removes the password, the passphrase and the TOTP secret
+// (FR-03.4). A missing entry is not an error — deleting a server that only
+// had a password must not fail on the absent passphrase or TOTP secret.
 func (keyringStore) Delete(serverID string) error {
 	if err := deleteIfPresent(serverID); err != nil {
 		return err
 	}
-	return deleteIfPresent(serverID + passphraseSuffix)
+	if err := deleteIfPresent(serverID + passphraseSuffix); err != nil {
+		return err
+	}
+	return deleteIfPresent(serverID + totpSuffix)
 }
 
 func deleteIfPresent(account string) error {

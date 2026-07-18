@@ -71,3 +71,78 @@ func TestSecretTooBigIsRejected(t *testing.T) {
 		t.Fatal("oversized secret should be rejected")
 	}
 }
+
+func TestFakeRoundTripsTOTPSecret(t *testing.T) {
+	t.Parallel()
+	s := NewFake()
+	if err := s.SetTOTPSecret("srv1", "JBSWY3DPEHPK3PXP"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetTOTPSecret("srv1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "JBSWY3DPEHPK3PXP" {
+		t.Fatalf("totp secret = %q", got)
+	}
+}
+
+func TestFakeGetTOTPMissingReturnsErrNotStored(t *testing.T) {
+	t.Parallel()
+	s := NewFake()
+	if _, err := s.GetTOTPSecret("nope"); !errors.Is(err, ErrNotStored) {
+		t.Fatalf("want ErrNotStored, got %v", err)
+	}
+}
+
+// The password, passphrase and totp secrets for the same server ID must be
+// namespaced distinctly (TZ 5.6: ":totp" suffix mirrors ":passphrase") so
+// setting all three does not clobber one another.
+func TestPasswordPassphraseAndTOTPDoNotCollide(t *testing.T) {
+	t.Parallel()
+	s := NewFake()
+	_ = s.SetPassword("srv1", "pw")
+	_ = s.SetPassphrase("srv1", "phrase")
+	_ = s.SetTOTPSecret("srv1", "totp-secret")
+
+	if got, _ := s.GetPassword("srv1"); got != "pw" {
+		t.Fatalf("password = %q", got)
+	}
+	if got, _ := s.GetPassphrase("srv1"); got != "phrase" {
+		t.Fatalf("passphrase = %q", got)
+	}
+	if got, _ := s.GetTOTPSecret("srv1"); got != "totp-secret" {
+		t.Fatalf("totp secret = %q", got)
+	}
+}
+
+// Delete must clear the TOTP secret too (SEC-01 lifecycle), on top of the
+// password and passphrase already covered by TestFakeDeleteRemovesBothSecrets.
+func TestFakeDeleteRemovesTOTPSecret(t *testing.T) {
+	t.Parallel()
+	s := NewFake()
+	_ = s.SetPassword("srv1", "pw")
+	_ = s.SetPassphrase("srv1", "phrase")
+	_ = s.SetTOTPSecret("srv1", "totp-secret")
+
+	if err := s.Delete("srv1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetPassword("srv1"); !errors.Is(err, ErrNotStored) {
+		t.Fatal("password survived Delete")
+	}
+	if _, err := s.GetPassphrase("srv1"); !errors.Is(err, ErrNotStored) {
+		t.Fatal("passphrase survived Delete")
+	}
+	if _, err := s.GetTOTPSecret("srv1"); !errors.Is(err, ErrNotStored) {
+		t.Fatal("totp secret survived Delete")
+	}
+}
+
+func TestTOTPSecretTooBigIsRejected(t *testing.T) {
+	t.Parallel()
+	s := NewFake()
+	if err := s.SetTOTPSecret("srv1", strings.Repeat("x", maxSecretBytes+1)); err == nil {
+		t.Fatal("oversized totp secret should be rejected")
+	}
+}

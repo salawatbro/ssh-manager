@@ -51,6 +51,12 @@ type Server struct {
 	Tags        string      `json:"tags"`
 	Notes       string      `json:"notes"`
 
+	// TwoFactor marks a server as requiring a TOTP code at connect time.
+	// The code and its secret NEVER live here or anywhere in the DB/JSON
+	// export — only this flag does. The secret itself lives in the OS
+	// keychain (SEC-01), keyed by this server's ID (secret.Store).
+	TwoFactor bool `gorm:"not null;default:false" json:"twoFactor"`
+
 	LastUsedAt *time.Time `gorm:"index" json:"lastUsedAt"`
 	UseCount   int        `gorm:"not null;default:0" json:"useCount"`
 	SortOrder  int        `gorm:"not null;default:0" json:"sortOrder"`
