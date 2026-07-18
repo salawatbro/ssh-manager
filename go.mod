@@ -24,7 +24,10 @@ require (
 	gorm.io/gorm v1.31.2
 )
 
-require github.com/Microsoft/go-winio v0.6.2
+require (
+	github.com/Microsoft/go-winio v0.6.2
+	github.com/pkg/sftp v1.13.1
+)
 
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
@@ -37,9 +40,11 @@ require (
 	github.com/jchv/go-winloader v0.0.0-20250406163304-c1995be93bd1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/kr/fs v0.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/sys v0.47.0 // indirect
