@@ -38,14 +38,17 @@ func (s *SSHService) ConfirmHostKey(requestID string, accept bool) error {
 // Open connects to a server and starts an interactive PTY, returning the new
 // session id the frontend subscribes term:data on. It runs the full host-key
 // flow (a hostkey:request may fire mid-dial, exactly as in TestConnection).
-// The initial pty is 80x24; the frontend issues a Resize with real dimensions
-// the moment its xterm has laid out.
+// The pty is opened at cols x rows — the frontend's already-fitted xterm
+// size — so a long-output command scrolls correctly from the first frame
+// instead of overwriting until the next resize. cols/rows under 1 (an
+// unmeasured caller) fall back to a sane 80x24 inside OpenSession. The
+// frontend still issues a Resize on every later container resize.
 //
 // No ctx timeout here — the dialer owns the whole connect ceiling via its
 // handshakeDeadline, deliberately longer than the network timeout so a
 // legitimate host-key prompt is never killed mid-decision (same reasoning as
 // TestConnection).
-func (s *SSHService) Open(serverID string) (string, error) {
+func (s *SSHService) Open(serverID string, cols, rows int) (string, error) {
 	srv, err := s.repo.Get(serverID)
 	if err != nil {
 		return "", err
@@ -62,7 +65,7 @@ func (s *SSHService) Open(serverID string) (string, error) {
 		return "", err // DialChain already classified it
 	}
 
-	sess, err := sshx.OpenSession(conn, 0, 0) // OpenSession closes conn (target+jumps) on error
+	sess, err := sshx.OpenSession(conn, cols, rows) // OpenSession closes conn (target+jumps) on error
 	if err != nil {
 		return "", domain.NewError(domain.CodeConnRefused, "Connected, but the server would not open a shell.")
 	}

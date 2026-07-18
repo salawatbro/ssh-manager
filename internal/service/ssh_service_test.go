@@ -1,16 +1,25 @@
 package service
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"io"
+	"net"
+	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
+
 	"github.com/salawat/sshmgr/internal/domain"
 	"github.com/salawat/sshmgr/internal/secret"
+	"github.com/salawat/sshmgr/internal/sshx"
 	"github.com/salawat/sshmgr/internal/store"
 	"github.com/salawat/sshmgr/internal/term"
 )
@@ -90,7 +99,7 @@ func TestOpenMissingPasswordDoesNotDial(t *testing.T) {
 	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
 	svc := NewSSHService(nil, repo, secret.NewFake(), dialer, mgr)
 
-	_, err := svc.Open("s1")
+	_, err := svc.Open("s1", 80, 24)
 	var de *domain.Error
 	if err == nil || !errors.As(err, &de) || de.Code != domain.CodeAuthFailed {
 		t.Fatalf("want ERR_AUTH_FAILED, got %v", err)
@@ -109,7 +118,7 @@ func TestOpenDialFailurePropagates(t *testing.T) {
 	dialer := &fakeDialer{dialErr: domain.NewError(domain.CodeConnRefused, "Connection refused.")}
 	svc := NewSSHService(nil, repo, sec, dialer, term.NewManager(nopEmitter{}, time.Hour, time.Hour))
 
-	_, err := svc.Open("s1")
+	_, err := svc.Open("s1", 80, 24)
 	var de *domain.Error
 	if err == nil || !errors.As(err, &de) || de.Code != domain.CodeConnRefused {
 		t.Fatalf("want ERR_CONN_REFUSED, got %v", err)
@@ -196,5 +205,184 @@ func TestBroadcastUnknownSessionDoesNotAbortOthersAndReturnsFirstError(t *testin
 		if written != "hi" {
 			t.Errorf("session %q written = %q, want %q (unknown id must not abort the fan-out)", name, written, "hi")
 		}
+	}
+}
+
+// TestOpenRequestsPTYAtThePassedSize proves the actual bug end-to-end: Open
+// must request the remote PTY at the xterm size the frontend passed in, not
+// a hardcoded 80x24 (see internal/sshx/session.go's OpenSession, which
+// requests whatever cols/rows it is given). The bug lives entirely in what
+// Open itself hands to sshx.OpenSession — a call fakeDialer/fakePTY never
+// exercise, since fakeDialer.DialChain returns no real *sshx.Conn and
+// fakePTY.Resize just records an in-memory struct field. So unlike every
+// other test in this file, this one stands up a real in-process SSH server
+// (mirroring internal/sshx's own test doubles, e.g. session_test.go's
+// newEchoServer) and a real *sshx.Dialer, and inspects the literal pty-req
+// wire message — the only vantage point from which "Open asked for the
+// wrong size" is actually observable.
+func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
+	addr, hostKey, dims := newPTYCapturingServer(t)
+	host, port := splitTestAddr(t, addr)
+
+	repo := newRepo(t)
+	srv := &domain.Server{ID: "s1", Name: "box", Host: host, Port: port, User: "u", AuthType: domain.AuthPassword}
+	if err := repo.Create(srv); err != nil {
+		t.Fatal(err)
+	}
+	sec := secret.NewFake()
+	if err := sec.SetPassword("s1", "pw"); err != nil {
+		t.Fatal(err)
+	}
+
+	khPath := filepath.Join(t.TempDir(), "known_hosts")
+	seedKnownHostForTest(t, khPath, addr, hostKey)
+	v, err := sshx.NewVerifier(khPath, acceptAllHostKeys{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dialer := sshx.NewDialer(v, 5*time.Second, 20*time.Second)
+	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
+	svc := NewSSHService(nil, repo, sec, dialer, mgr)
+
+	sessionID, err := svc.Open("s1", 120, 40)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = svc.Close(sessionID) }()
+
+	select {
+	case got := <-dims:
+		if got != [2]int{120, 40} {
+			t.Fatalf("pty-req dims (cols, rows) = %v, want [120 40] (the size Open was asked for)", got)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for the server's pty-req")
+	}
+}
+
+// acceptAllHostKeys satisfies sshx.HostKeyPrompter. It is only ever needed
+// to construct a *sshx.Verifier — TestOpenRequestsPTYAtThePassedSize always
+// seeds known_hosts up front, so the callback never actually has to prompt.
+type acceptAllHostKeys struct{}
+
+func (acceptAllHostKeys) Prompt(sshx.HostKeyRequest) (bool, error) { return true, nil }
+
+// ptyReqPayload mirrors the SSH_MSG_CHANNEL_REQUEST "pty-req" payload (RFC
+// 4254 §6.2): term, then character width/height, then pixel width/height,
+// then terminal modes. Only Cols/Rows matter to this test.
+type ptyReqPayload struct {
+	Term     string
+	Cols     uint32
+	Rows     uint32
+	WidthPx  uint32
+	HeightPx uint32
+	Modes    string
+}
+
+// newPTYCapturingServer starts an in-process, no-auth SSH server that
+// accepts one session channel, grants any PTY/shell/window-change request,
+// and pushes the exact (cols, rows) each pty-req asked for onto the
+// returned channel — the only way to see, from outside the process, what
+// window size Open actually requested.
+func newPTYCapturingServer(t *testing.T) (addr string, hostKey ssh.PublicKey, dims chan [2]int) {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromSigner(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := &ssh.ServerConfig{NoClientAuth: true}
+	cfg.AddHostKey(signer)
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	dims = make(chan [2]int, 4)
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go servePTYCapture(c, cfg, dims)
+		}
+	}()
+	return ln.Addr().String(), signer.PublicKey(), dims
+}
+
+func servePTYCapture(c net.Conn, cfg *ssh.ServerConfig, dims chan [2]int) {
+	sc, chans, reqs, err := ssh.NewServerConn(c, cfg)
+	if err != nil {
+		_ = c.Close()
+		return
+	}
+	go ssh.DiscardRequests(reqs)
+	go func() {
+		for nc := range chans {
+			if nc.ChannelType() != "session" {
+				_ = nc.Reject(ssh.UnknownChannelType, "only session")
+				continue
+			}
+			ch, chReqs, err := nc.Accept()
+			if err != nil {
+				continue
+			}
+			go func() {
+				for req := range chReqs {
+					switch req.Type {
+					case "pty-req":
+						var p ptyReqPayload
+						if err := ssh.Unmarshal(req.Payload, &p); err == nil {
+							dims <- [2]int{int(p.Cols), int(p.Rows)}
+						}
+						_ = req.Reply(true, nil)
+					case "shell", "window-change":
+						_ = req.Reply(true, nil)
+					default:
+						_ = req.Reply(false, nil)
+					}
+				}
+			}()
+			_ = ch // no I/O needed — Open only has to succeed, not echo
+		}
+	}()
+	_ = sc.Wait()
+}
+
+// splitTestAddr splits addr ("127.0.0.1:54321") into a host and int port for
+// building a domain.Server that points at an in-process test listener.
+func splitTestAddr(t *testing.T, addr string) (string, int) {
+	t.Helper()
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatalf("splitTestAddr(%q): %v", addr, err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("splitTestAddr(%q): %v", addr, err)
+	}
+	return host, port
+}
+
+// seedKnownHostForTest appends a known_hosts line for hostport/key to path,
+// creating the parent dir (0700) and file (0600) as needed.
+func seedKnownHostForTest(t *testing.T, path, hostport string, key ssh.PublicKey) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // G304: path is the test's own t.TempDir()-rooted known_hosts fixture, not external input.
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+	if _, err := f.WriteString(knownhosts.Line([]string{hostport}, key) + "\n"); err != nil {
+		t.Fatal(err)
 	}
 }

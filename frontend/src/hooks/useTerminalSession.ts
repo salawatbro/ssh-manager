@@ -146,7 +146,7 @@ export function useTerminalSession(
       if (s.state === 'closed') applyClosed(s.code, s.message)
     })
 
-    void SSHService.Open(serverId)
+    void SSHService.Open(serverId, term.cols, term.rows)
       .then((id) => {
         if (disposed) {
           void SSHService.Close(id).catch(() => {})
