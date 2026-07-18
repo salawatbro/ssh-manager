@@ -64,47 +64,39 @@ function cycle(tabs: Tab[], activeId: string | null, delta: number): string | nu
   return tabs[next].id
 }
 
+// Shared by closeTab/closePane: tabs+activeTabId after removing one tab. If
+// the closed tab wasn't active, activeId is unchanged; otherwise step back
+// one from its pre-removal position (or the first remaining tab), or null.
+function closeTabState(tabs: Tab[], closedId: string, activeId: string | null): { tabs: Tab[]; activeTabId: string | null } {
+  const remaining = tabs.filter((t) => t.id !== closedId)
+  if (activeId !== closedId) return { tabs: remaining, activeTabId: activeId }
+  const idx = tabs.findIndex((t) => t.id === closedId)
+  return { tabs: remaining, activeTabId: remaining.length ? remaining[Math.max(0, idx - 1)]?.id ?? remaining[0].id : null }
+}
+
+// Shared by the per-pane maps' clear* actions (paneStatus/paneDims/paneSession):
+// drop one key, or return the same record reference untouched if it's absent.
+function clearKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+  if (!(key in record)) return record
+  const next = { ...record }
+  delete next[key]
+  return next
+}
+
 export const useSessions = create<SessionsState>((set, get) => ({
   tabs: [],
   activeTabId: null,
   paneStatus: {},
-
-  setPaneStatus: (paneId, status) =>
-    set((s) => ({ paneStatus: { ...s.paneStatus, [paneId]: status } })),
-
-  clearPaneStatus: (paneId) =>
-    set((s) => {
-      if (!(paneId in s.paneStatus)) return {}
-      const paneStatus = { ...s.paneStatus }
-      delete paneStatus[paneId]
-      return { paneStatus }
-    }),
+  setPaneStatus: (paneId, status) => set((s) => ({ paneStatus: { ...s.paneStatus, [paneId]: status } })),
+  clearPaneStatus: (paneId) => set((s) => ({ paneStatus: clearKey(s.paneStatus, paneId) })),
 
   paneDims: {},
-
-  setPaneDims: (paneId, dims) =>
-    set((s) => ({ paneDims: { ...s.paneDims, [paneId]: dims } })),
-
-  clearPaneDims: (paneId) =>
-    set((s) => {
-      if (!(paneId in s.paneDims)) return {}
-      const paneDims = { ...s.paneDims }
-      delete paneDims[paneId]
-      return { paneDims }
-    }),
+  setPaneDims: (paneId, dims) => set((s) => ({ paneDims: { ...s.paneDims, [paneId]: dims } })),
+  clearPaneDims: (paneId) => set((s) => ({ paneDims: clearKey(s.paneDims, paneId) })),
 
   paneSession: {},
-
-  setPaneSession: (paneId, sessionId) =>
-    set((s) => ({ paneSession: { ...s.paneSession, [paneId]: sessionId } })),
-
-  clearPaneSession: (paneId) =>
-    set((s) => {
-      if (!(paneId in s.paneSession)) return {}
-      const paneSession = { ...s.paneSession }
-      delete paneSession[paneId]
-      return { paneSession }
-    }),
+  setPaneSession: (paneId, sessionId) => set((s) => ({ paneSession: { ...s.paneSession, [paneId]: sessionId } })),
+  clearPaneSession: (paneId) => set((s) => ({ paneSession: clearKey(s.paneSession, paneId) })),
 
   // A new tab, one leaf, one session. Multiple tabs to the same server are
   // allowed (each leaf id is unique, so each drives its own PTY).
@@ -137,13 +129,7 @@ export const useSessions = create<SessionsState>((set, get) => ({
 
   // Removing the tab unmounts its terminals, whose cleanup calls
   // SSHService.Close — so no explicit backend teardown is needed here.
-  closeTab: (tabId) =>
-    set((s) => {
-      const tabs = s.tabs.filter((t) => t.id !== tabId)
-      const activeTabId =
-        s.activeTabId === tabId ? (tabs.length ? tabs[Math.max(0, s.tabs.findIndex((t) => t.id === tabId) - 1)]?.id ?? tabs[0].id : null) : s.activeTabId
-      return { tabs, activeTabId }
-    }),
+  closeTab: (tabId) => set((s) => closeTabState(s.tabs, tabId, s.activeTabId)),
 
   selectTab: (tabId) => set({ activeTabId: tabId }),
   nextTab: () => set((s) => ({ activeTabId: cycle(s.tabs, s.activeTabId, 1) })),
@@ -179,12 +165,7 @@ export const useSessions = create<SessionsState>((set, get) => ({
       const tab = s.tabs.find((t) => t.id === tabId)
       if (!tab) return {}
       const root = removeLeaf(tab.root, paneId)
-      if (root === null) {
-        const tabs = s.tabs.filter((t) => t.id !== tabId)
-        const activeTabId =
-          s.activeTabId === tabId ? (tabs.length ? tabs[Math.max(0, s.tabs.findIndex((t) => t.id === tabId) - 1)]?.id ?? tabs[0].id : null) : s.activeTabId
-        return { tabs, activeTabId }
-      }
+      if (root === null) return closeTabState(s.tabs, tabId, s.activeTabId)
       const focusedPaneId = tab.focusedPaneId === paneId ? firstLeaf(root).id : tab.focusedPaneId
       return { tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, root, focusedPaneId } : t)) }
     }),
