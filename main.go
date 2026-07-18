@@ -119,6 +119,7 @@ func main() {
 		_ = application.Get().Event.Emit("forward:status", st)
 	})
 	forwardService := service.NewForwardService(forwardRepo, repo, kr, dialer, forwardMgr)
+	sftpService := service.NewSftpService(repo, kr, dialer, appEmitter{})
 
 	// Wires forwardRepo + forwardMgr into serverService so Delete tears down a
 	// server's live tunnels first (Task 4's deviation: a package-level func,
@@ -153,6 +154,7 @@ func main() {
 			application.NewService(dataService),
 			application.NewService(forwardService),
 			application.NewService(snippetService),
+			application.NewService(sftpService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -448,4 +450,5 @@ func init() {
 	application.RegisterEvent[term.State]("session:state")
 	application.RegisterEvent[forward.Status]("forward:status")
 	application.RegisterEvent[service.TrayConnect]("tray:connect")
+	application.RegisterEvent[service.SftpProgress]("sftp:progress")
 }

@@ -6,6 +6,7 @@ import * as ImportService from "./importservice.js";
 import * as SSHService from "./sshservice.js";
 import * as ServerService from "./serverservice.js";
 import * as SettingsService from "./settingsservice.js";
+import * as SftpService from "./sftpservice.js";
 import * as SnippetService from "./snippetservice.js";
 export {
     ForwardService,
@@ -13,6 +14,7 @@ export {
     SSHService,
     ServerService,
     SettingsService,
+    SftpService,
     SnippetService
 };
 
@@ -23,6 +25,7 @@ export type {
     HostKeyRequest,
     ImportItem,
     ImportPreview,
+    SftpProgress,
     SnippetInput,
     TOTPCodeView,
     TestResult,

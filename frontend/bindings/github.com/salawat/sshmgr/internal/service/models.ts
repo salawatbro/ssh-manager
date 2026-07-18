@@ -120,6 +120,28 @@ export interface ImportPreview {
 }
 
 /**
+ * SftpProgress is the sftp:progress event payload: one update for an in-flight
+ * transfer (or its terminal Finished/Error state). Carries no secret (SEC-01).
+ */
+export interface SftpProgress {
+    "transferID": string;
+
+    /**
+     * "upload" | "download"
+     */
+    "direction": string;
+    "currentFile": string;
+    "done": number;
+    "total": number;
+    "finished": boolean;
+
+    /**
+     * non-empty on failure
+     */
+    "error": string;
+}
+
+/**
  * SnippetInput is what the frontend sends to create or update a saved
  * snippet. It mirrors ForwardInput's shape: a plain JSON-tagged struct the
  * service turns into a domain.Snippet and validates again (SEC-08).

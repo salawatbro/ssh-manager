@@ -22,6 +22,7 @@ declare module "@wailsio/runtime" {
             "forward:status": forward$0.Status;
             "hostkey:request": service$0.HostKeyRequest;
             "session:state": term$0.State;
+            "sftp:progress": service$0.SftpProgress;
             "term:data": term$0.Output;
             "tray:connect": service$0.TrayConnect;
         }
