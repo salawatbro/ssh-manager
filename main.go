@@ -145,7 +145,7 @@ func main() {
 	})
 
 	app := application.New(application.Options{
-		Name:        "SSH Manager",
+		Name:        "Zish",
 		Description: "Local SSH connection manager",
 		// A *domain.Error's Code must reach the frontend even when a service
 		// wraps it — see service.MarshalError.
@@ -204,7 +204,7 @@ func main() {
 			}
 			quit := false
 			dialog := application.Get().Dialog.Question().
-				SetTitle("Quit SSH Manager?").
+				SetTitle("Quit Zish?").
 				SetMessage(fmt.Sprintf("%d terminal session(s) are still open. Quit and close them?", termMgr.SessionCount()))
 			dialog.AddButton("Quit").OnClick(func() { quit = true; forwardMgr.StopAll() })
 			dialog.AddButton("Cancel")
@@ -237,7 +237,7 @@ func main() {
 	})
 
 	mainWindow = app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:     "SSH Manager",
+		Title:     "Zish",
 		Width:     1200,
 		Height:    760,
 		MinWidth:  900,
@@ -362,7 +362,7 @@ func showMainWindow() {
 
 // fatalStartup handles the one failure a real user actually hits: disk
 // full, permissions broken by a restore, a corrupted database. The app
-// ships as "SSH Manager.app" (build/darwin/Taskfile.yml's
+// ships as "Zish.app" (build/darwin/Taskfile.yml's
 // create:app:bundle); launched from Finder or the Dock, a GUI app's stderr
 // goes to /dev/null or os_log, so the previous behaviour here —
 // log.Fatalf — left zero trace: the Dock icon bounces once, the process
@@ -386,9 +386,9 @@ func fatalStartup(context string, err error) {
 	msg := fmt.Sprintf("%s: %v", context, err)
 	logStartupFailure(msg)
 
-	dialogApp := application.New(application.Options{Name: "SSH Manager"})
+	dialogApp := application.New(application.Options{Name: "Zish"})
 	dialogApp.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
-		dialogApp.Dialog.Error().SetTitle("SSH Manager").SetMessage(msg).Show()
+		dialogApp.Dialog.Error().SetTitle("Zish").SetMessage(msg).Show()
 		dialogApp.Quit()
 	})
 	_ = dialogApp.Run()

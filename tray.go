@@ -14,7 +14,7 @@ import (
 // section (and its separators) is omitted, leaving the original Show/Quit menu.
 func buildTrayMenu(app *application.App, pinned []domain.Server, connect func(id string)) *application.Menu {
 	menu := app.NewMenu()
-	menu.Add("Show SSH Manager").OnClick(func(*application.Context) { showMainWindow() })
+	menu.Add("Show Zish").OnClick(func(*application.Context) { showMainWindow() })
 	if len(pinned) > 0 {
 		menu.AddSeparator()
 		for _, srv := range pinned {

@@ -25,7 +25,7 @@ static SSHMgrCloseGuard *gCloseGuard = nil;
 void sshmgrInterceptCloseButton(void) {
 	NSWindow *target = nil;
 	for (NSWindow *w in [NSApp windows]) {
-		if ([[w title] isEqualToString:@"SSH Manager"]) {
+		if ([[w title] isEqualToString:@"Zish"]) {
 			target = w;
 			break;
 		}
