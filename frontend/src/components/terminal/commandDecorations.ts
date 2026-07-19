@@ -15,13 +15,22 @@ export type PromptMarker = { line: number; marker: IMarker }
 export function installOsc133(term: Terminal): PromptMarker[] {
   const machine = createOsc133Machine()
   const promptMarkers: PromptMarker[] = []
+  // Blocks are strictly sequential A→B→C→D, so the marker created at the
+  // most recent 'A' IS the prompt marker for whichever block finalizes next
+  // on 'D' — track it so drawCommandBlock can anchor to the REAL marker
+  // (trim-safe: marker.line auto-adjusts as scrollback trims) instead of a
+  // frozen line number.
+  let lastPromptMarker: IMarker | undefined
   term.parser.registerOscHandler(133, (data) => {
     const b = term.buffer.active
     const line = b.baseY + b.cursorY
     if (data === 'A') {
       machine.push({ kind: 'A', line })
       const m = term.registerMarker(0)
-      if (m) promptMarkers.push({ line, marker: m })
+      if (m) {
+        promptMarkers.push({ line, marker: m })
+        lastPromptMarker = m
+      }
     } else if (data === 'B') {
       machine.push({ kind: 'B', line, col: b.cursorX })
     } else if (data === 'C') {
@@ -29,7 +38,7 @@ export function installOsc133(term: Terminal): PromptMarker[] {
     } else if (data.startsWith('D')) {
       const exit = Number(data.split(';')[1] ?? '0') || 0
       const block = machine.push({ kind: 'D', exit, atMs: performance.now() })
-      if (block) drawCommandBlock(term, block)
+      if (block) drawCommandBlock(term, block, lastPromptMarker)
     }
     return true // handled — do not print the sequence
   })
@@ -37,31 +46,38 @@ export function installOsc133(term: Terminal): PromptMarker[] {
 }
 
 // Draws the gutter bar for one finished command block, plus a ✗ + duration on
-// the prompt line. Anchored to a fresh marker at the prompt line so it scrolls
-// with the buffer and is disposed with the terminal.
-export function drawCommandBlock(term: Terminal, block: Block): void {
+// the prompt line. Anchored DIRECTLY to the block's own prompt IMarker (the
+// one installOsc133 registered at OSC 133;A time) rather than a fresh marker
+// derived from `block.promptLine` — that raw line number is frozen at 'A'
+// time, so if scrollback trims before 'D' (long-running output) it goes
+// stale while `marker.line` auto-adjusts. Bails if the marker is missing or
+// was disposed (e.g. trimmed out of scrollback entirely).
+export function drawCommandBlock(term: Terminal, block: Block, promptMarker: IMarker | undefined): void {
+  if (!promptMarker || promptMarker.isDisposed) return
   const active = term.buffer.active
-  const height = Math.max(1, active.baseY + active.cursorY - block.promptLine)
-  const marker = term.registerMarker(block.promptLine - (active.baseY + active.cursorY))
-  if (!marker) return
+  const height = Math.max(1, active.baseY + active.cursorY - promptMarker.line)
   const failed = block.exit !== 0
 
-  const bar = term.registerDecoration({ marker, x: 0, width: 1, height })
+  const bar = term.registerDecoration({ marker: promptMarker, x: 0, width: 1, height })
   bar?.onRender((el) => {
     el.style.background = failed ? 'var(--term-fail)' : 'var(--term-block)'
     el.style.opacity = failed ? '0.9' : '0.5'
     el.style.pointerEvents = 'none'
   })
 
-  const badge = term.registerDecoration({ marker, x: 0, width: term.cols, height: 1 })
+  const badge = term.registerDecoration({ marker: promptMarker, x: 0, width: term.cols, height: 1 })
+  // Set textContent + styles on the decoration element itself (idempotent)
+  // rather than appendChild-ing a new <span>: onRender re-fires on every
+  // viewport render pass for the decoration's whole lifetime (even while
+  // off-screen), so appendChild would accumulate an unbounded number of
+  // overlapping DOM nodes over a session.
   badge?.onRender((el) => {
     el.style.pointerEvents = 'none'
-    const right = document.createElement('span')
-    right.textContent = (failed ? '✗ ' : '') + fmtMs(block.durationMs)
-    right.style.cssText =
-      `position:absolute;right:6px;top:0;font-size:11px;` +
-      `color:${failed ? 'var(--term-fail)' : 'var(--term-dim)'};`
-    el.appendChild(right)
+    el.textContent = (failed ? '✗ ' : '') + fmtMs(block.durationMs)
+    el.style.textAlign = 'right'
+    el.style.paddingRight = '6px'
+    el.style.fontSize = '11px'
+    el.style.color = failed ? 'var(--term-fail)' : 'var(--term-dim)'
   })
 }
 
