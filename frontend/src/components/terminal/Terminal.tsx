@@ -96,6 +96,15 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
       } else if (k === 'v') {
         e.preventDefault()
         void navigator.clipboard.readText().then((txt) => t.paste(txt)).catch(() => {})
+      } else if (k === 'arrowup' || k === 'arrowdown') {
+        e.preventDefault()
+        const markers = promptMarkersRef.current
+        const top = t.buffer.active.viewportY
+        const lines = markers.map((m) => m.marker.line).filter((l) => l >= 0).sort((a, b) => a - b)
+        const target = k === 'arrowup'
+          ? [...lines].reverse().find((l) => l < top)
+          : lines.find((l) => l > top)
+        if (target !== undefined) t.scrollToLine(target)
       }
       return false
     })
