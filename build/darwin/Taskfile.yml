@@ -196,9 +196,9 @@ tasks:
     summary: Builds a drag-to-install DMG from the ad-hoc-signed .app (macOS only)
     vars:
       VERSION: "1.1.0"        # keep in sync with build/config.yml `version`
-      VOLNAME: "SSH Manager"
+      VOLNAME: "Zish"
       STAGING: "{{.BIN_DIR}}/dmg-staging"
-      DMG_OUT: "{{.BIN_DIR}}/SSH Manager-{{.VERSION}}.dmg"
+      DMG_OUT: "{{.BIN_DIR}}/Zish-{{.VERSION}}.dmg"
     deps:
       - task: package
     cmds:
@@ -208,9 +208,9 @@ tasks:
     internal: true
     vars:
       VERSION: "1.1.0"
-      VOLNAME: "SSH Manager"
+      VOLNAME: "Zish"
       STAGING: "{{.BIN_DIR}}/dmg-staging"
-      DMG_OUT: "{{.BIN_DIR}}/SSH Manager-{{.VERSION}}.dmg"
+      DMG_OUT: "{{.BIN_DIR}}/Zish-{{.VERSION}}.dmg"
     cmds:
       - rm -rf "{{.STAGING}}" "{{.DMG_OUT}}"
       - mkdir -p "{{.STAGING}}"

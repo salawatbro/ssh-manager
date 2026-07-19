@@ -6,7 +6,7 @@ version: '3'
 # This information is used to generate the build assets.
 info:
   companyName: "Salawat" # The name of the company
-  productName: "SSH Manager" # The name of the application
+  productName: "Zish" # The name of the application
   productIdentifier: "uz.salawat.sshmgr" # The unique product identifier
   description: "Local-first SSH connection manager for macOS — servers, jump hosts, tunnels, and a built-in terminal." # The application description
   copyright: "(c) 2026 Salawat" # Copyright text

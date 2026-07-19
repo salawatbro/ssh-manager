@@ -11,7 +11,7 @@ import (
 // LoginAgent registers the app as a per-user login item on macOS by writing a
 // LaunchAgent plist. File-based (no cgo, no admin); RunAtLoad launches the app
 // at login. The plist points at the current executable — for the packaged app
-// that is SSH Manager.app/Contents/MacOS/sshmgr; in dev it is the dev binary,
+// that is Zish.app/Contents/MacOS/sshmgr; in dev it is the dev binary,
 // which is fine for testing.
 type LoginAgent struct{}
 

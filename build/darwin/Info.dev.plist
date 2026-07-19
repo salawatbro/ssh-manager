@@ -4,7 +4,7 @@
         <key>CFBundlePackageType</key>
             <string>APPL</string>
         <key>CFBundleName</key>
-            <string>SSH Manager</string>
+            <string>Zish</string>
         <key>CFBundleExecutable</key>
             <string>sshmgr</string>
         <key>CFBundleIdentifier</key>
