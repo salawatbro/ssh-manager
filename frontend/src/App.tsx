@@ -136,7 +136,10 @@ export default function App() {
           on the outer band makes it a window drag region everywhere except
           the tabs / + button, which TabBar opts out with `.no-drag`. */}
       <div className="drag flex h-[52px] shrink-0 border-b border-border bg-bg1b">
-        <div className="w-[78px] shrink-0" />
+        {/* 92px horizontal clearance for the native traffic lights. Tahoe draws
+            them further right (and lower) than pre-Tahoe, so the old 78px let
+            the app label abut the zoom button — 92px leaves a clear gap. */}
+        <div className="w-[92px] shrink-0" />
         <div className="flex shrink-0 items-center border-r border-border pr-[12px]">
           <span className="text-[12px] font-semibold tracking-[0.02em] text-textMuted">Zish</span>
         </div>
