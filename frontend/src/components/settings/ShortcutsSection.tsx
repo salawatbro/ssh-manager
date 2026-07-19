@@ -4,7 +4,7 @@ import { SHORTCUTS } from '../../lib/shortcuts'
 
 // The only entry bound outside the app's own focus (App.tsx registers it as
 // a global hotkey via Wails) — everything else on this list only fires while
-// SSH Manager has focus.
+// Zish has focus.
 const GLOBAL_LABEL = 'Show / hide window'
 
 // READ-ONLY (dizayn Settings.dc.html Shortcuts section, minus rebinding):

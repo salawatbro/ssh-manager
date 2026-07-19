@@ -15,7 +15,7 @@ interface Slide {
 
 const slides: Slide[] = [
   {
-    title: 'Welcome to SSH Manager',
+    title: 'Welcome to Zish',
     body: 'Store a host once, connect with one key press. Everything stays on this machine — no account, no telemetry. Passwords and keys live in the macOS Keychain.',
   },
   {
