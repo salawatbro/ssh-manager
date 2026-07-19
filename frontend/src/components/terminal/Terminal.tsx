@@ -9,6 +9,7 @@ import { isMac } from '../../lib/platform'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { useSettings } from '../../stores/settings'
 import { useSessions } from '../../stores/sessions'
+import { collectLeaves } from '../../lib/paneTree'
 import { PaneNotice } from './PaneNotice'
 import { FindBar } from './FindBar'
 import { ContextMenu, type MenuEntry } from '../ui/ContextMenu'
@@ -29,6 +30,13 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
   const [findOpen, setFindOpen] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const cfg = useSettings((st) => st.settings)
+  // The focused-pane ring only earns its keep when a tab is split into ≥2
+  // panes (it tells them apart). On a lone pane it is just a bright border
+  // around the whole terminal, so suppress it there.
+  const isSplit = useSessions((s) => {
+    const tab = s.tabs.find((t) => t.id === tabId)
+    return tab ? collectLeaves(tab.root).length > 1 : false
+  })
 
   useEffect(() => {
     const host = hostRef.current
@@ -163,7 +171,7 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
 
   return (
     <div
-      className={`relative h-full w-full bg-bg0 ${focused ? 'shadow-[inset_0_0_0_1px_var(--color-accent)]' : ''}`}
+      className={`relative h-full w-full bg-bg0 ${focused && isSplit ? 'shadow-[inset_0_0_0_1px_var(--color-accent)]' : ''}`}
       onMouseDown={onFocus}
       onContextMenu={(e) => {
         e.preventDefault()
