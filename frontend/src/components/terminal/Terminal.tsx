@@ -13,6 +13,7 @@ import { collectLeaves } from '../../lib/paneTree'
 import { PaneNotice } from './PaneNotice'
 import { FindBar } from './FindBar'
 import { ContextMenu, type MenuEntry } from '../ui/ContextMenu'
+import { installOsc133, type PromptMarker } from './commandDecorations'
 
 interface Props {
   paneId: string
@@ -25,6 +26,9 @@ interface Props {
 export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<SearchAddon | null>(null)
+  // Ordered OSC 133 prompt markers, populated by installOsc133 on mount.
+  // Read (not written) by Task 5's jump-to-command navigation.
+  const promptMarkersRef = useRef<PromptMarker[]>([])
   const [term, setTerm] = useState<XTerm | null>(null)
   const [fit, setFit] = useState<FitAddon | null>(null)
   const [findOpen, setFindOpen] = useState(false)
@@ -95,6 +99,11 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
       }
       return false
     })
+
+    // Shell-integration OSC 133 markers → command blocks → gutter decorations.
+    // A no-op when the shell never emits 133 (integration setting off), since
+    // Task 3 only sends the injecting snippet when it's on.
+    promptMarkersRef.current = installOsc133(t)
 
     setTerm(t)
     setFit(fitAddon)

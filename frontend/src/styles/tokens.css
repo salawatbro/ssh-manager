@@ -64,6 +64,12 @@
   --term-magenta: #cf6bc9; --term-bright-magenta: #e08bd9;
   --term-cyan: #35c9d6;    --term-bright-cyan: #7fe6ef;
   --term-white: #98a3b2;   --term-bright-white: #dfe4ea;
+
+  /* Command-block decorations (OSC 133 gutter overlay) — additive to the ANSI
+     palette above, never a replacement for it. */
+  --term-block: #4b5563;   /* neutral command-block gutter bar */
+  --term-fail: #f2555a;    /* failed command bar + ✗ */
+  --term-dim: #6b7480;     /* duration text */
 }
 
 /* Everything below participates in the normal cascade via @layer base, so that
