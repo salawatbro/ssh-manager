@@ -42,4 +42,12 @@ describe('createOsc133Machine', () => {
     m.push({ kind: 'C', line: 1, atMs: 500 })
     expect(m.push({ kind: 'D', exit: 0, atMs: 100 })!.durationMs).toBe(0)
   })
+
+  it('discards sawC on new A even after a C was already seen', () => {
+    const m = createOsc133Machine()
+    m.push({ kind: 'A', line: 1 }); m.push({ kind: 'B', line: 1, col: 2 })
+    m.push({ kind: 'C', line: 1, atMs: 100 })          // sawC = true
+    m.push({ kind: 'A', line: 3 })                      // must reset sawC
+    expect(m.push({ kind: 'D', exit: 0, atMs: 200 })).toBeNull()
+  })
 })
