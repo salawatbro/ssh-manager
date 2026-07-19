@@ -138,7 +138,7 @@ export default function App() {
       <div className="drag flex h-[52px] shrink-0 border-b border-border bg-bg1b">
         <div className="w-[78px] shrink-0" />
         <div className="flex shrink-0 items-center border-r border-border pr-[12px]">
-          <span className="text-[12px] font-semibold tracking-[0.02em] text-textMuted">SSH Manager</span>
+          <span className="text-[12px] font-semibold tracking-[0.02em] text-textMuted">Zish</span>
         </div>
         <TabBar />
       </div>

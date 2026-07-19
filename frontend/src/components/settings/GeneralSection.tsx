@@ -20,7 +20,7 @@ export function GeneralSection() {
   if (!s) return null
   return (
     <div className="flex flex-col">
-      <Row label="Start at login" hint="Launch SSH Manager when you log in.">
+      <Row label="Start at login" hint="Launch Zish when you log in.">
         <Toggle on={s.startAtLogin} onChange={(v) => void update({ startAtLogin: v })} />
       </Row>
       <Row label="Keep running in tray" hint="Closing the window keeps sessions alive; ⌘⇧S brings it back.">

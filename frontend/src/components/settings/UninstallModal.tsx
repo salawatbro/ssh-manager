@@ -42,7 +42,7 @@ export function UninstallModal({ onClose }: Props) {
         className="relative flex w-[440px] flex-col rounded-[10px] border border-border bg-bg1b p-[22px] shadow-[0_16px_48px_rgba(0,0,0,.5)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-[15px] font-semibold text-text">Uninstall SSH Manager</div>
+        <div className="text-[15px] font-semibold text-text">Uninstall Zish</div>
         <div className="mt-[10px] text-[12.5px] text-textMuted">This permanently removes:</div>
         <ul className="mt-[6px] flex flex-col gap-[3px] text-[12.5px] text-textMuted">
           <li>• All saved servers and settings</li>

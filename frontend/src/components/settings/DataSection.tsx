@@ -52,7 +52,7 @@ export function DataSection() {
           <Btn label="Reveal folder" onClick={() => void DataService.RevealDataFolder().catch(() => {})} />
         </div>
       </Row>
-      <Row label="Uninstall SSH Manager" hint="Remove all data and move the app to the Trash. This cannot be undone." last>
+      <Row label="Uninstall Zish" hint="Remove all data and move the app to the Trash. This cannot be undone." last>
         <Btn label="Uninstall…" onClick={() => setShowUninstall(true)} />
       </Row>
       {showUninstall && <UninstallModal onClose={() => setShowUninstall(false)} />}

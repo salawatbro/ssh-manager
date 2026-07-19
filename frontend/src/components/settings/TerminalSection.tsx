@@ -18,7 +18,7 @@ export function TerminalSection() {
           pickers are inert rather than fake settings with one option that
           does nothing when "changed". */}
       <Row label="Font">
-        <InertSelect value={s.termFont} mono title="Only JetBrains Mono is bundled with SSH Manager" />
+        <InertSelect value={s.termFont} mono title="Only JetBrains Mono is bundled with Zish" />
         <Stepper value={s.termFontSize} min={8} max={32} onChange={(v) => void update({ termFontSize: v })} />
       </Row>
       <Row label="Theme" hint="Terminal colors, independent of the app theme.">
