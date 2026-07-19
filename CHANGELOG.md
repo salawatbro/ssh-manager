@@ -7,6 +7,14 @@ follow [Semantic Versioning](https://semver.org/).
 Only **1.0.0** and **1.1.0** are packaged, published releases (macOS `.dmg`).
 Versions **0.1–0.7** are the development milestones that built up to 1.0.
 
+## [Unreleased]
+
+### Changed
+- **Rebrand:** the app is now **Zish** (previously "SSH Manager"), with a new
+  spark-bolt icon. Internal identifiers — bundle id (`uz.salawat.sshmgr`), data
+  folder, and Keychain service — are unchanged, so existing installs keep all
+  servers, secrets, and settings.
+
 ## [1.1.0] — 2026-07-19
 
 Everything added since the first release. Released as

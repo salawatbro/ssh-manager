@@ -1,4 +1,4 @@
-# SSH Manager
+# Zish
 
 A local-first SSH connection manager for macOS with a built-in terminal.
 Everything stays on your machine — **no account, no telemetry, no network
@@ -11,8 +11,8 @@ multi-tab, split-pane terminal — all from one native desktop app.
 
 ## Install
 
-1. Download `SSH Manager-1.1.0.dmg`.
-2. Open the DMG and drag **SSH Manager** into **Applications**.
+1. Download `Zish-1.1.0.dmg`.
+2. Open the DMG and drag **Zish** into **Applications**.
 3. **First launch:** right-click (or Control-click) the app → **Open** →
    **Open** again. The app is ad-hoc signed but not notarized, so macOS asks
    once; after that it launches normally.
@@ -174,8 +174,8 @@ required and cross-compilation works.
 task package
 ```
 
-Produces a macOS application bundle (`SSH Manager`, bundle id
-`uz.salawat.sshmgr`).
+Produces a macOS application bundle (`Zish`, bundle id
+`uz.salawat.sshmgr`). The bundle id keeps the original `sshmgr` name to preserve existing installs' Keychain items and data.
 
 ### Build a distributable DMG
 
@@ -183,7 +183,7 @@ Produces a macOS application bundle (`SSH Manager`, bundle id
 task darwin:dmg
 ```
 
-Produces `bin/SSH Manager-1.1.0.dmg`. The app inside is ad-hoc signed but not
+Produces `bin/Zish-1.1.0.dmg`. The app inside is ad-hoc signed but not
 notarized, so recipients need to right-click → **Open** on first launch (see
 [Install](#install)).
 
@@ -238,7 +238,7 @@ The folder is `0700`; the database and `known_hosts` are `0600`.
 
 ## Platform support
 
-SSH Manager targets **macOS**. The native features — global hotkey, menu-bar
+Zish targets **macOS**. The native features — global hotkey, menu-bar
 tray, start-at-login, and the close-to-tray behavior — are macOS-only. The code
 compiles for Windows and Linux (with no-op stubs for the native pieces), but
 those platforms are not yet runtime-tested.
