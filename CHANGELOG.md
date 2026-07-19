@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **SSH Manager**. The format is based on
+All notable changes to **Zish**. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
 follow [Semantic Versioning](https://semver.org/).
 
