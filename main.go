@@ -276,7 +276,7 @@ func main() {
 	// the menu-bar icon (wrong for a full-size window). Right-click shows the
 	// menu below (Wails' smart default when a menu is set).
 	tray := app.SystemTray.New()
-	tray.SetLabel("SSH")
+	tray.SetLabel("Zish")
 	tray.OnClick(func() { toggleMainWindow() })
 
 	// The tray's server list mirrors the pinned set. rebuildTray refreshes it
