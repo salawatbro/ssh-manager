@@ -37,3 +37,20 @@ export function createOsc133Machine(): { push(ev: Osc133Event): CommandBlock | n
     },
   }
 }
+
+// One physical line sent over the PTY on connect. bash & zsh install OSC 133
+// hooks; any other shell falls through the guards and does nothing. Existing
+// PS1/PS0/PROMPT_COMMAND are preserved (prepend/append). Ends with a real
+// Enter (\r) added by the caller.
+export const SHELL_INTEGRATION_SNIPPET =
+  ` eval 'if [ -n "$BASH_VERSION" ]; then ` +
+  `__zish_pc() { local r=$?; printf "\\033]133;D;%s\\007" "$r"; }; ` +
+  `case "$PROMPT_COMMAND" in *__zish_pc*) ;; *) PROMPT_COMMAND="__zish_pc\${PROMPT_COMMAND:+;$PROMPT_COMMAND}";; esac; ` +
+  `PS0="\\[\\033]133;C\\007\\]$PS0"; ` +
+  `PS1="\\[\\033]133;A\\007\\]$PS1\\[\\033]133;B\\007\\]"; ` +
+  `elif [ -n "$ZSH_VERSION" ]; then ` +
+  `autoload -Uz add-zsh-hook; ` +
+  `__zish_precmd() { printf "\\033]133;D;%s\\007\\033]133;A\\007" "$?"; }; ` +
+  `__zish_preexec() { printf "\\033]133;C\\007"; }; ` +
+  `add-zsh-hook precmd __zish_precmd; add-zsh-hook preexec __zish_preexec; ` +
+  `PS1="$PS1%{$(printf "\\033]133;B\\007")%}"; fi'`
