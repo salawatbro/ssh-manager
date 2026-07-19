@@ -196,7 +196,7 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
         setMenu({ x: e.clientX, y: e.clientY })
       }}
     >
-      <div ref={hostRef} className="h-full w-full p-[6px]" />
+      <div ref={hostRef} className="h-full w-full py-[6px] pr-[6px] pl-[10px]" />
       {menu && term && (
         <ContextMenu
           x={menu.x}

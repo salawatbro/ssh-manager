@@ -60,8 +60,15 @@ export function drawCommandBlock(term: Terminal, block: Block, promptMarker: IMa
 
   const bar = term.registerDecoration({ marker: promptMarker, x: 0, width: 1, height })
   bar?.onRender((el) => {
-    el.style.background = failed ? 'var(--term-fail)' : 'var(--term-block)'
-    el.style.opacity = failed ? '0.9' : '0.5'
+    // Draw the bar as a thin left-border shifted LEFT into the terminal's own
+    // left padding (a gutter), so it never tints the first character cell.
+    // xterm re-sets left/top/width/height on the element each render but NOT
+    // border/background/transform — so these survive across render passes and
+    // stay idempotent (no accumulation).
+    el.style.background = 'transparent'
+    el.style.borderLeft = `3px solid ${failed ? 'var(--term-fail)' : 'var(--term-block)'}`
+    el.style.transform = 'translateX(-8px)'
+    el.style.opacity = failed ? '0.95' : '0.55'
     el.style.pointerEvents = 'none'
   })
 
