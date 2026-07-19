@@ -28,6 +28,7 @@ tasks:
       # package with "pattern all:frontend/dist: no matching files found".
       - cd frontend && npx tsc --noEmit
       - cd frontend && npm run build
+      - cd frontend && npm test
 
       - go vet ./...
       - golangci-lint run
