@@ -12,9 +12,13 @@ info:
   copyright: "(c) 2026 Salawat" # Copyright text
   comments: "Local SSH connection manager." # Comments
   version: "1.1.0" # The application version
-  # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
-  #                               # Should match the name of your .icon file without the extension
-  #                               # If not set and Assets.car exists, defaults to "appicon"
+  # cfBundleIconName: KEEP THIS COMMENTED OUT. The app ships an icns-only icon
+  #   (build/darwin/icons.icns from appicon.png); there is intentionally no
+  #   Assets.car and no CFBundleIconName in Info.plist. Do NOT run
+  #   `wails3 task common:update:build-assets` — it regenerates Info.plist from a
+  #   template and can silently reintroduce CFBundleIconName, which would make
+  #   macOS prefer a (nonexistent/stale) Assets.car over icons.icns. Edit
+  #   Info.plist directly instead. See generate:icons in build/Taskfile.yml.
 
 # iOS build configuration (uncomment to customise iOS project generation)
 # Note: Keys under `ios` OVERRIDE values under `info` when set.

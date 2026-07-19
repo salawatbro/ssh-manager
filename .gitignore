@@ -25,6 +25,9 @@ frontend/node_modules/
 *.db-shm
 .DS_Store
 
+# Bare app binary from `go build .` at repo root (use `task` for real builds)
+/sshmgr
+
 # CI not needed for now (kept locally, not pushed)
 .github/workflows/
 # Superpowers implementation plans/specs — local working docs only
