@@ -8,7 +8,7 @@ export function AboutSection() {
         </svg>
       </div>
       <div className="text-[17px] font-semibold text-text">Zish</div>
-      <div className="mt-[5px] font-mono text-[12px] text-textDim">1.1.0 · darwin/arm64</div>
+      <div className="mt-[5px] font-mono text-[12px] text-textDim">1.1.1 · darwin/arm64</div>
       <div className="mt-[22px] flex w-[400px] flex-col gap-[7px] rounded-[7px] border border-border bg-bg0 p-[13px_16px]">
         {[
           'Everything stays on this machine',

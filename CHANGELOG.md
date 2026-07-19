@@ -4,16 +4,27 @@ All notable changes to **Zish**. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
 follow [Semantic Versioning](https://semver.org/).
 
-Only **1.0.0** and **1.1.0** are packaged, published releases (macOS `.dmg`).
+Only **1.0.0**, **1.1.0** and **1.1.1** are packaged, published releases (macOS `.dmg`).
 Versions **0.1–0.7** are the development milestones that built up to 1.0.
 
-## [Unreleased]
+## [1.1.1] — 2026-07-19
+
+### Added
+- **Terminal shell integration** (bash/zsh) — the terminal now distinguishes the
+  prompt, the command you typed, and its output via OSC 133 markers: a gutter bar
+  per command, a red mark on failed commands, per-command duration, and jump to
+  the previous/next command (⌘↑ / ⌘↓). Toggle under Settings → Terminal.
 
 ### Changed
 - **Rebrand:** the app is now **Zish** (previously "SSH Manager"), with a new
   spark-bolt icon. Internal identifiers — bundle id (`uz.salawat.sshmgr`), data
   folder, and Keychain service — are unchanged, so existing installs keep all
   servers, secrets, and settings.
+
+### Fixed
+- Title-bar and terminal polish: the app-name divider lines up with the sidebar
+  edge, the app name clears the macOS traffic lights (Tahoe), and the focused-pane
+  ring shows only when a tab is split.
 
 ## [1.1.0] — 2026-07-19
 
@@ -133,5 +144,6 @@ This release bundles everything from 0.1 through 0.7 below.
   port, user, auth method, jump host), grouped in the sidebar. No connections
   yet — that arrived in 0.2.
 
+[1.1.1]: https://github.com/salawatbro/ssh-manager/releases/tag/v1.1.1
 [1.1.0]: https://github.com/salawatbro/ssh-manager/releases/tag/v1.1.0
 [1.0.0]: https://github.com/salawatbro/ssh-manager/releases/tag/v1.0.0
