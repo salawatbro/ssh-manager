@@ -150,6 +150,12 @@ export interface Settings {
     "termScrollback": number;
 
     /**
+     * ShellIntegration injects an OSC 133 snippet on connect (bash/zsh) to mark
+     * prompt/command/output boundaries. Off = plain terminal.
+     */
+    "shellIntegration": boolean;
+
+    /**
      * Prod guard (FR-14): an ERGONOMIC barrier on dangerous commands typed
      * against a prod-tagged server, not a security control (FR-14.9). The DB
      * default for GuardPatterns is deliberately empty (multi-line text doesn't

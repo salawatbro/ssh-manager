@@ -42,6 +42,9 @@ export function TerminalSection() {
       <Row label="Blink cursor">
         <Toggle on={s.termBlink} onChange={(v) => void update({ termBlink: v })} />
       </Row>
+      <Row label="Shell integration" hint="Distinguish prompt, commands and output; mark failed commands (bash/zsh).">
+        <Toggle on={s.shellIntegration} onChange={(v) => void update({ shellIntegration: v })} />
+      </Row>
       <Row label="Scrollback" hint="Lines kept per session. Applies to new sessions." last>
         <NumberBox
           value={s.termScrollback}

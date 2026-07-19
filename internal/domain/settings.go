@@ -20,6 +20,10 @@ type Settings struct {
 	TermBlink      bool   `gorm:"not null;default:true" json:"termBlink"`
 	TermScrollback int    `gorm:"not null;default:10000" json:"termScrollback"`
 
+	// ShellIntegration injects an OSC 133 snippet on connect (bash/zsh) to mark
+	// prompt/command/output boundaries. Off = plain terminal.
+	ShellIntegration bool `gorm:"not null;default:true" json:"shellIntegration"`
+
 	// Prod guard (FR-14): an ERGONOMIC barrier on dangerous commands typed
 	// against a prod-tagged server, not a security control (FR-14.9). The DB
 	// default for GuardPatterns is deliberately empty (multi-line text doesn't
@@ -49,6 +53,7 @@ func DefaultSettings() Settings {
 		TermCursor:         "block",
 		TermBlink:          true,
 		TermScrollback:     10000,
+		ShellIntegration:   true,
 		GuardEnabled:       true,
 		GuardPatterns:      defaultGuardPatterns,
 	}

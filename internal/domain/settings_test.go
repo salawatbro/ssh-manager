@@ -11,3 +11,9 @@ func TestDefaultSettingsGuard(t *testing.T) {
 		t.Error("GuardPatterns = \"\", want non-empty")
 	}
 }
+
+func TestDefaultShellIntegrationOn(t *testing.T) {
+	if !DefaultSettings().ShellIntegration {
+		t.Error("ShellIntegration default = false, want true")
+	}
+}
