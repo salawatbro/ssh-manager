@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, Zap } from 'lucide-react'
 import Fuse from 'fuse.js'
 import type { Snippet } from '@bindings/github.com/salawat/sshmgr/internal/domain'
@@ -102,25 +102,14 @@ export function SnippetPalette() {
             <div className="px-[10px] py-[14px] text-[13px] text-textDim">No snippets for this server.</div>
           )}
           {rows.map((s, idx) => (
-            <button
+            <SnippetRow
               key={s.id}
-              type="button"
-              onClick={() => choose(idx)}
-              onMouseEnter={() => setI(idx)}
-              className={`flex w-full items-center gap-[9px] rounded-[6px] px-[10px] py-[7px] text-left ${
-                idx === i ? 'bg-bgSel' : ''
-              }`}
-            >
-              {server && <span className={`h-[7px] w-[7px] shrink-0 rounded-env ${envClassOf(server.environment)}`} />}
-              <span className="min-w-0 flex-1 truncate text-[13px] text-text">{s.name}</span>
-              {s.slot > 0 && (
-                <span className="shrink-0 rounded-[3px] border border-border px-[5px] font-mono text-[10px] text-textDim">
-                  {SLOT_PREFIX}
-                  {s.slot}
-                </span>
-              )}
-              <span className="max-w-[220px] shrink-0 truncate font-mono text-[11px] text-textDim">{s.body}</span>
-            </button>
+              snippet={s}
+              envClass={server ? envClassOf(server.environment) : null}
+              active={idx === i}
+              onChoose={() => choose(idx)}
+              onHover={() => setI(idx)}
+            />
           ))}
         </div>
         <div className="flex h-[34px] shrink-0 items-center gap-[16px] border-t border-border bg-bg1 px-[14px] text-[11px] text-textDim">
@@ -135,5 +124,52 @@ export function SnippetPalette() {
         </div>
       </div>
     </div>
+  )
+}
+
+// One snippet row. Mirrors PaletteRow: keyboard ↑↓ only moves the active
+// index, so the active row must pull itself into view (block:'nearest' is a
+// no-op when already visible). Hover uses mouseMove, not mouseEnter, so the
+// programmatic scroll shifting rows under a still pointer can't steal the
+// selection.
+function SnippetRow({
+  snippet,
+  envClass,
+  active,
+  onChoose,
+  onHover,
+}: {
+  snippet: Snippet
+  envClass: string | null
+  active: boolean
+  onChoose: () => void
+  onHover: () => void
+}) {
+  const ref = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (active) ref.current?.scrollIntoView({ block: 'nearest' })
+  }, [active])
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={onChoose}
+      onMouseMove={onHover}
+      className={`flex w-full items-center gap-[9px] rounded-[6px] px-[10px] py-[7px] text-left ${
+        active ? 'bg-bgSel' : ''
+      }`}
+    >
+      {envClass && <span className={`h-[7px] w-[7px] shrink-0 rounded-env ${envClass}`} />}
+      <span className="min-w-0 flex-1 truncate text-[13px] text-text">{snippet.name}</span>
+      {snippet.slot > 0 && (
+        <span className="shrink-0 rounded-[3px] border border-border px-[5px] font-mono text-[10px] text-textDim">
+          {SLOT_PREFIX}
+          {snippet.slot}
+        </span>
+      )}
+      <span className="max-w-[220px] shrink-0 truncate font-mono text-[11px] text-textDim">{snippet.body}</span>
+    </button>
   )
 }
