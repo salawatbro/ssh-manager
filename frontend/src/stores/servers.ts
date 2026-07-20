@@ -4,6 +4,7 @@ import { ServerService } from '@bindings/github.com/salawat/sshmgr/internal/serv
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { CreateServerInput, TestResult } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import type { KeyInfo } from '@bindings/github.com/salawat/sshmgr/internal/sshx'
+import { toastError } from './toasts'
 
 interface ServersState {
   servers: Server[]
@@ -83,13 +84,16 @@ export const useServers = create<ServersState>((set, get) => ({
   },
 
   // Tray quick-connect: pin/unpin, then reload so the row indicator and the
-  // menu-bar list both reflect it. A cap error (6th pin) surfaces via `error`.
+  // menu-bar list both reflect it. A cap error (6th pin) has no inline surface
+  // — the pin lives in a context menu that's gone by the time this settles —
+  // so it surfaces as a toast. Unwrap .message like `save` does, so the
+  // RuntimeError prefix never reaches the shown text.
   setPinned: async (id, pinned) => {
     try {
       await ServerService.SetPinned(id, pinned)
       await get().load()
     } catch (e) {
-      set({ error: String(e) })
+      toastError(e instanceof Error ? e.message : String(e))
     }
   },
 

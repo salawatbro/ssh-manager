@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { SettingsService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import type { Settings } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import { toastError } from './toasts'
 
 export type SettingsSection = 'general' | 'terminal' | 'shortcuts' | 'data' | 'snippets' | 'about'
 
@@ -38,8 +39,11 @@ export const useSettings = create<SettingsState>((set, get) => ({
     try {
       const saved = await SettingsService.Update(next)
       set({ settings: saved })
-    } catch {
-      set({ settings: cur }) // revert on failure
+    } catch (e) {
+      // Revert the optimistic patch AND say so — a control silently snapping
+      // back reads as a UI glitch, not as a failed save.
+      set({ settings: cur })
+      toastError(e instanceof Error ? e.message : String(e))
     }
   },
 

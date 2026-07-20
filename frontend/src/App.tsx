@@ -15,6 +15,7 @@ import { SettingsModal } from './components/settings/SettingsModal'
 import { ImportPreview } from './components/palette/ImportPreview'
 import { TunnelsPanel } from './components/forwards/TunnelsPanel'
 import { StatusBar } from './components/layout/StatusBar'
+import { Toasts } from './components/ui/Toasts'
 import { useAppKeymap } from './hooks/useAppKeymap'
 import { useTrayConnect } from './hooks/useTrayConnect'
 import { useSftpProgress } from './hooks/useSftpProgress'
@@ -216,6 +217,10 @@ export default function App() {
           reused by the manual buffer here and by the reliable/broadcast paths
           (Tasks 8/9). GuardModal renders nothing itself when closed. */}
       <GuardModal />
+      {/* Transient feedback stack (dizayn manbasi: Toast.dc.html) — reports
+          for actions with no inline surface: the tray pin cap, SFTP ops after
+          connect, a failed settings save, Data-section export/import/backup. */}
+      <Toasts />
     </div>
   )
 }

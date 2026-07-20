@@ -3,6 +3,7 @@ import { SftpService } from '@bindings/github.com/salawat/sshmgr/internal/servic
 import type { FileEntry } from '@bindings/github.com/salawat/sshmgr/internal/sftpx'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { joinRemote, dirnameRemote } from '../lib/remotePath'
+import { toastError } from './toasts'
 
 // Mirrors the sftp:progress event payload (service/models.ts SftpProgress)
 // minus the terminal-only `finished`/`error` fields (see applyProgress).
@@ -24,6 +25,9 @@ interface SftpState {
   localEntries: FileEntry[]
   remoteEntries: FileEntry[]
   transfers: TransferProgress[]
+  // Connect-time failure only — SftpView renders it on the pre-connect
+  // screen. Errors after connect (nav, transfer, mkdir/remove/rename) have no
+  // inline surface there and go through toasts instead.
   error: string | null
 
   openFor: (server: Server) => Promise<void>
@@ -106,7 +110,7 @@ export const useSftp = create<SftpState>((set, get) => ({
       const entries = (await SftpService.ListLocal(dir)) ?? []
       set({ localCwd: dir, localEntries: entries })
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) })
+      toastError(e instanceof Error ? e.message : String(e))
     }
   },
 
@@ -117,7 +121,7 @@ export const useSftp = create<SftpState>((set, get) => ({
       const entries = (await SftpService.ListRemote(sessionId, dir)) ?? []
       set({ remoteCwd: dir, remoteEntries: entries })
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) })
+      toastError(e instanceof Error ? e.message : String(e))
     }
   },
 
@@ -133,7 +137,7 @@ export const useSftp = create<SftpState>((set, get) => ({
     try {
       await SftpService.Upload(sessionId, localPath, remoteCwd)
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) })
+      toastError(e instanceof Error ? e.message : String(e))
     }
   },
 
@@ -143,7 +147,7 @@ export const useSftp = create<SftpState>((set, get) => ({
     try {
       await SftpService.Download(sessionId, remotePath, localCwd)
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) })
+      toastError(e instanceof Error ? e.message : String(e))
     }
   },
 
@@ -158,7 +162,7 @@ export const useSftp = create<SftpState>((set, get) => ({
       await SftpService.Mkdir(sessionId, joinRemote(remoteCwd, name))
       await get().navRemote(remoteCwd)
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) })
+      toastError(e instanceof Error ? e.message : String(e))
     }
   },
 
@@ -169,7 +173,7 @@ export const useSftp = create<SftpState>((set, get) => ({
       await SftpService.Remove(sessionId, path)
       await get().navRemote(remoteCwd)
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) })
+      toastError(e instanceof Error ? e.message : String(e))
     }
   },
 
@@ -180,11 +184,14 @@ export const useSftp = create<SftpState>((set, get) => ({
       await SftpService.Rename(sessionId, oldPath, joinRemote(dirnameRemote(oldPath), newName))
       await get().navRemote(remoteCwd)
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) })
+      toastError(e instanceof Error ? e.message : String(e))
     }
   },
 
   applyProgress: (p) => {
+    // A transfer that dies mid-flight reports through its progress event; the
+    // panel is past the pre-connect screen by then, so toast it.
+    if (p.error) toastError(p.error)
     set((state) => ({
       transfers: p.finished
         ? state.transfers.filter((t) => t.transferID !== p.transferID)
@@ -192,7 +199,6 @@ export const useSftp = create<SftpState>((set, get) => ({
             ...state.transfers.filter((t) => t.transferID !== p.transferID),
             { transferID: p.transferID, direction: p.direction, currentFile: p.currentFile, done: p.done, total: p.total },
           ],
-      error: p.error || state.error,
     }))
     // A finished transfer may leave a partial file — refresh both panels.
     if (p.finished) void get().refresh()
