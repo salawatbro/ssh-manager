@@ -9,6 +9,54 @@ import { useSftp } from '../../stores/sftp'
 import type { Status } from '../../lib/status'
 import { searchServers } from '../../lib/fuzzy'
 import { PaletteRow } from './PaletteRow'
+import { ServerService } from '@bindings/github.com/salawat/sshmgr/internal/service'
+import { AuthType, Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import { parseQuickConnect, formatQuickTarget, type QuickConnectTarget } from '../../lib/quickConnect'
+import { toastError } from '../../stores/toasts'
+
+// Quick connect (spec 2026-07-20): reuse an existing server when the
+// host+user+port triple already exists (ImportJSON's identity rule — the
+// name is NOT the identity), otherwise auto-save into "Quick connects" and
+// open. select(null) first for the same reason the server branch of choose()
+// does it: close any open edit form so the terminal is visible.
+async function quickConnect(target: QuickConnectTarget) {
+  useServers.getState().select(null)
+  const existing = useServers
+    .getState()
+    .servers.find((s) => s.host === target.host && s.user === target.user && s.port === target.port)
+  if (existing) {
+    useSessions.getState().openOrFocus(existing)
+    return
+  }
+  try {
+    const created = await ServerService.Create({
+      name: formatQuickTarget(target),
+      host: target.host,
+      port: target.port,
+      user: target.user,
+      authType: AuthType.AuthAgent,
+      keyPath: '',
+      // Empty string = "do not write" (SEC-01) — an agent server has no secret.
+      password: '',
+      passphrase: '',
+      totpSecret: '',
+      twoFactor: false,
+      jumpId: null,
+      group: 'Quick connects',
+      environment: Environment.EnvNone,
+      tags: [],
+      notes: '',
+    })
+    if (!created) return
+    useSessions.getState().open(created)
+    // Refresh so the sidebar shows the new "Quick connects" row right away.
+    await useServers.getState().load()
+  } catch (e) {
+    // The backend's domain.Error message is user-ready; unwrap .message so
+    // the binding's "RuntimeError: " prefix never reaches the toast.
+    toastError(e instanceof Error ? e.message : String(e))
+  }
+}
 
 // The ⌘K command palette (FR-08). Servers (fuzzy / recency) followed by app
 // commands (v0.4: New server). Enter opens a server's terminal or runs the
@@ -67,7 +115,11 @@ export function CommandPalette({
         : []),
       { kind: 'command' as const, id: 'authenticator', label: 'Authenticator', run: () => useAuthenticator.getState().show() },
     ].filter((c) => !ql || c.label.toLowerCase().includes(ql))
-    return [...serverRows, ...commands]
+    // Quick connect is always row 0 when the input parses — Enter connects
+    // with nothing else to press. Fuzzy results stay visible below it.
+    const target = parseQuickConnect(q)
+    const quickRows: PaletteRowData[] = target ? [{ kind: 'quick-connect', target }] : []
+    return [...quickRows, ...serverRows, ...commands]
   }, [servers, q, onNewServer, onOpenTunnels, selectedId, tabs, paneStatus])
 
   useEffect(() => {
@@ -90,14 +142,16 @@ export function CommandPalette({
     if (row.kind === 'server') {
       useServers.getState().select(null)
       useSessions.getState().open(row.server)
-    } else {
+    } else if (row.kind === 'command') {
       row.run()
+    } else {
+      void quickConnect(row.target)
     }
   }
 
-  // Serves rows always precede command rows in `rows` (built that way above),
-  // so a single "SERVERS" header ahead of the mapped list lands in the right
-  // spot without needing to slice the array in two.
+  // Server rows precede command rows in `rows`; the synthetic quick-connect
+  // row, when present, is index 0 and is rendered separately above the
+  // SERVERS header (the map skips it), so indices still line up for ↑↓.
   const hasServerRows = rows.some((row) => row.kind === 'server')
 
   return (
@@ -133,20 +187,25 @@ export function CommandPalette({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-[6px]">
           {rows.length === 0 && <div className="px-[10px] py-[14px] text-[13px] text-textDim">No matches</div>}
+          {rows[0]?.kind === 'quick-connect' && (
+            <PaletteRow row={rows[0]} active={i === 0} onChoose={() => choose(0)} onHover={() => setI(0)} />
+          )}
           {hasServerRows && (
             <div className="px-[10px] pb-[4px] pt-[6px] text-[10px] font-semibold tracking-[.07em] text-textDim">
               SERVERS
             </div>
           )}
-          {rows.map((row, idx) => (
-            <PaletteRow
-              key={row.kind === 'server' ? row.server.id : row.id}
-              row={row}
-              active={idx === i}
-              onChoose={() => choose(idx)}
-              onHover={() => setI(idx)}
-            />
-          ))}
+          {rows.map((row, idx) =>
+            row.kind === 'quick-connect' ? null : (
+              <PaletteRow
+                key={row.kind === 'server' ? row.server.id : row.id}
+                row={row}
+                active={idx === i}
+                onChoose={() => choose(idx)}
+                onHover={() => setI(idx)}
+              />
+            ),
+          )}
         </div>
         {/* Footer hints (dizayn manbasi: overlay=palette footer bar). ↵ connect
             and ↑↓ navigate are real bindings, wired above. `>` commands and

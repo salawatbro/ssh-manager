@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { envClassOf } from '../../lib/env'
 import { formatRecency } from '../../lib/relativeTime'
+import { formatQuickTarget } from '../../lib/quickConnect'
 import { StatusDot } from '../server/StatusDot'
 import type { PaletteRowData } from '../../stores/palette'
 
@@ -52,10 +53,20 @@ export function PaletteRow({
             {formatRecency(row.server.lastUsedAt)}
           </span>
         </>
-      ) : (
+      ) : row.kind === 'command' ? (
         <>
           <span className="w-[7px] shrink-0 text-center text-[13px] text-accent">›</span>
           <span className="flex-1 text-[13.5px] text-text">{row.label}</span>
+        </>
+      ) : (
+        <>
+          {/* Quick connect: a text glyph, deliberately not a dot (UI-11 —
+              bare circles mean status, squares mean environment). */}
+          <span className="w-[7px] shrink-0 text-center text-[13px] text-accent">→</span>
+          <span className="min-w-0 flex-1 truncate text-[13.5px] text-text">
+            Connect to {formatQuickTarget(row.target)}
+          </span>
+          <span className="shrink-0 text-[11px] text-textDim">saves to Quick connects</span>
         </>
       )}
     </div>
