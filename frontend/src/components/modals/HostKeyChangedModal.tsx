@@ -10,7 +10,7 @@ export function HostKeyChangedModal({ request, onConfirm }: Props) {
   const [armed, setArmed] = useState(false)
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black/[.58]">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/[.58]">
       <div className="w-[500px] overflow-hidden rounded-[9px] border border-stFailed bg-bg2 shadow-[0_20px_60px_rgba(0,0,0,.5)]">
         {/* Tinted header band */}
         <div className="flex items-center gap-[9px] border-b border-stFailed/40 bg-stFailed/[.12] px-[20px] py-[15px]">

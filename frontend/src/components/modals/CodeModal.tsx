@@ -20,7 +20,7 @@ export function CodeModal({ request, onSubmit, onCancel }: Props) {
   }
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="w-[460px] rounded-[9px] border border-borderStrong bg-bg2 p-[20px] shadow-[0_20px_60px_rgba(0,0,0,.45)]">
         <div className="text-[15px] font-semibold text-text">Verification code for {request.serverName}</div>
         <div className="mt-[3px] break-words font-mono text-[12px] text-textMuted">{request.prompt}</div>

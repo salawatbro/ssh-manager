@@ -196,7 +196,12 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
         setMenu({ x: e.clientX, y: e.clientY })
       }}
     >
-      <div ref={hostRef} className="h-full w-full py-[6px] pr-[6px] pl-[10px]" />
+      {/* isolate: xterm's internal z-indexed layers (canvas 1-3, helpers 5,
+          decorations 6/7) must not escape into the app's stacking context,
+          where they'd sit above any z-auto overlay (the host-key/2FA modals
+          hit exactly that). FindBar/PaneNotice/ContextMenu are siblings of
+          this host, so they keep painting above the terminal as before. */}
+      <div ref={hostRef} className="isolate h-full w-full py-[6px] pr-[6px] pl-[10px]" />
       {menu && term && (
         <ContextMenu
           x={menu.x}
