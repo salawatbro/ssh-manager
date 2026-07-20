@@ -10,6 +10,11 @@ describe('parseQuickConnect', () => {
     expect(parseQuickConnect('root@example.com:2222')).toEqual({ user: 'root', host: 'example.com', port: 2222 })
   })
 
+  it('accepts the valid port boundaries', () => {
+    expect(parseQuickConnect('user@host:1')).toEqual({ user: 'user', host: 'host', port: 1 })
+    expect(parseQuickConnect('user@host:65535')).toEqual({ user: 'user', host: 'host', port: 65535 })
+  })
+
   it('accepts dots, dashes and underscores where ssh does', () => {
     expect(parseQuickConnect('db_admin.x@web-01.prod.local')).toEqual({
       user: 'db_admin.x',

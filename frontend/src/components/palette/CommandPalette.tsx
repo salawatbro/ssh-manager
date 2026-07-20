@@ -58,9 +58,10 @@ async function quickConnect(target: QuickConnectTarget) {
   }
 }
 
-// The ⌘K command palette (FR-08). Servers (fuzzy / recency) followed by app
-// commands (v0.4: New server). Enter opens a server's terminal or runs the
-// command; ↑↓ move; Esc / backdrop close.
+// The ⌘K command palette (FR-08). A quick-connect row when the input parses
+// as user@host[:port] (spec 2026-07-20), then servers (fuzzy / recency),
+// then app commands (v0.4: New server). Enter connects or runs the command;
+// ↑↓ move; Esc / backdrop close.
 export function CommandPalette({
   onNewServer,
   onOpenTunnels,
