@@ -188,6 +188,20 @@ func (s *ServerService) SetPinned(id string, pinned bool) error {
 	return nil
 }
 
+// SetGroupOrder persists a sidebar drag-reorder: ids is one group's full row
+// list in its new visual order. A successful change fires onServersChanged so
+// the tray's pinned list follows the sidebar's order.
+func (s *ServerService) SetGroupOrder(group string, ids []string) error {
+	if len(ids) == 0 {
+		return domain.NewError(domain.CodeValidation, "Nothing to reorder.")
+	}
+	if err := s.repo.SetGroupOrder(group, ids); err != nil {
+		return err
+	}
+	s.notifyServersChanged()
+	return nil
+}
+
 // PinnedForTray returns the servers to show in the menu-bar tray: those the
 // user pinned, in the given order, capped at maxPinned. Pure (no repo access)
 // so it stays trivially testable; main.go feeds it serverService.List(). The

@@ -1170,3 +1170,34 @@ func TestPinnedForTrayFiltersAndCaps(t *testing.T) {
 		}
 	}
 }
+
+func TestSetGroupOrderServiceValidatesAndPersists(t *testing.T) {
+	svc, repo := newServiceWithRepo(t)
+
+	if err := svc.SetGroupOrder("Prod", nil); err == nil {
+		t.Fatal("SetGroupOrder(empty ids) error = nil, want validation error")
+	}
+
+	mk := func(id, name string) *domain.Server {
+		return &domain.Server{
+			ID: id, Name: name, Host: "10.0.1.20", Port: 22, User: "deploy",
+			AuthType: domain.AuthAgent, GroupName: "Prod", Environment: domain.EnvProd,
+		}
+	}
+	for _, s := range []*domain.Server{mk("a", "alpha"), mk("b", "beta")} {
+		if err := repo.Create(s); err != nil {
+			t.Fatalf("Create error = %v", err)
+		}
+	}
+
+	if err := svc.SetGroupOrder("Prod", []string{"b", "a"}); err != nil {
+		t.Fatalf("SetGroupOrder error = %v", err)
+	}
+	list, err := repo.List()
+	if err != nil {
+		t.Fatalf("List error = %v", err)
+	}
+	if list[0].ID != "b" || list[1].ID != "a" {
+		t.Fatalf("List order = [%s %s], want [b a]", list[0].ID, list[1].ID)
+	}
+}

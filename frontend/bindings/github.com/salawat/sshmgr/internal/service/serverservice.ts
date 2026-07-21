@@ -99,6 +99,15 @@ export function SSHCommand(id: string): $CancellablePromise<string> {
 }
 
 /**
+ * SetGroupOrder persists a sidebar drag-reorder: ids is one group's full row
+ * list in its new visual order. A successful change fires onServersChanged so
+ * the tray's pinned list follows the sidebar's order.
+ */
+export function SetGroupOrder(group: string, ids: string[] | null): $CancellablePromise<void> {
+    return $Call.ByID(1348005271, group, ids);
+}
+
+/**
  * SetPinned pins or unpins a server for the menu-bar tray. Pinning is capped at
  * maxPinned; the next pin is refused with a validation error the frontend
  * surfaces. Re-pinning an already-pinned server and unpinning are always

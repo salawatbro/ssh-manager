@@ -168,6 +168,31 @@ func (r *ServerRepo) CountByJumpID(id string) (int64, error) {
 	return n, nil
 }
 
+// SetGroupOrder rewrites sort_order for one group to match ids' positions
+// (1-based). It writes ONLY sort_order, inside one transaction, and every
+// UPDATE is scoped `id AND group_name` — an id from another group (or a
+// stale id) is simply skipped, never renumbered. sort_order is deliberately
+// absent from updatableColumns, so a form save can never clobber a manual
+// order: this method is its sole writer (same isolation as SetPinned and
+// BumpUsage).
+func (r *ServerRepo) SetGroupOrder(group string, ids []string) error {
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		for i, id := range ids {
+			if err := tx.Model(&domain.Server{}).
+				Where("id = ? AND group_name = ?", id, group).
+				UpdateColumn("sort_order", i+1).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf(
+			"cannot save the new order for group %q; check the database file is writable and not locked by another instance: %w", group, err)
+	}
+	return nil
+}
+
 // Groups returns the distinct non-empty group names, sorted.
 func (r *ServerRepo) Groups() ([]string, error) {
 	var groups []string

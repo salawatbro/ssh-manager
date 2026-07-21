@@ -512,3 +512,56 @@ func TestUpdateDoesNotClobberPinned(t *testing.T) {
 		t.Fatal("Update cleared Pinned; updatableColumns must exclude \"pinned\"")
 	}
 }
+
+func TestSetGroupOrderRewritesOrderWithinGroup(t *testing.T) {
+	r := newRepo(t)
+	for _, s := range []*domain.Server{
+		sample("a", "alpha", "Prod"), sample("b", "beta", "Prod"), sample("c", "gamma", "Prod"),
+	} {
+		if err := r.Create(s); err != nil {
+			t.Fatalf("Create error = %v", err)
+		}
+	}
+
+	if err := r.SetGroupOrder("Prod", []string{"c", "a", "b"}); err != nil {
+		t.Fatalf("SetGroupOrder error = %v", err)
+	}
+
+	list, err := r.List()
+	if err != nil {
+		t.Fatalf("List error = %v", err)
+	}
+	got := []string{list[0].ID, list[1].ID, list[2].ID}
+	want := []string{"c", "a", "b"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("List order = %v, want %v", got, want)
+		}
+	}
+	// Only sort_order moved — every other column is untouched.
+	if list[0].Name != "gamma" || list[0].Host != "10.0.1.20" {
+		t.Fatalf("SetGroupOrder touched non-order columns: %+v", list[0])
+	}
+}
+
+func TestSetGroupOrderIgnoresIDFromAnotherGroup(t *testing.T) {
+	r := newRepo(t)
+	if err := r.Create(sample("p", "prodbox", "Prod")); err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+	if err := r.Create(sample("d", "devbox", "Dev")); err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+
+	// "d" belongs to Dev — listing it under Prod must not renumber it.
+	if err := r.SetGroupOrder("Prod", []string{"d", "p"}); err != nil {
+		t.Fatalf("SetGroupOrder error = %v", err)
+	}
+	got, err := r.Get("d")
+	if err != nil {
+		t.Fatalf("Get error = %v", err)
+	}
+	if got.SortOrder != 0 {
+		t.Fatalf("foreign-group SortOrder = %d, want 0", got.SortOrder)
+	}
+}
