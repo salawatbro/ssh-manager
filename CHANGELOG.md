@@ -4,8 +4,40 @@ All notable changes to **Zish**. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
 follow [Semantic Versioning](https://semver.org/).
 
-Only **1.0.0**, **1.1.0** and **1.1.1** are packaged, published releases (macOS `.dmg`).
-Versions **0.1–0.7** are the development milestones that built up to 1.0.
+Only **1.0.0**, **1.1.0** and **1.2.0** are packaged, published releases (macOS `.dmg`).
+Versions **0.1–0.7** are the development milestones that built up to 1.0; **1.1.1**
+was a version bump that first shipped packaged as part of 1.2.0.
+
+## [1.2.0] — 2026-07-21
+
+Also carries everything from 1.1.1 below, which was never published on its own.
+
+### Added
+- **Quick connect** — type `user@host` (or `user@host:port`) straight into the
+  `⌘K` palette and hit Enter: the server is saved into a "Quick connects"
+  group and a terminal opens immediately. If a server with the same
+  host/user/port already exists, its tab is focused instead of creating a
+  duplicate.
+- **Sidebar filter** — the sidebar search box is now a real live filter
+  (fuzzy, over name/host/user/group/tags), with tag chips below it: select
+  one or more tags to narrow the list (any-of), combined with the text.
+- **Collapsible groups** — click a group header to fold it; the fold state
+  survives restarts. Filtering temporarily reveals matches inside folded
+  groups.
+- **Drag to reorder** — drag servers within a group to set their order; the
+  order persists and the menu-bar tray follows it. (Disabled while a filter
+  is active.)
+- **Toast notifications** — background failures that previously vanished
+  (tray pin limit, SFTP file operations after connect, a failed settings
+  save, data export/import/backup) now surface as toasts, plus a
+  confirmation when servers are imported.
+
+### Fixed
+- The host-key (first-connect) and 2FA prompts could be unclickable when they
+  appeared over an open terminal — the terminal's render layers sat above
+  them. They now always stack on top.
+- The `⌘E` snippet palette scrolls the highlighted row into view during
+  keyboard navigation (the same fix `⌘K` received in 1.1.0).
 
 ## [1.1.1] — 2026-07-19
 
@@ -144,6 +176,6 @@ This release bundles everything from 0.1 through 0.7 below.
   port, user, auth method, jump host), grouped in the sidebar. No connections
   yet — that arrived in 0.2.
 
-[1.1.1]: https://github.com/salawatbro/ssh-manager/releases/tag/v1.1.1
+[1.2.0]: https://github.com/salawatbro/ssh-manager/releases/tag/v1.2.0
 [1.1.0]: https://github.com/salawatbro/ssh-manager/releases/tag/v1.1.0
 [1.0.0]: https://github.com/salawatbro/ssh-manager/releases/tag/v1.0.0
