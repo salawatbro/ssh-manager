@@ -58,4 +58,10 @@ describe('sidebar store', () => {
     const useSidebar = await loadStore()
     expect(useSidebar.getState().collapsed).toEqual({})
   })
+
+  it('ignores keys stored with a non-true value', async () => {
+    backing['sidebar.collapsedGroups'] = '{"Prod": false, "Dev": true}'
+    const useSidebar = await loadStore()
+    expect(useSidebar.getState().collapsed).toEqual({ Dev: true })
+  })
 })

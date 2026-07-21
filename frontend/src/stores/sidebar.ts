@@ -17,7 +17,9 @@ function readCollapsed(): Record<string, true> {
     const parsed: unknown = JSON.parse(raw)
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       const out: Record<string, true> = {}
-      for (const k of Object.keys(parsed)) out[k] = true
+      for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+        if (v === true) out[k] = true
+      }
       return out
     }
   } catch {

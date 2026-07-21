@@ -41,6 +41,7 @@ export function Sidebar({ onAdd, onOpenTunnels }: Props) {
               }
             }}
             placeholder="Filter servers"
+            aria-label="Filter servers"
             className="h-full min-w-0 flex-1 bg-transparent text-[12.5px] text-text outline-none placeholder:text-textDim"
           />
           {query ? (
@@ -69,6 +70,7 @@ export function Sidebar({ onAdd, onOpenTunnels }: Props) {
                 <button
                   key={tag}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => toggleTag(tag)}
                   className={`no-drag h-[18px] rounded-[4px] px-[6px] text-[10.5px] font-medium ${
                     active

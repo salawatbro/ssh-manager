@@ -23,6 +23,7 @@ export function GroupHeader({ group, count, env, collapsed, onToggle }: Props) {
     <button
       type="button"
       onClick={onToggle}
+      aria-expanded={!collapsed}
       className="flex w-full items-center gap-[7px] px-[10px] pt-[10px] pb-[4px] text-left"
     >
       <span className="w-[8px] shrink-0 text-[9px] text-textDim">{collapsed ? '▸' : '▾'}</span>

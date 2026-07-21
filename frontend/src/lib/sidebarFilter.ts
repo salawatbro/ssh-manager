@@ -1,12 +1,15 @@
 import Fuse from 'fuse.js'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import { SERVER_FUSE_OPTIONS } from './fuzzy'
 
 // Sidebar filter helpers (spec 2026-07-21). Pure and framework-free so the
 // OR/AND semantics and the order guarantee are unit-testable.
 
-// parseTags splits the CSV `Server.tags` column. ServerForm joins tags with
-// ',' and never escapes (a tag cannot contain a comma), so a plain split is
-// the whole grammar; filter(Boolean) shrugs off a trailing comma.
+// parseTags splits the CSV `Server.tags` column. The backend joins tags with
+// ',' on save (internal/service/server_service.go, strings.Join) and never
+// escapes (a tag cannot contain a comma), so a plain split is the whole
+// grammar; ServerForm.tsx does the reverse split when loading a server for
+// editing; filter(Boolean) shrugs off a trailing comma.
 export function parseTags(csv: string): string[] {
   return csv ? csv.split(',').filter(Boolean) : []
 }
@@ -43,11 +46,7 @@ export function filterServers(servers: Server[], query: string, tags: string[]):
   }
   const q = query.trim()
   if (q) {
-    const fuse = new Fuse(out, {
-      keys: ['name', 'host', 'user', 'group', 'tags'],
-      threshold: 0.4,
-      ignoreLocation: true,
-    })
+    const fuse = new Fuse(out, SERVER_FUSE_OPTIONS)
     const hit = new Set(fuse.search(q).map((r) => r.item.id))
     out = out.filter((s) => hit.has(s.id))
   }
