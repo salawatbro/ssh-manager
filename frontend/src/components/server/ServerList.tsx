@@ -3,6 +3,7 @@ import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain
 import { groupServers, useServers } from '../../stores/servers'
 import { useSidebar } from '../../stores/sidebar'
 import { filterServers } from '../../lib/sidebarFilter'
+import { useServerDrag } from '../../hooks/useServerDrag'
 import { GroupHeader } from './GroupHeader'
 import { ServerRow } from './ServerRow'
 import { ServerContextMenu } from './ServerContextMenu'
@@ -35,6 +36,7 @@ export function ServerList({ onOpenTunnels }: Props) {
   // stored collapse state is overridden (matches inside a folded group must
   // be visible) but never mutated.
   const filtering = query.trim() !== '' || tags.length > 0
+  const { rowProps } = useServerDrag(!filtering)
   const visible = useMemo(() => filterServers(servers, query, tags), [servers, query, tags])
   const groups = groupServers(visible)
 
@@ -80,6 +82,7 @@ export function ServerList({ onOpenTunnels }: Props) {
                 onSelect={() => select(s.id)}
                 onContextMenu={(x, y) => setMenu({ server: s, x, y })}
                 onTunnels={() => onOpenTunnels(s.id)}
+                drag={rowProps(s)}
               />
             ))}
         </div>

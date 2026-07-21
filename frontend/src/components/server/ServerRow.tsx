@@ -3,6 +3,7 @@ import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain
 import { StatusDot } from './StatusDot'
 import { useServers } from '../../stores/servers'
 import { useSessions } from '../../stores/sessions'
+import type { RowDrag } from '../../hooks/useServerDrag'
 
 interface Props {
   server: Server
@@ -14,9 +15,13 @@ interface Props {
   // an auth-method/key indicator, not an action), so this is a deliberate,
   // unambiguous per-row affordance rather than a reused design glyph.
   onTunnels: () => void
+  // Sidebar drag-reorder (spec 2026-07-21): handlers + insert indicator from
+  // useServerDrag. The row stays a plain div; drag attaches to the wrapper so
+  // the inner buttons keep their click semantics.
+  drag: RowDrag
 }
 
-export function ServerRow({ server, selected, onSelect, onContextMenu, onTunnels }: Props) {
+export function ServerRow({ server, selected, onSelect, onContextMenu, onTunnels, drag }: Props) {
   const target = `${server.user}@${server.host}${server.port === 22 ? '' : `:${server.port}`}`
 
   // Shared by the connect icon and the row's double-click: close any open
@@ -31,7 +36,22 @@ export function ServerRow({ server, selected, onSelect, onContextMenu, onTunnels
     // The connect/tunnels triggers below are further interactive controls on
     // the row — a <button> can't nest another <button>, so the row itself is
     // a plain div wrapping sibling buttons instead of being the button.
-    <div className={`group relative ${selected ? 'bg-bgSel' : 'hover:bg-bg1b'}`}>
+    <div
+      className={`group relative ${selected ? 'bg-bgSel' : 'hover:bg-bg1b'}`}
+      draggable={drag.draggable}
+      onDragStart={drag.onDragStart}
+      onDragOver={drag.onDragOver}
+      onDragLeave={drag.onDragLeave}
+      onDrop={drag.onDrop}
+      onDragEnd={drag.onDragEnd}
+    >
+      {drag.indicator && (
+        <span
+          className={`pointer-events-none absolute inset-x-[6px] z-10 h-[2px] rounded-[1px] bg-accent ${
+            drag.indicator === 'top' ? 'top-0' : 'bottom-0'
+          }`}
+        />
+      )}
       <button
         type="button"
         onClick={onSelect}
