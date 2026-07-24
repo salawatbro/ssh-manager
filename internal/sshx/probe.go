@@ -26,10 +26,7 @@ const (
 // runs on an established connection, so a slow answer means a busy or weird
 // host, not a network problem. Falling back to ShellUnknown costs the user
 // only the integration, never the session.
-//
-// It is a var rather than a const only so a test can shorten it to exercise
-// the timeout path without a multi-second sleep.
-var shellProbeTimeout = 3 * time.Second
+const shellProbeTimeout = 3 * time.Second
 
 // DetectShell asks the target for its login shell over a short, PTY-less exec
 // channel. It NEVER fails the caller: a refused channel (ForceCommand,
@@ -40,6 +37,16 @@ var shellProbeTimeout = 3 * time.Second
 // snippet — that blind injection is what made csh/tcsh print a parse error on
 // every connect.
 func DetectShell(conn *Conn) Shell {
+	return detectShell(conn, shellProbeTimeout)
+}
+
+// detectShell is DetectShell with an injectable timeout, so tests can exercise
+// the timeout path without a multi-second sleep.
+func detectShell(conn *Conn, timeout time.Duration) Shell {
+	if conn == nil || conn.Client == nil {
+		return ShellUnknown
+	}
+
 	type result struct {
 		out []byte
 		err error
@@ -85,7 +92,7 @@ func DetectShell(conn *Conn) Shell {
 			return ShellUnknown
 		}
 		return classifyShell(string(r.out))
-	case <-time.After(shellProbeTimeout):
+	case <-time.After(timeout):
 		mu.Lock()
 		timedOut = true
 		if sess != nil {

@@ -6,6 +6,8 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"net"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -203,27 +205,95 @@ func TestDetectShellUnknownWhenChannelRejected(t *testing.T) {
 
 // The single property DetectShell exists to guarantee: against a host that
 // accepts the exec channel and then never answers, it returns ShellUnknown
-// promptly instead of hanging. shellProbeTimeout is shortened for the
-// duration of this test so it runs fast.
+// promptly instead of hanging. The timeout is shortened for the duration of
+// this test so it runs fast.
 func TestDetectShellUnknownOnTimeout(t *testing.T) {
-	orig := shellProbeTimeout
-	shellProbeTimeout = 100 * time.Millisecond
-	t.Cleanup(func() { shellProbeTimeout = orig })
+	const testTimeout = 100 * time.Millisecond
 
 	addr, hostKey := newHangServer(t)
 	start := time.Now()
-	got := DetectShell(dialTo(t, addr, hostKey))
+	got := detectShell(dialTo(t, addr, hostKey), testTimeout)
 	elapsed := time.Since(start)
 
 	if got != ShellUnknown {
 		t.Errorf("DetectShell = %q, want unknown", got)
+	}
+	// Lower bound pins that this return actually came from the timeout
+	// firing, not from some error path returning immediately (which would
+	// let a regression that silently grows the timeout slip through).
+	if elapsed < testTimeout {
+		t.Errorf("DetectShell took %v, want at least %v", elapsed, testTimeout)
 	}
 	// Generous upper bound so this isn't flaky under CI load, but tight
 	// enough that it fails if the timeout/select were removed (in which case
 	// DetectShell would block until the test's deferred client.Close, or
 	// hang the whole test run).
 	if elapsed > time.Second {
-		t.Errorf("DetectShell took %v, want roughly %v", elapsed, shellProbeTimeout)
+		t.Errorf("DetectShell took %v, want roughly %v", elapsed, testTimeout)
+	}
+}
+
+// TestDetectShellDoesNotLeakGoroutineOnTimeout proves the reviewer's fix: on
+// timeout, DetectShell closes the session so the probe goroutine's blocked
+// s.Output call unblocks and the goroutine actually exits, instead of leaking
+// for the rest of the connection's life. Neutering the "_ = sess.Close()" call
+// in the timeout branch makes this test fail (no goroutine is ever reaped),
+// which is what proves this test covers the fix rather than just the
+// return value asserted by TestDetectShellUnknownOnTimeout.
+func TestDetectShellDoesNotLeakGoroutineOnTimeout(t *testing.T) {
+	const testTimeout = 100 * time.Millisecond
+
+	addr, hostKey := newHangServer(t)
+	got := detectShell(dialTo(t, addr, hostKey), testTimeout)
+	if got != ShellUnknown {
+		t.Errorf("DetectShell = %q, want unknown", got)
+	}
+
+	const (
+		pollInterval = 20 * time.Millisecond
+		maxWait      = 2 * time.Second
+	)
+	deadline := time.Now().Add(maxWait)
+	for {
+		n := countGoroutinesOnStack(t, "sshx.detectShell")
+		if n == 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d goroutine(s) still have sshx.detectShell on their stack after %v", n, maxWait)
+		}
+		time.Sleep(pollInterval)
+	}
+}
+
+// countGoroutinesOnStack snapshots every goroutine's stack via runtime.Stack
+// and counts how many mention marker, e.g. "sshx.detectShell".
+func countGoroutinesOnStack(t *testing.T, marker string) int {
+	t.Helper()
+	buf := make([]byte, 1<<20)
+	for {
+		n := runtime.Stack(buf, true)
+		if n < len(buf) {
+			buf = buf[:n]
+			break
+		}
+		buf = make([]byte, 2*len(buf))
+	}
+	count := 0
+	for _, stack := range strings.Split(string(buf), "\n\n") {
+		if strings.Contains(stack, marker) {
+			count++
+		}
+	}
+	return count
+}
+
+func TestDetectShellNilConn(t *testing.T) {
+	if got := DetectShell(nil); got != ShellUnknown {
+		t.Errorf("DetectShell(nil) = %q, want unknown", got)
+	}
+	if got := DetectShell(&Conn{}); got != ShellUnknown {
+		t.Errorf("DetectShell(&Conn{}) = %q, want unknown", got)
 	}
 }
 
