@@ -26,6 +26,7 @@ require (
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
+	github.com/creack/pty v1.1.24
 	github.com/pkg/sftp v1.13.1
 )
 
