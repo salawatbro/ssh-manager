@@ -3,7 +3,10 @@ package sshx
 import (
 	"path"
 	"strings"
+	"sync"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 // Shell is the login shell detected on the target. The zero value is
@@ -23,7 +26,10 @@ const (
 // runs on an established connection, so a slow answer means a busy or weird
 // host, not a network problem. Falling back to ShellUnknown costs the user
 // only the integration, never the session.
-const shellProbeTimeout = 3 * time.Second
+//
+// It is a var rather than a const only so a test can shorten it to exercise
+// the timeout path without a multi-second sleep.
+var shellProbeTimeout = 3 * time.Second
 
 // DetectShell asks the target for its login shell over a short, PTY-less exec
 // channel. It NEVER fails the caller: a refused channel (ForceCommand,
@@ -41,14 +47,35 @@ func DetectShell(conn *Conn) Shell {
 	// Buffered so the goroutine can always finish and exit even after the
 	// timeout below has already given up on it.
 	ch := make(chan result, 1)
+
+	// mu guards sess and timedOut, which are written from both this
+	// goroutine and the one below: a host that accepts the exec channel and
+	// then never answers leaves sess.Output blocked until the *ssh.Client
+	// itself is closed, so on timeout we close the session ourselves to
+	// unblock it and let the goroutine finish instead of leaking it (and its
+	// open remote channel) for the rest of the connection's life.
+	var mu sync.Mutex
+	var sess *ssh.Session
+	var timedOut bool
+
 	go func() {
-		sess, err := conn.Client.NewSession()
+		s, err := conn.Client.NewSession()
 		if err != nil {
 			ch <- result{nil, err}
 			return
 		}
-		defer func() { _ = sess.Close() }()
-		out, err := sess.Output(`echo "$SHELL"`)
+		mu.Lock()
+		if timedOut {
+			// The timeout already fired before we could publish sess; there
+			// is nothing left to unblock us, so tear down ourselves.
+			mu.Unlock()
+			_ = s.Close()
+			return
+		}
+		sess = s
+		mu.Unlock()
+		defer func() { _ = s.Close() }()
+		out, err := s.Output(`echo "$SHELL"`)
 		ch <- result{out, err}
 	}()
 
@@ -59,6 +86,14 @@ func DetectShell(conn *Conn) Shell {
 		}
 		return classifyShell(string(r.out))
 	case <-time.After(shellProbeTimeout):
+		mu.Lock()
+		timedOut = true
+		if sess != nil {
+			// Closing the session unblocks the goroutine's Output call so
+			// it can exit instead of leaking.
+			_ = sess.Close()
+		}
+		mu.Unlock()
 		return ShellUnknown
 	}
 }

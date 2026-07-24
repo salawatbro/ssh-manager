@@ -83,6 +83,72 @@ func serveExec(c net.Conn, cfg *ssh.ServerConfig, out string) {
 	_ = sc.Wait()
 }
 
+// newHangServer starts an in-process SSH server that accepts the session
+// channel — unlike newTestServer, which rejects the channel open itself —
+// but then never replies to any request on it, including "exec". That leaves
+// a client's sess.Output call blocked exactly like a busy or wedged real
+// host, exercising DetectShell's timeout path. It closes on test cleanup.
+func newHangServer(t *testing.T) (addr string, hostKey ssh.PublicKey) {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromSigner(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := &ssh.ServerConfig{NoClientAuth: true}
+	cfg.AddHostKey(signer)
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go serveHang(c, cfg)
+		}
+	}()
+	return ln.Addr().String(), signer.PublicKey()
+}
+
+func serveHang(c net.Conn, cfg *ssh.ServerConfig) {
+	sc, chans, reqs, err := ssh.NewServerConn(c, cfg)
+	if err != nil {
+		_ = c.Close()
+		return
+	}
+	go ssh.DiscardRequests(reqs)
+	go func() {
+		for nc := range chans {
+			if nc.ChannelType() != "session" {
+				_ = nc.Reject(ssh.UnknownChannelType, "only session")
+				continue
+			}
+			_, chReqs, err := nc.Accept()
+			if err != nil {
+				continue
+			}
+			// Drain requests without ever replying — the client's "exec"
+			// request (wantReply: true) hangs forever, or until the
+			// connection is torn down.
+			go func() {
+				for req := range chReqs {
+					_ = req // never replied to, by design
+				}
+			}()
+		}
+	}()
+	_ = sc.Wait()
+}
+
 // dialTo is the shared "get a live *Conn against addr" setup for these tests.
 func dialTo(t *testing.T, addr string, hostKey ssh.PublicKey) *Conn {
 	t.Helper()
@@ -122,12 +188,42 @@ func TestDetectShellReadsTheLoginShell(t *testing.T) {
 	}
 }
 
-// A server that refuses to open a session channel at all (ForceCommand,
-// sftp-only account) must degrade to unknown, never fail the connect.
-func TestDetectShellUnknownWhenExecRefused(t *testing.T) {
+// A server that rejects the session-channel open itself — an earlier failure
+// point than a real ForceCommand/sftp-only account, which would open the
+// channel and only then refuse or ignore the exec request — must still
+// degrade to unknown, never fail the connect. See
+// TestDetectShellUnknownOnTimeout for the "channel opens, command never
+// answers" case.
+func TestDetectShellUnknownWhenChannelRejected(t *testing.T) {
 	addr, hostKey := newTestServer(t) // rejects every channel
 	if got := DetectShell(dialTo(t, addr, hostKey)); got != ShellUnknown {
 		t.Errorf("DetectShell = %q, want unknown", got)
+	}
+}
+
+// The single property DetectShell exists to guarantee: against a host that
+// accepts the exec channel and then never answers, it returns ShellUnknown
+// promptly instead of hanging. shellProbeTimeout is shortened for the
+// duration of this test so it runs fast.
+func TestDetectShellUnknownOnTimeout(t *testing.T) {
+	orig := shellProbeTimeout
+	shellProbeTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { shellProbeTimeout = orig })
+
+	addr, hostKey := newHangServer(t)
+	start := time.Now()
+	got := DetectShell(dialTo(t, addr, hostKey))
+	elapsed := time.Since(start)
+
+	if got != ShellUnknown {
+		t.Errorf("DetectShell = %q, want unknown", got)
+	}
+	// Generous upper bound so this isn't flaky under CI load, but tight
+	// enough that it fails if the timeout/select were removed (in which case
+	// DetectShell would block until the test's deferred client.Close, or
+	// hang the whole test run).
+	if elapsed > time.Second {
+		t.Errorf("DetectShell took %v, want roughly %v", elapsed, shellProbeTimeout)
 	}
 }
 
