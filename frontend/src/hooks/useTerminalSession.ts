@@ -11,7 +11,7 @@ import { paneShellInfo } from '../lib/paneShellInfo'
 import { useServers } from '../stores/servers'
 import { useSettings } from '../stores/settings'
 import { useGuard } from '../stores/guard'
-import { useSessions } from '../stores/sessions'
+import { usePanes } from '../stores/panes'
 
 // 'exited' is a clean shell exit (`exit`/Ctrl-D/`exit N`) — the pane closes
 // itself, no notice. 'closed' is an abnormal drop (dead peer, connection
@@ -157,13 +157,13 @@ export function useTerminalSession(
         }
         myId = id
         sessionId.current = id
-        useSessions.getState().setPaneSession(paneId, id)
+        usePanes.getState().setPaneSession(paneId, id)
         setStatus('connected')
         // Only inject a snippet the detected shell can actually parse. An
         // unknown or unsupported shell gets nothing — that is the whole point
         // of the probe (csh used to answer the POSIX blob with a parse error).
         const snippet = useSettings.getState().settings?.shellIntegration ? snippetFor(res.shell) : null
-        useSessions.getState().setPaneShell(paneId, paneShellInfo(res.shell, snippet))
+        usePanes.getState().setPaneShell(paneId, paneShellInfo(res.shell, snippet))
         if (snippet) {
           void SSHService.Write(id, strToB64(snippet + '\r')).catch(() => {})
         }
@@ -195,7 +195,7 @@ export function useTerminalSession(
       offState?.()
       const id = sessionId.current
       sessionId.current = null
-      useSessions.getState().clearPaneConnection(paneId)
+      usePanes.getState().clearPaneConnection(paneId)
       if (id) void SSHService.Close(id).catch(() => {})
     }
   }, [serverId, paneId, term, fit, attempt])

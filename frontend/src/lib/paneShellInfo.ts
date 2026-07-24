@@ -1,4 +1,4 @@
-import type { PaneShell } from '../stores/sessions'
+import type { PaneShell } from '../stores/panes'
 
 // The honesty correlation the status bar's shell segment depends on:
 // integration is only ever reported as on when a snippet was actually chosen

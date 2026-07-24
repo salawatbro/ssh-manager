@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useSftp } from './sftp'
 import { replaceLeaf, removeLeaf, firstLeaf } from '../lib/paneTree'
-import type { TermStatus } from '../hooks/useTerminalSession'
 
 // A tab's panes form a binary split tree; a leaf is one terminal session for a
 // server. Task 6 fills in splitFocused/closePane; v0.3-Task-5 only ever builds
@@ -23,45 +22,9 @@ export interface Tab {
   startedAt: number
 }
 
-// A pane's live xterm grid size, keyed by leaf (pane) id — mirrors paneStatus
-// below; lets the status bar show the ACTIVE pane's dims without its own xterm.
-export interface PaneDims {
-  cols: number
-  rows: number
-}
-
-// A pane's detected shell and whether a shell-integration snippet was actually
-// injected for it, keyed by leaf (pane) id — mirrors paneStatus/paneDims. The
-// status bar reads this to report integration honestly instead of implying it
-// is always on.
-export interface PaneShell {
-  shell: string
-  integration: boolean
-}
-
 interface SessionsState {
   tabs: Tab[]
   activeTabId: string | null
-  // Per-pane connection status, keyed by leaf (pane) id — mirrored from
-  // useTerminalSession so the tab strip (no PTY of its own) can read it.
-  paneStatus: Record<string, TermStatus>
-  setPaneStatus: (paneId: string, status: TermStatus) => void
-  clearPaneStatus: (paneId: string) => void
-  paneDims: Record<string, PaneDims>
-  setPaneDims: (paneId: string, dims: PaneDims) => void
-  clearPaneDims: (paneId: string) => void
-  // paneId → live session id (useTerminalSession); BroadcastBar's source for sessionIds.
-  paneSession: Record<string, string>
-  setPaneSession: (paneId: string, sessionId: string) => void
-  clearPaneSession: (paneId: string) => void
-  paneShell: Record<string, PaneShell>
-  setPaneShell: (paneId: string, info: PaneShell) => void
-  clearPaneShell: (paneId: string) => void
-  // Both cleared together, once, from useTerminalSession's cleanup — a single
-  // action rather than two separate calls so "the pane's session and shell
-  // info both drop on teardown" is one behavior a store test can hold to,
-  // not two independent call sites that could silently drift apart.
-  clearPaneConnection: (paneId: string) => void
   open: (server: Server) => void
   openOrFocus: (server: Server) => void
   closeTab: (tabId: string) => void
@@ -107,38 +70,9 @@ function closeTabState(tabs: Tab[], closedId: string, activeId: string | null): 
   return { tabs: remaining, activeTabId: remaining.length ? remaining[Math.max(0, idx - 1)]?.id ?? remaining[0].id : null }
 }
 
-// Shared by the per-pane maps' clear* actions (paneStatus/paneDims/paneSession):
-// drop one key, or return the same record reference untouched if it's absent.
-function clearKey<T>(record: Record<string, T>, key: string): Record<string, T> {
-  if (!(key in record)) return record
-  const next = { ...record }
-  delete next[key]
-  return next
-}
-
 export const useSessions = create<SessionsState>((set, get) => ({
   tabs: [],
   activeTabId: null,
-  paneStatus: {},
-  setPaneStatus: (paneId, status) => set((s) => ({ paneStatus: { ...s.paneStatus, [paneId]: status } })),
-  clearPaneStatus: (paneId) => set((s) => ({ paneStatus: clearKey(s.paneStatus, paneId) })),
-
-  paneDims: {},
-  setPaneDims: (paneId, dims) => set((s) => ({ paneDims: { ...s.paneDims, [paneId]: dims } })),
-  clearPaneDims: (paneId) => set((s) => ({ paneDims: clearKey(s.paneDims, paneId) })),
-
-  paneSession: {},
-  setPaneSession: (paneId, sessionId) => set((s) => ({ paneSession: { ...s.paneSession, [paneId]: sessionId } })),
-  clearPaneSession: (paneId) => set((s) => ({ paneSession: clearKey(s.paneSession, paneId) })),
-
-  paneShell: {},
-  setPaneShell: (paneId, info) => set((s) => ({ paneShell: { ...s.paneShell, [paneId]: info } })),
-  clearPaneShell: (paneId) => set((s) => ({ paneShell: clearKey(s.paneShell, paneId) })),
-  clearPaneConnection: (paneId) =>
-    set((s) => ({
-      paneSession: clearKey(s.paneSession, paneId),
-      paneShell: clearKey(s.paneShell, paneId),
-    })),
 
   // A new tab, one leaf, one session. Multiple tabs to the same server are
   // allowed (each leaf id is unique, so each drives its own PTY).

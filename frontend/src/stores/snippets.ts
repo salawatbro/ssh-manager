@@ -7,6 +7,7 @@ import { collectLeaves } from '../lib/paneTree'
 import { matchesDangerous, splitPatterns } from '../lib/guard'
 import { strToB64 } from '../lib/termbytes'
 import { useSessions, type Tab } from './sessions'
+import { usePanes } from './panes'
 import { useServers } from './servers'
 import { useSettings } from './settings'
 import { useGuard } from './guard'
@@ -84,7 +85,7 @@ function focusedTarget(): { sessionId: string; server: Server } | null {
   const st = useSessions.getState()
   const active = st.tabs.find((t) => t.id === st.activeTabId)
   if (!active) return null
-  const sessionId = st.paneSession[active.focusedPaneId]
+  const sessionId = usePanes.getState().paneSession[active.focusedPaneId]
   if (!sessionId) return null
   const server = focusedServer()
   if (!server) return null

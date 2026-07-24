@@ -1,5 +1,6 @@
 import { FolderTree } from 'lucide-react'
 import { useSessions } from '../../stores/sessions'
+import { usePanes } from '../../stores/panes'
 import { useServers } from '../../stores/servers'
 import { usePalette } from '../../stores/palette'
 import { useSftp } from '../../stores/sftp'
@@ -17,7 +18,7 @@ export function TabBar() {
   const activeTabId = useSessions((s) => s.activeTabId)
   const selectTab = useSessions((s) => s.selectTab)
   const closeTab = useSessions((s) => s.closeTab)
-  const paneStatus = useSessions((s) => s.paneStatus)
+  const paneStatus = usePanes((s) => s.paneStatus)
   const servers = useServers((s) => s.servers)
   // One SFTP session at a time (the store holds a single one), so at most one
   // SFTP tab — shown last, after the terminal tabs.

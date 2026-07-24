@@ -1,4 +1,4 @@
-import type { PaneShell } from '../stores/sessions'
+import type { PaneShell } from '../stores/panes'
 
 // The honest shell-integration report (audit item 20): before the probe, an
 // unsupported shell silently got nothing and the user could not tell the

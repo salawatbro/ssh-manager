@@ -4,7 +4,8 @@ import { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain
 import { collectLeaves } from '../../lib/paneTree'
 import { matchesDangerous, splitPatterns } from '../../lib/guard'
 import { strToB64 } from '../../lib/termbytes'
-import { useSessions, type Tab } from '../../stores/sessions'
+import type { Tab } from '../../stores/sessions'
+import { usePanes } from '../../stores/panes'
 import { useServers } from '../../stores/servers'
 import { useSettings } from '../../stores/settings'
 import { useGuard, type GuardTarget } from '../../stores/guard'
@@ -15,7 +16,7 @@ import { useGuard, type GuardTarget } from '../../stores/guard'
 // not N separate onData calls, so it stays in lockstep across panes.
 export function BroadcastBar({ tab }: { tab: Tab }) {
   const [text, setText] = useState('')
-  const paneSession = useSessions((s) => s.paneSession)
+  const paneSession = usePanes((s) => s.paneSession)
 
   function send() {
     const servers = useServers.getState().servers

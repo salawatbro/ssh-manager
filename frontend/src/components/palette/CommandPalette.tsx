@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import { usePalette, type PaletteRowData } from '../../stores/palette'
 import { useServers } from '../../stores/servers'
 import { useSessions } from '../../stores/sessions'
+import { usePanes } from '../../stores/panes'
 import { useAuthenticator } from '../../stores/authenticator'
 import { useTour } from '../../stores/tour'
 import { useSftp } from '../../stores/sftp'
@@ -82,7 +83,7 @@ export function CommandPalette({
   // the Zustand v5 selector rule — only real state changes retrigger the
   // `rows` memo below.
   const tabs = useSessions((s) => s.tabs)
-  const paneStatus = useSessions((s) => s.paneStatus)
+  const paneStatus = usePanes((s) => s.paneStatus)
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
 

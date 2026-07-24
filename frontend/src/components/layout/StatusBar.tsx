@@ -3,6 +3,7 @@ import { Key, Lock, UserCheck, type LucideIcon } from 'lucide-react'
 import { AuthType } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useServers } from '../../stores/servers'
 import { useSessions } from '../../stores/sessions'
+import { usePanes } from '../../stores/panes'
 import { useSettings } from '../../stores/settings'
 import { useForwards } from '../../stores/forwards'
 import { StatusDot } from '../server/StatusDot'
@@ -48,8 +49,8 @@ export function StatusBar({ onOpenTunnels }: Props) {
   const selectedId = useServers((s) => s.selectedId)
   const tabs = useSessions((s) => s.tabs)
   const activeTabId = useSessions((s) => s.activeTabId)
-  const paneDims = useSessions((s) => s.paneDims)
-  const paneShell = useSessions((s) => s.paneShell)
+  const paneDims = usePanes((s) => s.paneDims)
+  const paneShell = usePanes((s) => s.paneShell)
   const shellIntegration = useSettings((s) => s.settings?.shellIntegration ?? false)
   const byServer = useForwards((s) => s.byServer)
   const statusById = useForwards((s) => s.statusById)
