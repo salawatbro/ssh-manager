@@ -27,6 +27,7 @@ export type {
     HostKeyRequest,
     ImportItem,
     ImportPreview,
+    OpenResult,
     SftpProgress,
     SnippetInput,
     TOTPCodeView,

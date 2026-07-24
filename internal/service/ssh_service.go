@@ -12,12 +12,22 @@ import (
 	"github.com/salawat/sshmgr/internal/term"
 )
 
+// OpenResult is what both SSHService.Open and LocalService.Open hand the
+// frontend. Shell is the detected login shell ("bash"/"zsh"/"fish"), or "" when
+// it could not be classified — the frontend maps that to "inject nothing" and
+// reports it honestly in the status bar.
+type OpenResult struct {
+	SessionID string `json:"sessionID"`
+	Shell     string `json:"shell"`
+}
+
 // SSHService is bound to the frontend. It owns host-key confirmation (v0.2)
 // and, from v0.3, the terminal session lifecycle: Open dials + starts a PTY +
 // registers it with the term.Manager; Write/Resize/Close delegate to it.
 type SSHService struct {
 	prompter     *HostKeyPrompter
 	repo         *store.ServerRepo
+	settings     *store.SettingsRepo
 	secret       secret.Store
 	dialer       Dialer
 	mgr          *term.Manager
@@ -27,8 +37,8 @@ type SSHService struct {
 // NewSSHService wires the service to the shared host-key prompter, the
 // repository, the keychain, the dialer, the terminal manager and the shared
 // TOTP/2FA code prompter.
-func NewSSHService(p *HostKeyPrompter, repo *store.ServerRepo, sec secret.Store, dialer Dialer, mgr *term.Manager, codePrompter *CodePrompter) *SSHService {
-	return &SSHService{prompter: p, repo: repo, secret: sec, dialer: dialer, mgr: mgr, codePrompter: codePrompter}
+func NewSSHService(p *HostKeyPrompter, repo *store.ServerRepo, settings *store.SettingsRepo, sec secret.Store, dialer Dialer, mgr *term.Manager, codePrompter *CodePrompter) *SSHService {
+	return &SSHService{prompter: p, repo: repo, settings: settings, secret: sec, dialer: dialer, mgr: mgr, codePrompter: codePrompter}
 }
 
 // ConfirmHostKey delivers the user's decision for a pending host-key prompt.
@@ -58,26 +68,38 @@ func (s *SSHService) SubmitCode(requestID, code string) error {
 // handshakeDeadline, deliberately longer than the network timeout so a
 // legitimate host-key prompt is never killed mid-decision (same reasoning as
 // TestConnection).
-func (s *SSHService) Open(serverID string, cols, rows int) (string, error) {
+func (s *SSHService) Open(serverID string, cols, rows int) (OpenResult, error) {
 	srv, err := s.repo.Get(serverID)
 	if err != nil {
-		return "", err
+		return OpenResult{}, err
 	}
 	chain, err := resolveChain(s.repo, s.secret, srv)
 	if err != nil {
-		return "", err // coded (auth / keychain / jump cycle / jump depth)
+		return OpenResult{}, err // coded (auth / keychain / jump cycle / jump depth)
 	}
 
 	conn, err := s.dialer.DialChain(context.Background(), chain)
 	// SEC-10: drop every hop's plaintext secrets the instant dialing is done.
 	zeroChainCreds(chain)
 	if err != nil {
-		return "", err // DialChain already classified it
+		return OpenResult{}, err // DialChain already classified it
+	}
+
+	// Probe BEFORE the PTY, and only when the user actually wants shell
+	// integration — otherwise the extra round trip buys nothing. A probe
+	// failure is not a connect failure (DetectShell never errors). A nil
+	// settings repo (tests construct the service that way, same as the nil
+	// prompter/codePrompter) reads as "off".
+	shell := sshx.ShellUnknown
+	if s.settings != nil {
+		if cur, serr := s.settings.Get(); serr == nil && cur.ShellIntegration {
+			shell = sshx.DetectShell(conn)
+		}
 	}
 
 	sess, err := sshx.OpenSession(conn, cols, rows) // OpenSession closes conn (target+jumps) on error
 	if err != nil {
-		return "", domain.NewError(domain.CodeConnRefused, "Connected, but the server would not open a shell.")
+		return OpenResult{}, domain.NewError(domain.CodeConnRefused, "Connected, but the server would not open a shell.")
 	}
 
 	sessionID := uuid.NewString()
@@ -85,7 +107,7 @@ func (s *SSHService) Open(serverID string, cols, rows int) (string, error) {
 	// FR-04.5: a real Open (not a test) records usage. Best-effort — a bump
 	// failure must not fail an otherwise-good session; the next open self-heals.
 	_ = s.repo.BumpUsage(serverID)
-	return sessionID, nil
+	return OpenResult{SessionID: sessionID, Shell: string(shell)}, nil
 }
 
 // Write sends base64-encoded input to a session's shell.

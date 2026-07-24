@@ -99,8 +99,8 @@ func main() {
 	repo := store.NewServerRepo(db)
 	kr := secret.NewKeyring()
 	serverService := service.NewServerService(repo, kr, dialer)
-	sshService := service.NewSSHService(prompter, repo, kr, dialer, termMgr, codePrompter)
 	settingsRepo := store.NewSettingsRepo(db)
+	sshService := service.NewSSHService(prompter, repo, settingsRepo, kr, dialer, termMgr, codePrompter)
 	settingsService := service.NewSettingsService(settingsRepo, platform.NewLoginAgent())
 	importService, err := service.NewImportService(repo)
 	if err != nil {

@@ -6,7 +6,7 @@ import type { Terminal } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import { b64ToBytes, strToB64 } from '../lib/termbytes'
 import { createGuardBuffer, matchesDangerous, splitPatterns } from '../lib/guard'
-import { BASH_ZSH_SNIPPET } from '../lib/shellIntegration'
+import { snippetFor } from '../lib/shellSnippets'
 import { useServers } from '../stores/servers'
 import { useSettings } from '../stores/settings'
 import { useGuard } from '../stores/guard'
@@ -148,7 +148,8 @@ export function useTerminalSession(
     })
 
     void SSHService.Open(serverId, term.cols, term.rows)
-      .then((id) => {
+      .then((res) => {
+        const id = res.sessionID
         if (disposed) {
           void SSHService.Close(id).catch(() => {})
           return
@@ -157,8 +158,12 @@ export function useTerminalSession(
         sessionId.current = id
         useSessions.getState().setPaneSession(paneId, id)
         setStatus('connected')
-        if (useSettings.getState().settings?.shellIntegration) {
-          void SSHService.Write(id, strToB64(BASH_ZSH_SNIPPET + '\r')).catch(() => {})
+        // Only inject a snippet the detected shell can actually parse. An
+        // unknown or unsupported shell gets nothing — that is the whole point
+        // of the probe (csh used to answer the POSIX blob with a parse error).
+        const snippet = useSettings.getState().settings?.shellIntegration ? snippetFor(res.shell) : null
+        if (snippet) {
+          void SSHService.Write(id, strToB64(snippet + '\r')).catch(() => {})
         }
         for (const o of preBuffer) {
           if (o.sessionID === id) ingest(o.seq, o.data)

@@ -97,7 +97,7 @@ func TestOpenMissingPasswordDoesNotDial(t *testing.T) {
 	passwordServer(t, repo)
 	dialer := &fakeDialer{}
 	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
-	svc := NewSSHService(nil, repo, secret.NewFake(), dialer, mgr, nil)
+	svc := NewSSHService(nil, repo, nil, secret.NewFake(), dialer, mgr, nil)
 
 	_, err := svc.Open("s1", 80, 24)
 	var de *domain.Error
@@ -116,7 +116,7 @@ func TestOpenDialFailurePropagates(t *testing.T) {
 	sec := secret.NewFake()
 	_ = sec.SetPassword("s1", "pw")
 	dialer := &fakeDialer{dialErr: domain.NewError(domain.CodeConnRefused, "Connection refused.")}
-	svc := NewSSHService(nil, repo, sec, dialer, term.NewManager(nopEmitter{}, time.Hour, time.Hour), nil)
+	svc := NewSSHService(nil, repo, nil, sec, dialer, term.NewManager(nopEmitter{}, time.Hour, time.Hour), nil)
 
 	_, err := svc.Open("s1", 80, 24)
 	var de *domain.Error
@@ -129,7 +129,7 @@ func TestOpenDialFailurePropagates(t *testing.T) {
 // Prompt blocked on the prompter's channel unblocks with the submitted code.
 func TestSubmitCodeDelegatesToPrompterResolve(t *testing.T) {
 	cp := NewCodePrompter(&fakeCodeEmitter{})
-	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, term.NewManager(nopEmitter{}, time.Hour, time.Hour), cp)
+	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, term.NewManager(nopEmitter{}, time.Hour, time.Hour), cp)
 
 	go func() {
 		// Wait until Prompt has registered its channel, then submit.
@@ -148,7 +148,7 @@ func TestSubmitCodeDelegatesToPrompterResolve(t *testing.T) {
 // timeout, or a code prompter with nothing pending at all).
 func TestSubmitCodeUnknownRequestErrors(t *testing.T) {
 	cp := NewCodePrompter(&fakeCodeEmitter{})
-	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, term.NewManager(nopEmitter{}, time.Hour, time.Hour), cp)
+	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, term.NewManager(nopEmitter{}, time.Hour, time.Hour), cp)
 	if err := svc.SubmitCode("ghost", "123456"); err == nil {
 		t.Fatal("SubmitCode on an unknown request id should error")
 	}
@@ -159,7 +159,7 @@ func TestWriteResizeCloseDelegate(t *testing.T) {
 	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
 	pty := newFakePTY()
 	mgr.Add("sX", pty)
-	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, mgr, nil)
+	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, mgr, nil)
 
 	if err := svc.Write("sX", base64.StdEncoding.EncodeToString([]byte("hi"))); err != nil {
 		t.Fatal(err)
@@ -190,7 +190,7 @@ func TestBroadcastWritesToEverySession(t *testing.T) {
 	ptyA, ptyB := newFakePTY(), newFakePTY()
 	mgr.Add("a", ptyA)
 	mgr.Add("b", ptyB)
-	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, mgr, nil)
+	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, mgr, nil)
 
 	payload := base64.StdEncoding.EncodeToString([]byte("hi"))
 	if err := svc.Broadcast([]string{"a", "b"}, payload); err != nil {
@@ -215,7 +215,7 @@ func TestBroadcastUnknownSessionDoesNotAbortOthersAndReturnsFirstError(t *testin
 	ptyA, ptyC := newFakePTY(), newFakePTY()
 	mgr.Add("a", ptyA)
 	mgr.Add("c", ptyC)
-	svc := NewSSHService(nil, newRepo(t), secret.NewFake(), &fakeDialer{}, mgr, nil)
+	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, mgr, nil)
 
 	payload := base64.StdEncoding.EncodeToString([]byte("hi"))
 	err := svc.Broadcast([]string{"a", "ghost", "c"}, payload)
@@ -271,13 +271,21 @@ func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
 	}
 	dialer := sshx.NewDialer(v, 5*time.Second, 20*time.Second)
 	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
-	svc := NewSSHService(nil, repo, sec, dialer, mgr, nil)
+	svc := NewSSHService(nil, repo, nil, sec, dialer, mgr, nil)
 
-	sessionID, err := svc.Open("s1", 120, 40)
+	res, err := svc.Open("s1", 120, 40)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer func() { _ = svc.Close(sessionID) }()
+	if res.SessionID == "" {
+		t.Fatal("SessionID is empty")
+	}
+	// A nil settings repo means "shell integration off" — Open skips the probe
+	// entirely, so the shell is deliberately unreported here.
+	if res.Shell != "" {
+		t.Errorf("Shell = %q, want \"\" (probe skipped)", res.Shell)
+	}
+	defer func() { _ = svc.Close(res.SessionID) }()
 
 	select {
 	case got := <-dims:
@@ -286,6 +294,56 @@ func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("timed out waiting for the server's pty-req")
+	}
+}
+
+// With shell integration enabled the probe runs — and a server that answers no
+// exec must still produce a usable session, with the shell simply unreported.
+// A probe failure is never a connect failure.
+func TestOpenWithProbeEnabledSurvivesAnUnprobeableServer(t *testing.T) {
+	addr, hostKey, _ := newPTYCapturingServer(t)
+	host, port := splitTestAddr(t, addr)
+
+	repo := newRepo(t)
+	srv := &domain.Server{ID: "s1", Name: "box", Host: host, Port: port, User: "u", AuthType: domain.AuthPassword}
+	if err := repo.Create(srv); err != nil {
+		t.Fatal(err)
+	}
+	sec := secret.NewFake()
+	if err := sec.SetPassword("s1", "pw"); err != nil {
+		t.Fatal(err)
+	}
+
+	khPath := filepath.Join(t.TempDir(), "known_hosts")
+	seedKnownHostForTest(t, khPath, addr, hostKey)
+	v, err := sshx.NewVerifier(khPath, acceptAllHostKeys{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dialer := sshx.NewDialer(v, 5*time.Second, 20*time.Second)
+	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
+
+	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	settingsRepo := store.NewSettingsRepo(db)
+	seed := domain.DefaultSettings() // ShellIntegration is true by default
+	if err := settingsRepo.Save(&seed); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := NewSSHService(nil, repo, settingsRepo, sec, dialer, mgr, nil)
+	res, err := svc.Open("s1", 80, 24)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = svc.Close(res.SessionID) }()
+	if res.SessionID == "" {
+		t.Error("SessionID is empty")
+	}
+	if res.Shell != "" {
+		t.Errorf("Shell = %q, want \"\" (server answers no exec)", res.Shell)
 	}
 }
 

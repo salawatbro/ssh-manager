@@ -12,6 +12,10 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 /**
  * Broadcast writes the same base64 payload to every listed session (FR-15). It
  * is best-effort: a write to a gone session doesn't stop the others; the first
@@ -51,7 +55,7 @@ export function ConfirmHostKey(requestID: string, accept: boolean): $Cancellable
  * legitimate host-key prompt is never killed mid-decision (same reasoning as
  * TestConnection).
  */
-export function Open(serverID: string, cols: number, rows: number): $CancellablePromise<string> {
+export function Open(serverID: string, cols: number, rows: number): $CancellablePromise<$models.OpenResult> {
     return $Call.ByID(4190982559, serverID, cols, rows);
 }
 
