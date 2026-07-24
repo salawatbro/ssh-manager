@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zish 1.2.0 — imkoniyatlar va yaxshilash yo'nalishlari</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg0:#0f1216; --bg1:#13161b; --bg2:#171b21; --bg3:#1a1f26; --bg4:#212730;
+    --line:#242b35; --line2:#323a46;
+    --tx:#dfe4ea; --txm:#98a3b2; --txd:#69727f;
+    --ac:#35c9d6; --acd:#123f44; --acf:#7fe6ef;
+    --pink:#e8639f; --prod:#cf6bc9; --stag:#c99a3f; --dev:#5b8def;
+    --ok:#46c771; --warn:#e0a92e; --bad:#e5544b;
+    --mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --serif:"Instrument Serif", Iowan Old Style, Palatino, Georgia, serif;
+    --gut:clamp(20px, 5vw, 72px);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg0); color:var(--tx);
+    font-family:var(--mono); font-weight:400; font-size:13.5px; line-height:1.75;
+    -webkit-font-smoothing:antialiased; letter-spacing:-0.005em;
+  }
+  /* blueprint hairline grid + grain */
+  body::before{
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,.022) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.022) 1px, transparent 1px);
+    background-size:56px 56px;
+    mask-image:radial-gradient(ellipse 120% 80% at 50% 0%, #000 25%, transparent 85%);
+  }
+  body::after{
+    content:""; position:fixed; inset:0; z-index:9999; pointer-events:none; opacity:.028;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap{position:relative; z-index:1; max-width:1180px; margin:0 auto; padding:0 var(--gut)}
+
+  a{color:var(--acf); text-decoration:none; border-bottom:1px solid rgba(127,230,239,.28)}
+  a:hover{border-bottom-color:var(--acf)}
+  code,.m{font-family:var(--mono); font-size:.86em; color:var(--acf); background:rgba(53,201,214,.07);
+    border:1px solid rgba(53,201,214,.16); padding:.06em .38em; border-radius:3px; white-space:nowrap}
+
+  /* ---------- reveal ---------- */
+  /* JS-gated: without scripting every .rv stays fully visible */
+  .js .rv{opacity:0; transform:translateY(14px); transition:opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1)}
+  .js .rv.in{opacity:1; transform:none}
+  @media (prefers-reduced-motion:reduce){ .js .rv{opacity:1; transform:none; transition:none} }
+
+  /* ---------- hero ---------- */
+  header{padding:clamp(56px,11vh,130px) 0 clamp(40px,7vh,72px); border-bottom:1px solid var(--line)}
+  .eyebrow{display:flex; align-items:center; gap:12px; font-size:10.5px; letter-spacing:.24em;
+    text-transform:uppercase; color:var(--txd)}
+  .eyebrow .bolt{color:var(--pink); font-size:15px; letter-spacing:0}
+  .eyebrow .rule{flex:1; height:1px; background:linear-gradient(to right,var(--line2),transparent)}
+  h1{font-family:var(--serif); font-weight:400; letter-spacing:-.02em;
+    font-size:clamp(46px,9.5vw,116px); line-height:.92; margin:26px 0 0}
+  h1 em{font-style:italic; color:var(--ac)}
+  .sub{max-width:60ch; margin:24px 0 0; color:var(--txm); font-size:14px}
+  .badges{display:flex; flex-wrap:wrap; gap:8px; margin-top:28px}
+  .badge{font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--txm);
+    border:1px solid var(--line2); border-radius:999px; padding:5px 12px; background:var(--bg2)}
+  .badge.on{color:var(--acf); border-color:rgba(53,201,214,.4); background:rgba(53,201,214,.08)}
+
+  /* ---------- stats ---------- */
+  /* 8 stats — a fixed column count so the grid always fills exactly, no orphan cells */
+  .stats{display:grid; grid-template-columns:repeat(8,1fr); border:1px solid var(--line);
+    border-radius:4px; overflow:hidden; margin-top:44px; background:var(--bg1)}
+  .stat{padding:18px 18px 15px; border-right:1px solid var(--line); border-bottom:1px solid var(--line)}
+  .stat b{display:block; font-family:var(--serif); font-weight:400; font-size:34px; line-height:1;
+    letter-spacing:-.01em; color:var(--tx)}
+  .stat span{display:block; margin-top:8px; font-size:9.5px; letter-spacing:.15em;
+    text-transform:uppercase; color:var(--txd)}
+
+  /* ---------- sections ---------- */
+  section{padding:clamp(52px,9vh,104px) 0; border-bottom:1px solid var(--line)}
+  .shead{display:flex; align-items:baseline; gap:16px; margin-bottom:12px}
+  .snum{font-family:var(--serif); font-size:15px; color:var(--ac); letter-spacing:.02em}
+  h2{font-family:var(--serif); font-weight:400; font-size:clamp(28px,4.6vw,46px); line-height:1.05;
+    letter-spacing:-.015em; margin:0}
+  .slead{max-width:70ch; color:var(--txm); margin:14px 0 40px}
+
+  /* ---------- capability cards ---------- */
+  .caps{display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:1px; background:var(--line)}
+  .cap{background:var(--bg1); padding:24px 22px 22px; position:relative; transition:background .25s}
+  .cap:hover{background:var(--bg2)}
+  .cap::before{content:""; position:absolute; left:0; top:24px; bottom:22px; width:2px; background:var(--k,var(--ac)); opacity:.55}
+  .cap h3{margin:0 0 4px; font-family:var(--serif); font-weight:400; font-size:22px; letter-spacing:-.01em}
+  .cap .kk{font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--k,var(--ac)); opacity:.85}
+  .cap ul{list-style:none; margin:16px 0 0; padding:0}
+  .cap li{position:relative; padding-left:18px; margin-bottom:9px; font-size:12.6px; color:var(--txm); line-height:1.65}
+  .cap li::before{content:"—"; position:absolute; left:0; top:0; color:var(--k,var(--ac)); opacity:.5}
+  .cap li b{color:var(--tx); font-weight:500}
+
+  /* ---------- arch diagram ---------- */
+  .arch{border:1px solid var(--line); border-radius:4px; background:var(--bg1); overflow:hidden}
+  .layer{display:grid; grid-template-columns:158px 1fr; border-bottom:1px solid var(--line)}
+  .layer:last-child{border-bottom:0}
+  .layer > .lb{padding:16px 18px; border-right:1px solid var(--line); background:var(--bg2)}
+  .layer > .lb b{display:block; font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--tx)}
+  .layer > .lb span{display:block; margin-top:5px; font-size:10.5px; color:var(--txd); line-height:1.5}
+  .boxes{padding:16px 18px; display:flex; flex-wrap:wrap; gap:7px; align-content:flex-start}
+  .box{font-size:11.5px; color:var(--txm); border:1px solid var(--line2); border-radius:3px;
+    padding:4px 9px; background:var(--bg3); transition:.2s}
+  .box:hover{color:var(--acf); border-color:rgba(53,201,214,.45)}
+  .box.hi{color:var(--tx); border-color:var(--acd); background:rgba(53,201,214,.06)}
+  .bridge{display:flex; align-items:center; gap:14px; padding:11px 18px; background:var(--bg3);
+    border-bottom:1px solid var(--line); font-size:10.5px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--ac)}
+  .bridge .rule{flex:1; height:1px; background:repeating-linear-gradient(to right,var(--line2) 0 4px,transparent 4px 9px)}
+
+  /* ---------- security ---------- */
+  .inv{display:grid; grid-template-columns:repeat(auto-fit,minmax(255px,1fr)); gap:1px; background:var(--line)}
+  .iv{background:var(--bg1); padding:20px}
+  .iv b{display:block; font-size:12.5px; color:var(--tx); margin-bottom:7px}
+  .iv b::before{content:"▪ "; color:var(--ok)}
+  .iv p{margin:0; font-size:12.2px; color:var(--txm)}
+
+  /* ---------- keys ---------- */
+  .keys{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:1px 26px}
+  .kr{display:flex; align-items:baseline; gap:10px; padding:7px 0; border-bottom:1px dotted var(--line)}
+  kbd{font-family:var(--mono); font-size:11.5px; color:var(--tx); background:var(--bg3);
+    border:1px solid var(--line2); border-bottom-width:2px; border-radius:4px; padding:2px 7px; white-space:nowrap}
+  .kr span{color:var(--txm); font-size:12.2px}
+
+  /* ---------- improvements ---------- */
+  .filters{display:flex; flex-wrap:wrap; gap:7px; margin:0 0 26px}
+  .f{font-family:var(--mono); font-size:10.5px; letter-spacing:.13em; text-transform:uppercase;
+    color:var(--txm); background:transparent; border:1px solid var(--line2); border-radius:999px;
+    padding:6px 13px; cursor:pointer; transition:.2s}
+  .f:hover{color:var(--tx); border-color:var(--txd)}
+  .f[aria-pressed="true"]{color:var(--bg0); background:var(--ac); border-color:var(--ac); font-weight:500}
+  .imp{border-top:1px solid var(--line)}
+  .row{display:grid; grid-template-columns:52px 1fr 176px; gap:20px; padding:22px 0;
+    border-bottom:1px solid var(--line); align-items:start}
+  .row[hidden]{display:none}
+  .rn{font-family:var(--serif); font-size:30px; line-height:1; color:var(--line2); text-align:right}
+  .row:hover .rn{color:var(--ac)}
+  .rt{margin:0 0 8px; font-size:14.5px; font-weight:500; color:var(--tx); letter-spacing:-.005em; line-height:1.45}
+  .rd{margin:0; font-size:12.6px; color:var(--txm); max-width:74ch}
+  .rd + .rd{margin-top:7px}
+  .why{color:var(--txd)}
+  .why b{color:var(--txm); font-weight:400}
+  .meta{display:flex; flex-direction:column; gap:7px; align-items:flex-start}
+  .pill{font-size:9.5px; letter-spacing:.13em; text-transform:uppercase; padding:3px 9px;
+    border-radius:999px; border:1px solid currentColor}
+  .p-quick{color:var(--ok)} .p-feat{color:var(--ac)} .p-plat{color:var(--dev)} .p-qual{color:var(--stag)}
+  .gauge{display:flex; gap:9px; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--txd)}
+  .gauge i{font-style:normal; color:var(--txm)}
+  .dots{letter-spacing:1px}
+  .dots.hi{color:var(--pink)} .dots.md{color:var(--stag)} .dots.lo{color:var(--txd)}
+
+  /* ---------- roadmap ---------- */
+  .rm{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:1px; background:var(--line)}
+  .rc{background:var(--bg1); padding:24px 22px}
+  .rc h4{margin:0; font-family:var(--serif); font-weight:400; font-size:24px}
+  .rc .tag{font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--ac)}
+  .rc ol{margin:16px 0 0; padding-left:20px; color:var(--txm); font-size:12.5px}
+  .rc li{margin-bottom:9px}
+
+  footer{padding:44px 0 64px; color:var(--txd); font-size:11.5px;
+    display:flex; flex-wrap:wrap; gap:10px 26px; justify-content:space-between}
+
+  @media (max-width:1040px){ .stats{grid-template-columns:repeat(4,1fr)} }
+  @media (max-width:520px){ .stats{grid-template-columns:repeat(2,1fr)} }
+
+  @media (max-width:640px){
+    .row{grid-template-columns:34px 1fr; gap:14px}
+    .meta{grid-column:2; flex-direction:row; flex-wrap:wrap; align-items:center; margin-top:12px}
+    .rn{font-size:22px}
+    .layer{grid-template-columns:1fr}
+    .layer > .lb{border-right:0; border-bottom:1px solid var(--line)}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow rv">
+      <span class="bolt">⚡</span><span>Loyiha auditi</span><span class="rule"></span>
+      <span>2026-07-24</span>
+    </div>
+    <h1 class="rv" style="transition-delay:.06s">Zish<br><em>imkoniyatlar</em> xaritasi</h1>
+    <p class="sub rv" style="transition-delay:.12s">
+      macOS uchun local-first SSH menejeri: Wails v3, Go backend + React/TypeScript
+      frontend <span class="m">WKWebView</span> ichida. Hisob yo'q, telemetriya yo'q —
+      o'zingiz ochgan SSH ulanishlaridan boshqa tashqi trafik yo'q. Quyida
+      <b style="color:var(--tx);font-weight:500">nima ishlaydi</b> va
+      <b style="color:var(--tx);font-weight:500">nimani yaxshilash mumkin</b>.
+    </p>
+    <div class="badges rv" style="transition-delay:.18s">
+      <span class="badge on">v1.2.0 · published</span>
+      <span class="badge">Wails v3 alpha2.117</span>
+      <span class="badge">Go 1.26 · CGO-free internal</span>
+      <span class="badge">React 18 · Vite 8 · Tailwind 4</span>
+      <span class="badge">xterm.js 5.5</span>
+      <span class="badge">macOS only (runtime)</span>
+    </div>
+
+    <div class="stats rv" style="transition-delay:.24s">
+      <div class="stat"><b>17.5k</b><span>Go qatori</span></div>
+      <div class="stat"><b>10.1k</b><span>Go test qatori</span></div>
+      <div class="stat"><b>8.4k</b><span>TS / TSX qatori</span></div>
+      <div class="stat"><b>9</b><span>Wails service</span></div>
+      <div class="stat"><b>7</b><span>push event</span></div>
+      <div class="stat"><b>136</b><span>commit</span></div>
+      <div class="stat"><b>3</b><span>relise (DMG)</span></div>
+      <div class="stat"><b>0</b><span>telemetriya</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ 01 IMKONIYATLAR ============ -->
+<section>
+  <div class="wrap">
+    <div class="shead rv"><span class="snum">01</span><h2>Hozir mavjud imkoniyatlar</h2></div>
+    <p class="slead rv">
+      Yetti blok. Har biri kod bilan tasdiqlangan — <span class="m">CHANGELOG.md</span>,
+      <span class="m">internal/service/</span> va <span class="m">frontend/src/</span> asosida.
+    </p>
+
+    <div class="caps rv">
+      <article class="cap" style="--k:var(--ac)">
+        <span class="kk">01 · connections</span>
+        <h3>Ulanish va autentifikatsiya</h3>
+        <ul>
+          <li><b>Server CRUD</b> — yaratish, tahrirlash, nusxalash, o'chirish; guruh, muhit
+            (prod / staging / dev), teg, izoh.</li>
+          <li><b>Uch auth usuli</b> — parol, private key (+ passphrase), tizim
+            <span class="m">ssh-agent</span>; kalitlar <span class="m">~/.ssh</span> dan avto-aniqlanadi.</li>
+          <li><b>Secret'lar Keychain'da</b> — parol/passphrase/TOTP faqat macOS Keychain'da
+            (<span class="m">uz.salawat.sshmgr</span>), DB va export'da hech qachon yo'q.</li>
+          <li><b>Host-key TOFU</b> — o'z <span class="m">known_hosts</span>; o'zgargan yoki
+            <span class="m">@revoked</span> kalit bloklanadi.</li>
+          <li><b>Jump host</b> — <span class="m">ProxyJump</span> zanjiri; har hop'ning host-key'i tekshiriladi.</li>
+          <li><b>TOTP / 2FA</b> — keyboard-interactive kod avto-to'ldiriladi, qo'lda kiritish fallback'i bor;
+            + jonli Authenticator paneli.</li>
+          <li><b>Test connection</b> — forma ichida natija bilan; <b>Quick connect</b> —
+            <span class="m">⌘K</span> ga <span class="m">user@host:port</span> yozib Enter.</li>
+        </ul>
+      </article>
+
+      <article class="cap" style="--k:var(--ok)">
+        <span class="kk">02 · terminal</span>
+        <h3>Terminal</h3>
+        <ul>
+          <li><b>Haqiqiy PTY</b> SSH ustida, xterm.js (Canvas renderer) bilan chiziladi.</li>
+          <li><b>Tab + split pane</b> — gorizontal/vertikal bo'lish, pane daraxti, fokus ring.</li>
+          <li><b>Tartiblangan oqim</b> — <span class="m">term:data</span> event'lari
+            <span class="m">seq</span> bo'yicha qayta tartiblanadi (kadr yo'qolmaydi).</li>
+          <li><b>Find</b> (<span class="m">⌘F</span>), tanlaganda avto-nusxa, o'ng-tugma / <span class="m">⌘V</span> paste.</li>
+          <li><b>Reconnect</b> — uzilgan sessiya scrollback'ni saqlaydi va bir bosishda qayta ulanadi.</li>
+          <li><b>Shell integration (OSC 133)</b> — prompt / buyruq / chiqish ajratiladi: gutter chizig'i,
+            yiqilgan buyruqda qizil belgi, davomiylik, <span class="m">⌘↑</span>/<span class="m">⌘↓</span> bilan sakrash.</li>
+          <li><b>Jonli sozlama</b> — font o'lchami, kursor turi/blink, scrollback ochiq terminallarga darhol qo'llanadi.</li>
+        </ul>
+      </article>
+
+      <article class="cap" style="--k:var(--prod)">
+        <span class="kk">03 · tunnels &amp; workflow</span>
+        <h3>Tunnel va ish oqimi</h3>
+        <ul>
+          <li><b>Port forwarding</b> — local (<span class="m">-L</span>), remote (<span class="m">-R</span>),
+            dinamik (<span class="m">-D</span>, SOCKS5); server o'chirilsa tunnel'lari to'xtatiladi.</li>
+          <li><b>Jonli status</b> — <span class="m">forward:status</span> event'i orqali start/stop va xato holati.</li>
+          <li><b>Production guard</b> — <span class="m">prod</span> tegli serverda xavfli buyruqni
+            tasdiqlash so'raladi. Ergonomik to'siq, xavfsizlik nazorati emas.</li>
+          <li><b>Broadcast</b> — <span class="m">⇧↵</span> bilan bir matn tabdagi barcha panel'ga;
+            guard fan-out bilan.</li>
+          <li><b>Snippets</b> — global / guruh / server ko'lamli buyruqlar,
+            <span class="m">⌘E</span> palitrasi yoki <span class="m">⌘⇧1–9</span> slotlari.</li>
+        </ul>
+      </article>
+
+      <article class="cap" style="--k:var(--dev)">
+        <span class="kk">04 · files</span>
+        <h3>SFTP fayl almashinuvi</h3>
+        <ul>
+          <li><b>Ikki panelli brauzer</b> — lokal ↔ remote, cgo-siz <span class="m">internal/sftpx</span> ustida.</li>
+          <li><b>Fayl va rekursiv papka</b> yuklash/tushirish — drag yoki o'ng-tugma, jonli progress va cancel.</li>
+          <li><b>Remote amallar</b> — mkdir, delete, rename; ustiga yozishda tasdiq.</li>
+          <li><b>Xavfsizlik</b> — download'da path-traversal to'sig'i, symlink'ni kuzatmaydigan
+            <span class="m">Lstat</span>, oldingi sessiyani yopish (conn leak yo'q).</li>
+        </ul>
+      </article>
+
+      <article class="cap" style="--k:var(--pink)">
+        <span class="kk">05 · productivity</span>
+        <h3>Unumdorlik va UI</h3>
+        <ul>
+          <li><b>Command palette</b> (<span class="m">⌘K</span>) — Fuse.js fuzzy qidiruv, oxirgi ishlatilish bo'yicha tartib.</li>
+          <li><b>Sidebar 2.0</b> — jonli fuzzy filter (nom/host/user/guruh/teg), teg chiplari (any-of),
+            yopiladigan guruhlar (holati saqlanadi), guruh ichida drag bilan tartiblash.</li>
+          <li><b>Global hotkey</b> (<span class="m">⌘⇧S</span>) — ilova fonda bo'lsa ham oynani ko'rsatish/yashirish.</li>
+          <li><b>Menu-bar tray</b> — ≤5 pin qilingan serverga tray'dan ulanish; oynani yopish
+            ilovani o'chirmaydi, sessiyalar tirik qoladi.</li>
+          <li><b>Toast</b> tizimi, hamma joyda native o'ng-tugma menyulari, birinchi ishga tushirish turi,
+            jonli status bar (auth, target, o'lcham, tunnel soni, uptime).</li>
+        </ul>
+      </article>
+
+      <article class="cap" style="--k:var(--stag)">
+        <span class="kk">06 · data &amp; settings</span>
+        <h3>Ma'lumot va sozlamalar</h3>
+        <ul>
+          <li><b><span class="m">~/.ssh/config</span> import</b> — har bir host uchun preview
+            (import qilingani va sababi bilan tashlab ketilgani), <span class="m">ProxyJump</span> nom bo'yicha bog'lanadi.</li>
+          <li><b>Data vositalari</b> — serverlarni JSON'ga export/import (secret'siz), WAL-xavfsiz DB backup,
+            papkani Finder'da ochish.</li>
+          <li><b>To'liq Settings</b> — General (login'da ishga tushish, tray'da qolish, chiqishda tasdiq,
+            connect timeout), Terminal, Shortcuts (faqat o'qish), Data, About. Sozlamalar DB'da,
+            kirishda <span class="m">Sanitise()</span> bilan chegaralanadi.</li>
+          <li><b>Self-uninstall</b> — yozib-tasdiqlash bilan: barcha data, Keychain secret'lari,
+            login-item o'chadi, ilova Trash'ga ketadi. <span class="m">~/.ssh</span> tegilmaydi.</li>
+        </ul>
+      </article>
+
+      <article class="cap" style="--k:var(--acf)">
+        <span class="kk">07 · engineering</span>
+        <h3>Muhandislik sifati</h3>
+        <ul>
+          <li><b><span class="m">task check</span> darvozasi</b> — <span class="m">tsc</span>,
+            <span class="m">vite build</span>, <span class="m">vitest</span>, <span class="m">go vet</span>,
+            <span class="m">golangci-lint</span>, <span class="m">go test -race -cover</span>,
+            <span class="m">govulncheck</span>, taqiqlangan satr grep'lari, ≤250 qator qo'riqchisi,
+            <span class="m">CGO_ENABLED=0</span> build, <span class="m">wails3 build</span>.</li>
+          <li><b>Darvoza faqat lokal</b> — <span class="m">.github/workflows/ci.yml</span> fayli diskda bor
+            (macOS + Windows matritsasi), lekin git'da <b>kuzatilmaydi</b>: eski commit'larda bo'lgan,
+            keyin olib tashlanib <span class="m">.gitignore</span> ga qo'shilgan. Ya'ni GitHub'da hech nima
+            ishlamaydi — sifat butunlay qo'lda <span class="m">task check</span> ga tayanadi (22-punktga qara).</li>
+          <li><b>Test balansi</b> — Go'da 10 147 qator test / 17 531 qator kod (juda yaxshi);
+            frontend'da 6 test fayli / 8 435 qator (nomutanosib — 02-bo'limga qara).</li>
+          <li><b>Arxitektura invariantlari</b> — cgo faqat <span class="m">package main</span> ichida,
+            <span class="m">internal/</span> to'liq cgo-siz; frontend fayllari ≤250 qator.</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ARXITEKTURA ============ -->
+<section>
+  <div class="wrap">
+    <div class="shead rv"><span class="snum">02</span><h2>Arxitektura qatlamlari</h2></div>
+    <p class="slead rv">
+      Go service'lari <span class="m">main.go</span> da ro'yxatga olinadi va TypeScript binding'lariga
+      avto-eksport bo'ladi. Backend→frontend surish esa event'lar orqali, qaytish qiymati orqali emas.
+    </p>
+
+    <div class="arch rv">
+      <div class="layer">
+        <div class="lb"><b>Frontend</b><span>React 18 · TS 5 · Zustand 5</span></div>
+        <div class="boxes">
+          <span class="box hi">components/terminal</span><span class="box">components/sftp</span>
+          <span class="box">components/server</span><span class="box">components/palette</span>
+          <span class="box">components/settings</span><span class="box">components/snippets</span>
+          <span class="box">components/forwards</span><span class="box">components/authenticator</span>
+          <span class="box">components/ui</span><span class="box hi">stores/ (17)</span>
+          <span class="box hi">lib/ (framework-siz mantiq)</span><span class="box">hooks/ (7)</span>
+        </div>
+      </div>
+      <div class="bridge"><span>Wails bridge</span><span class="rule"></span>
+        <span>generated bindings ⇄ events: term:data · session:state · hostkey:request · code:request · forward:status · sftp:progress · tray:connect</span>
+      </div>
+      <div class="layer">
+        <div class="lb"><b>Service</b><span>frontend'ga ochiq yagona qatlam</span></div>
+        <div class="boxes">
+          <span class="box hi">ServerService</span><span class="box hi">SSHService</span>
+          <span class="box">SettingsService</span><span class="box">ImportService</span>
+          <span class="box">DataService</span><span class="box">ForwardService</span>
+          <span class="box">SnippetService</span><span class="box hi">SftpService</span>
+          <span class="box">UninstallService</span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="lb"><b>internal/</b><span>CGO_ENABLED=0 · gate bilan majburlangan</span></div>
+        <div class="boxes">
+          <span class="box hi">sshx — client, PTY, host-key TOFU, ssh_config</span>
+          <span class="box">term — PTY manager, seq oqimi</span>
+          <span class="box">forward — -L / -R / -D</span>
+          <span class="box">sftpx — cgo-siz SFTP</span>
+          <span class="box">secret — macOS Keychain</span>
+          <span class="box">store — GORM · glebarez/sqlite</span>
+          <span class="box">domain — model + validatsiya</span>
+          <span class="box">platform — paths, login item, Trash</span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="lb"><b>package main</b><span>cgo shu yerda qamalgan</span></div>
+        <div class="boxes">
+          <span class="box">global hotkey (⌘⇧S)</span><span class="box">close guard</span>
+          <span class="box">forced dark appearance</span>
+          <span class="box">tray.go — InvokeAsync bilan main-thread</span>
+          <span class="box">dataops_main.go — native dialoglar</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ XAVFSIZLIK ============ -->
+<section>
+  <div class="wrap">
+    <div class="shead rv"><span class="snum">03</span><h2>Qattiq invariantlar</h2></div>
+    <p class="slead rv">Bular shunchaki niyat emas — buzilishi <span class="m">task check</span> ni qizil qiladi.</p>
+    <div class="inv rv">
+      <div class="iv"><b>Faqat lokal</b><p>Login yo'q, analitika yo'q. Font, xterm.js, Fuse.js — hammasi bundle ichidan beriladi.</p></div>
+      <div class="iv"><b>Secret Keychain'dan chiqmaydi</b><p>DB va JSON export'ga hech qachon yozilmaydi; ishlatilgach xotiradan nolga to'ldiriladi.</p></div>
+      <div class="iv"><b>Host-key har doim tekshiriladi</b><p><span class="m">InsecureIgnoreHostKey</span> taqiqlangan satr — grep gate'da.</p></div>
+      <div class="iv"><b>Ishonchsiz kirish validatsiyadan o'tadi</b><p><span class="m">ssh_config</span> yoki JSON'dan kelgan har bir server saqlashdan oldin tekshiriladi — argv-injection to'sig'i.</p></div>
+      <div class="iv"><b>Fayl huquqlari qattiq</b><p>Data papkasi <span class="m">0700</span>, DB va <span class="m">known_hosts</span> <span class="m">0600</span>.</p></div>
+      <div class="iv"><b>Identifikator o'zgarmaydi</b><p>Modul, bundle id, Keychain service, data papka, exec nomi qotib qolgan — mavjud o'rnatmalar yetim bo'lmasin.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ YAXSHILASH ============ -->
+<section>
+  <div class="wrap">
+    <div class="shead rv"><span class="snum">04</span><h2>Nimani yaxshilash mumkin</h2></div>
+    <p class="slead rv">
+      21 ta konkret yo'nalish, ta'sir bo'yicha tartiblangan. Har biri kodda ko'rilgan haqiqiy bo'shliqdan
+      chiqqan — taxmin emas. <b style="color:var(--tx);font-weight:500">Ta'sir</b> = foydalanuvchi
+      qanchalik sezadi, <b style="color:var(--tx);font-weight:500">mehnat</b> = qancha ish talab qiladi.
+    </p>
+
+    <div class="filters rv" role="group" aria-label="Kategoriya bo'yicha filtr">
+      <button class="f" data-cat="all" aria-pressed="true">Hammasi · 22</button>
+      <button class="f" data-cat="quick" aria-pressed="false">Tez yutuq · 5</button>
+      <button class="f" data-cat="feat" aria-pressed="false">Yangi imkoniyat · 10</button>
+      <button class="f" data-cat="plat" aria-pressed="false">Platforma · 3</button>
+      <button class="f" data-cat="qual" aria-pressed="false">Sifat · 4</button>
+    </div>
+
+    <div class="imp" id="imp">
+
+      <div class="row rv" data-cat="quick">
+        <div class="rn">01</div>
+        <div>
+          <p class="rt">Terminal temasi va fonti hozir soxta tanlov — jonli qilish</p>
+          <p class="rd"><span class="m">TerminalSection.tsx</span> da Font va Theme
+            <span class="m">InertSelect</span>, chunki <span class="m">settings.go</span>
+            <span class="m">Sanitise()</span> ichida <code>if s.TermTheme != "graphite"</code> hamma
+            qiymatni qaytarib tashlaydi. Ya'ni maydonlar saqlanadi, lekin bitta variantdan boshqasi yo'q.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> <span class="m">lib/termTheme.ts</span> allaqachon
+            temani CSS o'zgaruvchilaridan o'qiydi — 3–5 ta ANSI palitrasini registry qilib qo'yish va
+            <span class="m">Sanitise()</span> ni ruxsat etilgan ro'yxatga o'tkazish kifoya. Terminal ilovasida
+            eng ko'p so'raladigan birinchi sozlama — bu.</p>
+        </div>
+        <div class="meta"><span class="pill p-quick">Tez yutuq</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots hi">●●●</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots lo">●○○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="feat">
+        <div class="rn">02</div>
+        <div>
+          <p class="rt">Avto-reconnect (backoff bilan)</p>
+          <p class="rd">Hozir uzilgan sessiya scrollback'ni saqlab qo'l bilan "Reconnect" tugmasini kutadi
+            (<span class="m">ERR_SESSION_CLOSED</span> → Reconnect pane). Wi-Fi almashganda yoki noutbuk
+            uyqudan qaytganda har bir tabni qo'lda bosish kerak.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> eksponensial backoff + jitter, urinish limiti va
+            Settings'dagi toggle. <span class="m">useTerminalSession.ts</span> da holat mashinasi bor —
+            faqat qayta urinish siklini qo'shish qoladi. Kunlik ishda eng ko'p sezilgan asabiylik shu.</p>
+        </div>
+        <div class="meta"><span class="pill p-feat">Yangi imkoniyat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots hi">●●●</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="feat">
+        <div class="rn">03</div>
+        <div>
+          <p class="rt">Sessiya loglash va transkript eksporti</p>
+          <p class="rd">Hozir terminal chiqishi faqat scrollback'da yashaydi; ilova yopilsa yo'qoladi.
+            Ops ishida "o'sha deploy paytida nima yozdim" savoli doim chiqadi.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> per-tab ixtiyoriy <span class="m">.log</span> yozish
+            (server bo'yicha papka, rotatsiya, hajm chegarasi) + tabni matn/HTML qilib eksport. Shell
+            integration allaqachon buyruq chegaralarini biladi, ya'ni log buyruq bo'yicha bo'lakli va
+            qidiriladigan bo'lishi mumkin. Muhim nozik joy: parol prompt'larini yozmaslik uchun redaksiya kerak.</p>
+        </div>
+        <div class="meta"><span class="pill p-feat">Yangi imkoniyat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots hi">●●●</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="feat">
+        <div class="rn">04</div>
+        <div>
+          <p class="rt">SSH agent forwarding (<span class="m">-A</span>)</p>
+          <p class="rd"><span class="m">internal/sshx</span> da agent bilan <em>autentifikatsiya</em> bor,
+            lekin agent kanalini uzoq xostga <em>uzatish</em> yo'q. <span class="m">ssh_config</span> parser
+            ham <span class="m">ForwardAgent</span> ni tushunmaydi (faqat 5 kalit o'qiladi).</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> bastion orqali kirib, o'sha yerdan
+            <span class="m">git clone</span> qilish — eng keng tarqalgan real oqim. Hozir buni Zish'da
+            umuman qilib bo'lmaydi, terminalga qaytib chiqishga majbur qiladi. Per-server toggle qilib,
+            ogohlantirish matni bilan berish to'g'ri (agent forwarding ishonch chegarasini kengaytiradi).</p>
+        </div>
+        <div class="meta"><span class="pill p-feat">Yangi imkoniyat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots hi">●●●</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="quick">
+        <div class="rn">05</div>
+        <div>
+          <p class="rt">Klaviatura biriktirishlarini o'zgartirish</p>
+          <p class="rd"><span class="m">lib/shortcuts.ts</span> da ochiq yozilgan:
+            "Rebinding is a later version — this is a reference list, not an editor".
+            <span class="m">ShortcutsSection.tsx</span> ham foydalanuvchiga shuni aytadi.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> <span class="m">lib/keymap.ts</span> +
+            <span class="m">shortcuts.ts</span> o'rtasida drift-lock testi allaqachon bor, ya'ni yagona
+            manba tayyor. Qo'shilishi kerak: konflikt aniqlash va "plain <span class="m">Ctrl+&lt;harf&gt;</span>
+            ishlatilmaydi" (readline ziddiyati) qoidasini validatsiyaga aylantirish. Settings'da allaqachon
+            ro'yxat ko'rinib turgani uchun UI joyi ham tayyor.</p>
+        </div>
+        <div class="meta"><span class="pill p-quick">Tez yutuq</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="qual">
+        <div class="rn">06</div>
+        <div>
+          <p class="rt">Frontend test qamrovi Go tomonidan ancha orqada</p>
+          <p class="rd">Go: 10 147 qator test / 17 531 qator kod. Frontend: 6 test fayli / 8 435 qator,
+            hammasi <span class="m">lib/</span> va <span class="m">stores/</span> da. Birorta komponent
+            testi ham, e2e smoke ham yo'q.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> aynan UI qatlamida chiqqan xatolar
+            CHANGELOG'da eng ko'p uchraydi — modal z-index yutilishi, palitrada
+            <span class="m">scrollIntoView</span> (ikki marta, <span class="m">⌘K</span> va
+            <span class="m">⌘E</span> uchun alohida). Testing Library bilan bir necha
+            "modal ustida ko'rinadi va bosiladi" testi shu turkumni butunlay yopadi.
+            <span class="m">vitest</span> gate'da allaqachon turgani uchun infratuzilma bepul.</p>
+        </div>
+        <div class="meta"><span class="pill p-qual">Sifat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="feat">
+        <div class="rn">07</div>
+        <div>
+          <p class="rt">Ochiq tablarni ilova qayta ishga tushganda tiklash</p>
+          <p class="rd">Sessiyalar faqat xotirada (<span class="m">stores/sessions.ts</span>); ilova
+            yopilsa tab tarkibi ham yo'qoladi. Sidebar'ning yopilgan guruhlari esa allaqachon
+            <span class="m">localStorage</span> da saqlanadi — naqsh mavjud.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> "workspace" tuyg'usi. Qaysi serverlar qaysi
+            split'da ochiq bo'lgani (pane daraxti bilan) saqlanib, ishga tushganda ixtiyoriy
+            qayta ulanish taklif qilinsa — kunni to'xtagan joyidan davom ettirish mumkin.</p>
+        </div>
+        <div class="meta"><span class="pill p-feat">Yangi imkoniyat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="quick">
+        <div class="rn">08</div>
+        <div>
+          <p class="rt"><span class="m">ssh_config</span> import qamrovi juda tor</p>
+          <p class="rd">Parser faqat beshta kalitni tushunadi: <span class="m">HostName</span>,
+            <span class="m">User</span>, <span class="m">Port</span>, <span class="m">IdentityFile</span>,
+            <span class="m">ProxyJump</span>. Real konfiglarda uchraydigan
+            <span class="m">Include</span>, <span class="m">Match</span>, wildcard
+            <span class="m">Host</span> naqshlari, <span class="m">ProxyCommand</span>,
+            <span class="m">IdentityAgent</span>, <span class="m">ServerAliveInterval</span> jimgina tashlanadi.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> import — birinchi taassurot. Yuz xostli konfig
+            yarmi tushib qolib import qilinsa, foydalanuvchi ilovaga ishonchni yo'qotadi.
+            Preview oynasi allaqachon "sababi bilan tashlab ketildi" ni ko'rsatadi, ya'ni eng arzon qadam —
+            qo'llab-quvvatlanmagan kalitlarni <em>aniq nomlab</em> sabab qilib chiqarish, keyin
+            <span class="m">Include</span> ni qo'shish.</p>
+        </div>
+        <div class="meta"><span class="pill p-quick">Tez yutuq</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="feat">
+        <div class="rn">09</div>
+        <div>
+          <p class="rt">Snippet'larda o'rin egallovchilar</p>
+          <p class="rd">Snippet hozir statik matn. <span class="m">{{host}}</span>,
+            <span class="m">{{user}}</span>, <span class="m">{{port}}</span> kabi avto-to'ldirilar va
+            ishga tushirishda so'raladigan <span class="m">{{?branch}}</span> kabi kirishlar yo'q.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> bu snippet'ni "eslatma"dan "vosita"ga aylantiradi —
+            bitta snippet o'ntasining o'rnini bosadi. Ko'lam mantiqi (global / guruh / server)
+            allaqachon bor, shuning uchun faqat kichik shablon almashtirish qatlami va bitta
+            so'rov modali kerak.</p>
+        </div>
+        <div class="meta"><span class="pill p-feat">Yangi imkoniyat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots lo">●○○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="quick">
+        <div class="rn">10</div>
+        <div>
+          <p class="rt">Tab nomini o'zgartirish va tablarni qayta tartiblash</p>
+          <p class="rd"><span class="m">sessions.ts</span> da <span class="m">title</span> maydoni bor,
+            lekin u faqat <span class="m">server.name || server.host</span> dan to'ladi va o'zgarmaydi.
+            Bitta serverga uch tab ochilsa, uchtasi bir xil nomda turadi.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> ikki-uch panelli ishda kerakli tabni topish
+            muammoga aylanadi. Ikki bosishda nom o'zgartirish + drag bilan tartiblash — kichik ish,
+            lekin har kuni sezilib turadi. Sidebar'dagi drag mantiqi
+            (<span class="m">useServerDrag.ts</span>) namuna sifatida tayyor.</p>
+        </div>
+        <div class="meta"><span class="pill p-quick">Tez yutuq</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots lo">●○○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="feat">
+        <div class="rn">11</div>
+        <div>
+          <p class="rt">SFTP: remote faylni joyida tahrirlash va tez ko'rish</p>
+          <p class="rd">Hozir faqat ko'chirish amallari bor. Bitta <span class="m">nginx.conf</span> ni
+            tuzatish uchun: tushirish → tahrirlash → yuklash → ustiga yozishni tasdiqlash.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> "tahrirlash uchun ochish" (vaqtinchalik faylga
+            tushirib, tizim muharririda ochib, saqlaganda avtomatik qaytarib yuklash) SFTP mijozlarining
+            asosiy sotuv nuqtasi. Yonida: matn/rasm uchun tez preview, remote papka bookmark'lari,
+            transfer navbatini saqlash va uzilganda davom ettirish.</p>
+        </div>
+        <div class="meta"><span class="pill p-feat">Yangi imkoniyat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="quick">
+        <div class="rn">12</div>
+        <div>
+          <p class="rt">Versiya 7 joyda qo'lda yozilgan — relise skripti kerak</p>
+          <p class="rd"><span class="m">build/config.yml</span>,
+            <span class="m">build/darwin/Info.plist</span> (×2),
+            <span class="m">build/darwin/Taskfile.yml</span> (×2),
+            <span class="m">AboutSection.tsx</span>, README'dagi DMG nomlari — hammasi qo'lda bir vaqtda
+            o'zgartirilishi kerak. <span class="m">CLAUDE.md</span> buni footgun deb yozib qo'ygan.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> yagona manba (<span class="m">version.txt</span>
+            yoki Taskfile o'zgaruvchisi) + <span class="m">task bump</span> va gate'da "hamma joy mos"
+            tekshiruvi. Bir kishilik loyihada aynan shu turdagi qo'l ishi jimgina noto'g'ri relise chiqaradi.
+            <span class="m">Info.plist</span> ni shablon generatoriga bermaslik kerak — u ikonani buzadi.</p>
+        </div>
+        <div class="meta"><span class="pill p-quick">Tez yutuq</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots lo">●○○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots lo">●○○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="plat">
+        <div class="rn">13</div>
+        <div>
+          <p class="rt">Notarizatsiya va ixtiyoriy yangilanish tekshiruvi</p>
+          <p class="rd">DMG ad-hoc imzolangan, notarizatsiya qilinmagan — har bir yangi foydalanuvchi
+            o'ng-tugma → Open marosimini o'tishi kerak. Ilova ichida yangilanishdan xabar berish
+            mexanizmi ham yo'q.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> tarqatishdagi eng katta ishqalanish shu.
+            Nozik joy: yangilanish tekshiruvi "tashqi trafik yo'q" invariantiga tegadi — shuning uchun u
+            <em>aniq ixtiyoriy</em>, sozlamada o'chirilgan holatda kelishi va nimaga murojaat qilishini
+            oshkora yozishi kerak. Notarizatsiya bunga ta'sir qilmaydi (bir martalik Apple Developer ishi).</p>
+        </div>
+        <div class="meta"><span class="pill p-plat">Platforma</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="feat">
+        <div class="rn">14</div>
+        <div>
+          <p class="rt">Guard'ni ixtiyoriy ravishda kuchaytirish</p>
+          <p class="rd"><span class="m">MatchesDangerous()</span> — oddiy, katta-kichik harfga sezgir
+            substring tekshiruvi, faqat <span class="m">prod</span> tegli serverga qo'llanadi.
+            Kod izohida "ataylab sodda va aylanib o'tiladigan" deb yozilgan.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> ergonomik to'siq bo'lib qolishi to'g'ri, lekin
+            ixtiyoriy regex rejimi, per-server ustiga yozish va guard'ni <span class="m">staging</span>
+            ga ham yoyish imkoni foydali. Muhimi: bu xavfsizlik nazorati emasligi UI'da ochiq yozilib
+            qolishi kerak — aks holda foydalanuvchi unga ishonib qo'yadi.</p>
+        </div>
+        <div class="meta"><span class="pill p-feat">Yangi imkoniyat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots lo">●○○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots lo">●○○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="feat">
+        <div class="rn">15</div>
+        <div>
+          <p class="rt">Tunnel'larni ulanishda avtomatik ko'tarish</p>
+          <p class="rd">Tunnel'lar mustaqil obyekt: har birini qo'lda start/stop qilish kerak.
+            Serverga ulanish uning saqlangan forward'larini ko'tarmaydi.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> amalda tunnel deyarli har doim sessiyaga
+            bog'langan (DB porti, admin UI). Per-forward "ulanganda avtomatik boshlash" belgisi
+            takrorlanuvchi ishni yo'q qiladi. <span class="m">ForwardService</span> va status event'i
+            allaqachon mavjud — faqat ulanish hodisasiga ulash qoladi.</p>
+        </div>
+        <div class="meta"><span class="pill p-feat">Yangi imkoniyat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots lo">●○○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="qual">
+        <div class="rn">16</div>
+        <div>
+          <p class="rt">A11y auditi: toast'lar, fokus tartibi, harakatni kamaytirish</p>
+          <p class="rd">Sidebar'ga ARIA atributlari qo'shilgan, lekin butun ilova bo'yicha tizimli o'tish
+            bo'lmagan: toast'larda <span class="m">aria-live</span>, modal'larda fokus tuzog'i va qaytishi,
+            <span class="m">prefers-reduced-motion</span>, <span class="m">textDim</span> matnining
+            kontrast nisbati.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> nafaqat imkoniyatlar uchun — fokus boshqaruvi
+            aynan modal z-index turkumidagi xatolarga qarindosh. Bir marta tizimli o'tish shu sinfni
+            butunlay yopadi va klaviatura bilan ishlashni yaxshilaydi.</p>
+        </div>
+        <div class="meta"><span class="pill p-qual">Sifat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots lo">●○○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="feat">
+        <div class="rn">17</div>
+        <div>
+          <p class="rt">Server sog'lig'i va kechikish ko'rsatkichi</p>
+          <p class="rd">Sidebar'dagi status nuqtasi faqat <em>ochiq sessiya</em> holatini bildiradi.
+            Ulanmagan server "sog'mi yoki o'likmi" — bilinmaydi.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> ixtiyoriy davriy TCP tekshiruvi (masalan
+            30 sekundda bir, faqat oyna ko'rinib turganda) va oxirgi kechikish qiymati "ulanmaguncha
+            bilmayman" holatini yo'q qiladi. Nozik joy: bu fon trafigi — ochiq o'chirib-yoqiladigan
+            bo'lishi va "faqat lokal" da'vosining ma'nosini buzmasligi kerak (u faqat sizning
+            serverlaringizga tegadi).</p>
+        </div>
+        <div class="meta"><span class="pill p-feat">Yangi imkoniyat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="feat">
+        <div class="rn">18</div>
+        <div>
+          <p class="rt">Passphrase bilan shifrlangan to'liq zaxira</p>
+          <p class="rd">JSON export ataylab secret'siz, DB backup esa secret'larni o'z ichiga olmaydi
+            (ular Keychain'da). Ya'ni yangi Mac'ka ko'chishda har bir parol/passphrase/TOTP qo'lda
+            qayta kiritiladi.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> ixtiyoriy, passphrase bilan shifrlangan
+            (masalan age yoki scrypt + AEAD) to'liq arxiv — ko'chish va ofline zaxira uchun.
+            Bu SEC-01 ni buzmaydi, chunki oddiy eksport secret'siz bo'lib qoladi: shifrlangan arxiv
+            alohida, oshkora tanlanadigan yo'l bo'ladi.</p>
+        </div>
+        <div class="meta"><span class="pill p-feat">Yangi imkoniyat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="plat">
+        <div class="rn">19</div>
+        <div>
+          <p class="rt">Windows / Linux'ni haqiqatda ishga tushirish</p>
+          <p class="rd">Kod ikkisiga ham kompilyatsiya bo'ladi (native qismlar no-op stub) va CI'da
+            Windows matritsasi bor, lekin runtime hech qachon sinalmagan. Global hotkey, tray,
+            login-item, close-to-tray — hammasi macOS'ga xos.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> eng katta bozor kengaytmasi va eng katta ish hajmi.
+            Keychain o'rniga Windows Credential Manager / libsecret, keymap'ni qayta ko'rish
+            (<span class="m">Ctrl+&lt;harf&gt;</span> readline bilan ziddiyat — <span class="m">Ctrl+Shift</span>
+            yoki <span class="m">Ctrl+&lt;raqam&gt;</span> ishlatiladi), yo'llar va login-item ekvivalentlari.
+            Rostdan kerak bo'lsa alohida relise sifatida rejalashtirilishi kerak, yo'lda emas.</p>
+        </div>
+        <div class="meta"><span class="pill p-plat">Platforma</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots hi">●●●</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots hi">●●●</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="qual">
+        <div class="rn">20</div>
+        <div>
+          <p class="rt">Shell integration qamrovi va halol degradatsiya</p>
+          <p class="rd">OSC 133 snippet'i faqat bash/zsh uchun. fish, nushell yoki noodatiy prompt'da
+            xususiyat jimgina ishlamaydi — foydalanuvchi buzuq deb o'ylashi mumkin.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> ikki yo'l bor va ikkisi ham arzon: fish/nu
+            snippet'larini qo'shish, va/yoki qobiq aniqlanmaganda status bar'da "shell integration
+            bu qobiqda qo'llanmaydi" deb aniq ko'rsatish. Jim ishlamaslik — eng yomon variant.</p>
+        </div>
+        <div class="meta"><span class="pill p-qual">Sifat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots lo">●○○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots lo">●○○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="plat">
+        <div class="rn">21</div>
+        <div>
+          <p class="rt">Broadcast'ni tab tashqarisiga chiqarish</p>
+          <p class="rd"><span class="m">⇧↵</span> faqat bitta tab ichidagi panel'larga yuboradi.
+            Tanlangan serverlar to'plamiga yoki butun guruhga bir buyruqni yuborish yo'q.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> parkni boshqarish oqimi (o'nta xostda bir xil
+            paket yangilash) shu bilan boshlanadi. Guard fan-out mantiqi allaqachon bor, ya'ni xavfsizlik
+            tomoni tayyor — asosiy ish nishonni tanlash UI'si va natijalarni jamlab ko'rsatish.
+            Bu Zish'ni "SSH mijozi"dan "ko'p xostli asbob"ga siljitadi, shuning uchun ko'lamni
+            ataylab tanlash kerak.</p>
+        </div>
+        <div class="meta"><span class="pill p-plat">Platforma</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots md">●●○</span></span></div>
+      </div>
+
+      <div class="row rv" data-cat="qual">
+        <div class="rn">22</div>
+        <div>
+          <p class="rt">CI git'da kuzatilmaydi — darvoza faqat sizning mashinangizda ishlaydi</p>
+          <p class="rd"><span class="m">.github/workflows/ci.yml</span> diskda bor va to'g'ri yozilgan
+            (macOS + Windows matritsasi), lekin <span class="m">git ls-files</span> uni ko'rmaydi: fayl eski
+            commit'larda (<span class="m">cd5eac9</span>, <span class="m">79e666f</span>) bo'lgan, keyin
+            kuzatuvdan olib tashlanib <span class="m">.gitignore</span> ga
+            "CI not needed for now" izohi bilan qo'shilgan.</p>
+          <p class="rd why"><b>Nima uchun arziydi:</b> hozir push va PR'da hech nima tekshirilmaydi —
+            butun sifat kafolati sizning lokal <span class="m">task check</span> ni eslab qolishingizga
+            bog'liq. Bir kishilik loyihada bu ko'p vaqt ishlaydi, lekin bitta esdan chiqish yiqilgan
+            testni main'ga tushiradi. Faylni qaytarish arzon: <span class="m">.gitignore</span> dagi bitta
+            qatorni olib tashlab, <span class="m">git add -f</span> qilish kifoya. Agar ataylab o'chirilgan
+            bo'lsa (Actions daqiqasini tejash), buni <span class="m">CLAUDE.md</span> da yozib qo'yish
+            kerak — hozir sabab faqat <span class="m">.gitignore</span> izohida.</p>
+        </div>
+        <div class="meta"><span class="pill p-qual">Sifat</span>
+          <span class="gauge"><i>ta'sir</i><span class="dots md">●●○</span></span>
+          <span class="gauge"><i>mehnat</i><span class="dots lo">●○○</span></span></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ ROADMAP ============ -->
+<section>
+  <div class="wrap">
+    <div class="shead rv"><span class="snum">05</span><h2>Taklif etilgan tartib</h2></div>
+    <p class="slead rv">
+      Yuqoridagi ro'yxatni uch bosqichga bo'lsa: <b style="color:var(--tx);font-weight:500">1.3</b> —
+      ko'rinadigan bo'shliqlarni yopish, <b style="color:var(--tx);font-weight:500">1.4</b> —
+      kunlik ish oqimini kuchaytirish, <b style="color:var(--tx);font-weight:500">2.0</b> —
+      ko'lamni o'zgartiradigan qarorlar.
+    </p>
+    <div class="rm rv">
+      <div class="rc">
+        <span class="tag">v1.3 · hozir</span>
+        <h4>Bo'shliqlarni yopish</h4>
+        <ol>
+          <li>Terminal temasi + font tanlash (soxta tanlovni yo'q qilish)</li>
+          <li>Avto-reconnect + backoff</li>
+          <li>Klaviatura rebinding, konflikt tekshiruvi bilan</li>
+          <li>Tab nomi + tab tartibi</li>
+          <li><span class="m">task bump</span> — versiyaga yagona manba</li>
+          <li>Komponent testlari: modal / palitra turkumi</li>
+        </ol>
+      </div>
+      <div class="rc">
+        <span class="tag">v1.4 · keyin</span>
+        <h4>Ish oqimi</h4>
+        <ol>
+          <li>Sessiya loglash + transkript eksporti (redaksiya bilan)</li>
+          <li>Agent forwarding (<span class="m">-A</span>), per-server toggle</li>
+          <li>Snippet o'rin egallovchilari</li>
+          <li>Tunnel avto-start; sessiyani tiklash</li>
+          <li><span class="m">ssh_config</span>: <span class="m">Include</span> + aniq skip sabablari</li>
+          <li>SFTP: joyida tahrirlash, preview, bookmark</li>
+        </ol>
+      </div>
+      <div class="rc">
+        <span class="tag">v2.0 · uzoqroq</span>
+        <h4>Ko'lam qarorlari</h4>
+        <ol>
+          <li>Notarizatsiya + ixtiyoriy yangilanish tekshiruvi</li>
+          <li>Windows / Linux runtime (alohida relise sifatida)</li>
+          <li>Ko'p xostli broadcast va parkni boshqarish</li>
+          <li>Shifrlangan to'liq zaxira / ko'chirish</li>
+          <li>Sog'liq va kechikish monitoringi</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SHORTCUTS ============ -->
+<section>
+  <div class="wrap">
+    <div class="shead rv"><span class="snum">06</span><h2>Klaviatura ma'lumotnomasi</h2></div>
+    <p class="slead rv">Terminal fokusda bo'lganda ishlaydi va hech qachon xostga yuborilmaydi.</p>
+    <div class="keys rv">
+      <div class="kr"><kbd>⌘K</kbd><span>Buyruq palitrasi</span></div>
+      <div class="kr"><kbd>⌘E</kbd><span>Snippet palitrasi</span></div>
+      <div class="kr"><kbd>⌘⇧1–9</kbd><span>Snippet slotlari</span></div>
+      <div class="kr"><kbd>⇧↵</kbd><span>Tabdagi hamma panelga broadcast</span></div>
+      <div class="kr"><kbd>⌘⇧S</kbd><span>Oynani ko'rsatish/yashirish (global)</span></div>
+      <div class="kr"><kbd>⌘N</kbd><span>Yangi server</span></div>
+      <div class="kr"><kbd>⌘,</kbd><span>Sozlamalar</span></div>
+      <div class="kr"><kbd>⌘D</kbd><span>Panelni vertikal bo'lish</span></div>
+      <div class="kr"><kbd>⌘⇧D</kbd><span>Panelni gorizontal bo'lish</span></div>
+      <div class="kr"><kbd>⌘W</kbd><span>Fokusdagi panelni yopish</span></div>
+      <div class="kr"><kbd>⌘1–9</kbd><span>Tabga o'tish</span></div>
+      <div class="kr"><kbd>⌘⇧] / [</kbd><span>Keyingi / oldingi tab</span></div>
+      <div class="kr"><kbd>⌘F</kbd><span>Terminalda qidirish</span></div>
+      <div class="kr"><kbd>⌘↑ / ⌘↓</kbd><span>Oldingi / keyingi buyruqqa sakrash</span></div>
+      <div class="kr"><kbd>⌘V</kbd><span>Terminalga qo'yish</span></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex; flex-wrap:wrap; gap:10px 26px; justify-content:space-between; width:100%">
+    <span>Zish v1.2.0 — <span style="color:var(--pink)">⚡</span> local-first SSH manager</span>
+    <span>manba: <span class="m">CHANGELOG.md</span> · <span class="m">internal/</span> · <span class="m">frontend/src/</span></span>
+    <span>2026-07-24</span>
+  </div>
+</footer>
+
+<script>
+  // scroll reveal — the .js class turns the hidden start state on, so a page
+  // with scripting disabled (or a script error before this line) shows everything.
+  document.documentElement.classList.add('js')
+  const io = new IntersectionObserver((es) => {
+    es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target) } })
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 })
+  document.querySelectorAll('.rv').forEach((el) => io.observe(el))
+  // hero reveals immediately
+  document.querySelectorAll('header .rv').forEach((el) => el.classList.add('in'))
+
+  // stagger the improvement rows a touch
+  document.querySelectorAll('#imp .row').forEach((r, i) => {
+    r.style.transitionDelay = (Math.min(i, 6) * 0.035) + 's'
+  })
+
+  // category filter
+  const btns = [...document.querySelectorAll('.f')]
+  const rows = [...document.querySelectorAll('#imp .row')]
+  btns.forEach((b) => b.addEventListener('click', () => {
+    const cat = b.dataset.cat
+    btns.forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+    rows.forEach((r) => { r.hidden = !(cat === 'all' || r.dataset.cat === cat) })
+  }))
+</script>
+</body>
+</html>
