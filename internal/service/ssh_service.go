@@ -35,8 +35,9 @@ type SSHService struct {
 }
 
 // NewSSHService wires the service to the shared host-key prompter, the
-// repository, the keychain, the dialer, the terminal manager and the shared
-// TOTP/2FA code prompter.
+// repository, the settings repo (gates the shell-integration probe in Open —
+// a nil settings repo means the probe never runs), the keychain, the dialer,
+// the terminal manager and the shared TOTP/2FA code prompter.
 func NewSSHService(p *HostKeyPrompter, repo *store.ServerRepo, settings *store.SettingsRepo, sec secret.Store, dialer Dialer, mgr *term.Manager, codePrompter *CodePrompter) *SSHService {
 	return &SSHService{prompter: p, repo: repo, settings: settings, secret: sec, dialer: dialer, mgr: mgr, codePrompter: codePrompter}
 }
@@ -55,19 +56,23 @@ func (s *SSHService) SubmitCode(requestID, code string) error {
 	return s.codePrompter.Resolve(requestID, code)
 }
 
-// Open connects to a server and starts an interactive PTY, returning the new
-// session id the frontend subscribes term:data on. It runs the full host-key
-// flow (a hostkey:request may fire mid-dial, exactly as in TestConnection).
-// The pty is opened at cols x rows — the frontend's already-fitted xterm
-// size — so a long-output command scrolls correctly from the first frame
-// instead of overwriting until the next resize. cols/rows under 1 (an
-// unmeasured caller) fall back to a sane 80x24 inside OpenSession. The
-// frontend still issues a Resize on every later container resize.
+// Open connects to a server and starts an interactive PTY, returning an
+// OpenResult carrying the new session id the frontend subscribes term:data
+// on and the detected login shell. It runs the full host-key flow (a
+// hostkey:request may fire mid-dial, exactly as in TestConnection). The pty
+// is opened at cols x rows — the frontend's already-fitted xterm size — so a
+// long-output command scrolls correctly from the first frame instead of
+// overwriting until the next resize. cols/rows under 1 (an unmeasured
+// caller) fall back to a sane 80x24 inside OpenSession. The frontend still
+// issues a Resize on every later container resize.
 //
-// No ctx timeout here — the dialer owns the whole connect ceiling via its
-// handshakeDeadline, deliberately longer than the network timeout so a
-// legitimate host-key prompt is never killed mid-decision (same reasoning as
-// TestConnection).
+// No ctx timeout on the dial itself — the dialer owns the whole connect
+// ceiling via its handshakeDeadline, deliberately longer than the network
+// timeout so a legitimate host-key prompt is never killed mid-decision (same
+// reasoning as TestConnection). That ceiling is not the whole story anymore,
+// though: when the probe below runs, sshx.DetectShell adds its own
+// independent ~3s timeout on top of the already-established connection, so a
+// hung host can delay a successful Open by up to that long beyond the dial.
 func (s *SSHService) Open(serverID string, cols, rows int) (OpenResult, error) {
 	srv, err := s.repo.Get(serverID)
 	if err != nil {

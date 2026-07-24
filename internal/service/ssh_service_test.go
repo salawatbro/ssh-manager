@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"io"
 	"net"
@@ -250,7 +251,7 @@ func TestBroadcastUnknownSessionDoesNotAbortOthersAndReturnsFirstError(t *testin
 // wire message — the only vantage point from which "Open asked for the
 // wrong size" is actually observable.
 func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
-	addr, hostKey, dims := newPTYCapturingServer(t)
+	addr, hostKey, dims, execs := newPTYCapturingServer(t, "")
 	host, port := splitTestAddr(t, addr)
 
 	repo := newRepo(t)
@@ -285,6 +286,15 @@ func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
 	if res.Shell != "" {
 		t.Errorf("Shell = %q, want \"\" (probe skipped)", res.Shell)
 	}
+	// The central assertion this test proves for the "off" side of the gate:
+	// with a nil settings repo, Open must never even attempt the exec probe.
+	// (Open has already returned above, so the server has had every chance to
+	// record an attempt — no need to wait on execs here.)
+	select {
+	case cmd := <-execs:
+		t.Fatalf("exec attempted (%q) though shell integration is off (nil settings repo)", cmd)
+	default:
+	}
 	defer func() { _ = svc.Close(res.SessionID) }()
 
 	select {
@@ -301,7 +311,7 @@ func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
 // exec must still produce a usable session, with the shell simply unreported.
 // A probe failure is never a connect failure.
 func TestOpenWithProbeEnabledSurvivesAnUnprobeableServer(t *testing.T) {
-	addr, hostKey, _ := newPTYCapturingServer(t)
+	addr, hostKey, _, execs := newPTYCapturingServer(t, "") // "" = refuse every exec request
 	host, port := splitTestAddr(t, addr)
 
 	repo := newRepo(t)
@@ -345,6 +355,70 @@ func TestOpenWithProbeEnabledSurvivesAnUnprobeableServer(t *testing.T) {
 	if res.Shell != "" {
 		t.Errorf("Shell = %q, want \"\" (server answers no exec)", res.Shell)
 	}
+	// The gate is on here (ShellIntegration is true), so the probe must still
+	// have fired even though it came back empty-handed — this is what tells
+	// this test apart from the nil-settings "gate off" case, where no exec
+	// attempt happens at all (TestOpenRequestsPTYAtThePassedSize).
+	select {
+	case <-execs:
+	default:
+		t.Error("expected Open to attempt the exec probe when shell integration is enabled")
+	}
+}
+
+// With shell integration enabled and a server that actually answers the probe
+// command, Open must report back the shell the server named — this is the
+// other half of the gate: TestOpenRequestsPTYAtThePassedSize proves "off"
+// skips the probe entirely; this proves "on" both runs it and surfaces its
+// result.
+func TestOpenReportsDetectedShellWhenIntegrationEnabled(t *testing.T) {
+	addr, hostKey, _, execs := newPTYCapturingServer(t, "/bin/bash\n")
+	host, port := splitTestAddr(t, addr)
+
+	repo := newRepo(t)
+	srv := &domain.Server{ID: "s1", Name: "box", Host: host, Port: port, User: "u", AuthType: domain.AuthPassword}
+	if err := repo.Create(srv); err != nil {
+		t.Fatal(err)
+	}
+	sec := secret.NewFake()
+	if err := sec.SetPassword("s1", "pw"); err != nil {
+		t.Fatal(err)
+	}
+
+	khPath := filepath.Join(t.TempDir(), "known_hosts")
+	seedKnownHostForTest(t, khPath, addr, hostKey)
+	v, err := sshx.NewVerifier(khPath, acceptAllHostKeys{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dialer := sshx.NewDialer(v, 5*time.Second, 20*time.Second)
+	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
+
+	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	settingsRepo := store.NewSettingsRepo(db)
+	seed := domain.DefaultSettings() // ShellIntegration is true by default
+	if err := settingsRepo.Save(&seed); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := NewSSHService(nil, repo, settingsRepo, sec, dialer, mgr, nil)
+	res, err := svc.Open("s1", 80, 24)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = svc.Close(res.SessionID) }()
+
+	if res.Shell != "bash" {
+		t.Errorf("Shell = %q, want %q (server answered echo \"$SHELL\" with /bin/bash)", res.Shell, "bash")
+	}
+	select {
+	case <-execs:
+	default:
+		t.Error("expected Open to attempt the exec probe when shell integration is enabled")
+	}
 }
 
 // acceptAllHostKeys satisfies sshx.HostKeyPrompter. It is only ever needed
@@ -366,12 +440,29 @@ type ptyReqPayload struct {
 	Modes    string
 }
 
+// execReqPayload mirrors the SSH_MSG_CHANNEL_REQUEST "exec" payload (RFC 4254
+// §6.5): a single string, the command line. sshx.DetectShell always sends
+// `echo "$SHELL"`, but the field is recorded verbatim rather than assumed.
+type execReqPayload struct {
+	Command string
+}
+
 // newPTYCapturingServer starts an in-process, no-auth SSH server that
 // accepts one session channel, grants any PTY/shell/window-change request,
-// and pushes the exact (cols, rows) each pty-req asked for onto the
-// returned channel — the only way to see, from outside the process, what
-// window size Open actually requested.
-func newPTYCapturingServer(t *testing.T) (addr string, hostKey ssh.PublicKey, dims chan [2]int) {
+// and pushes the exact (cols, rows) each pty-req asked for onto the returned
+// dims channel — the only way to see, from outside the process, what window
+// size Open actually requested.
+//
+// It also handles "exec" requests, which is how sshx.DetectShell's probe
+// shows up on the wire: every exec attempt's command is recorded on the
+// returned execs channel regardless of outcome, so a test can assert "the
+// probe never even tried" by finding that channel empty. If execOut is
+// non-empty the server answers the exec request the way
+// internal/sshx/probe_test.go's serveExec does — reply success, write
+// execOut, send exit-status 0, close the channel — so DetectShell classifies
+// whatever shell execOut names. If execOut is empty the request is refused
+// outright, modelling a host with exec disabled or ForceCommand set.
+func newPTYCapturingServer(t *testing.T, execOut string) (addr string, hostKey ssh.PublicKey, dims chan [2]int, execs chan string) {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -391,19 +482,20 @@ func newPTYCapturingServer(t *testing.T) (addr string, hostKey ssh.PublicKey, di
 	t.Cleanup(func() { _ = ln.Close() })
 
 	dims = make(chan [2]int, 4)
+	execs = make(chan string, 4)
 	go func() {
 		for {
 			c, err := ln.Accept()
 			if err != nil {
 				return
 			}
-			go servePTYCapture(c, cfg, dims)
+			go servePTYCapture(c, cfg, dims, execs, execOut)
 		}
 	}()
-	return ln.Addr().String(), signer.PublicKey(), dims
+	return ln.Addr().String(), signer.PublicKey(), dims, execs
 }
 
-func servePTYCapture(c net.Conn, cfg *ssh.ServerConfig, dims chan [2]int) {
+func servePTYCapture(c net.Conn, cfg *ssh.ServerConfig, dims chan [2]int, execs chan string, execOut string) {
 	sc, chans, reqs, err := ssh.NewServerConn(c, cfg)
 	if err != nil {
 		_ = c.Close()
@@ -431,12 +523,25 @@ func servePTYCapture(c net.Conn, cfg *ssh.ServerConfig, dims chan [2]int) {
 						_ = req.Reply(true, nil)
 					case "shell", "window-change":
 						_ = req.Reply(true, nil)
+					case "exec":
+						var p execReqPayload
+						_ = ssh.Unmarshal(req.Payload, &p)
+						execs <- p.Command
+						if execOut == "" {
+							_ = req.Reply(false, nil)
+							continue
+						}
+						_ = req.Reply(true, nil)
+						_, _ = ch.Write([]byte(execOut))
+						status := make([]byte, 4)
+						binary.BigEndian.PutUint32(status, 0)
+						_, _ = ch.SendRequest("exit-status", false, status)
+						_ = ch.Close()
 					default:
 						_ = req.Reply(false, nil)
 					}
 				}
 			}()
-			_ = ch // no I/O needed — Open only has to succeed, not echo
 		}
 	}()
 	_ = sc.Wait()
