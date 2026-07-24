@@ -7,6 +7,7 @@ import type { FitAddon } from '@xterm/addon-fit'
 import { b64ToBytes, strToB64 } from '../lib/termbytes'
 import { createGuardBuffer, matchesDangerous, splitPatterns } from '../lib/guard'
 import { snippetFor } from '../lib/shellSnippets'
+import { paneShellInfo } from '../lib/paneShellInfo'
 import { useServers } from '../stores/servers'
 import { useSettings } from '../stores/settings'
 import { useGuard } from '../stores/guard'
@@ -162,7 +163,7 @@ export function useTerminalSession(
         // unknown or unsupported shell gets nothing — that is the whole point
         // of the probe (csh used to answer the POSIX blob with a parse error).
         const snippet = useSettings.getState().settings?.shellIntegration ? snippetFor(res.shell) : null
-        useSessions.getState().setPaneShell(paneId, { shell: res.shell, integration: snippet !== null })
+        useSessions.getState().setPaneShell(paneId, paneShellInfo(res.shell, snippet))
         if (snippet) {
           void SSHService.Write(id, strToB64(snippet + '\r')).catch(() => {})
         }
@@ -194,8 +195,7 @@ export function useTerminalSession(
       offState?.()
       const id = sessionId.current
       sessionId.current = null
-      useSessions.getState().clearPaneSession(paneId)
-      useSessions.getState().clearPaneShell(paneId)
+      useSessions.getState().clearPaneConnection(paneId)
       if (id) void SSHService.Close(id).catch(() => {})
     }
   }, [serverId, paneId, term, fit, attempt])

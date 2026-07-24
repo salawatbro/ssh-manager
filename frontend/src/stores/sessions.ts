@@ -57,6 +57,11 @@ interface SessionsState {
   paneShell: Record<string, PaneShell>
   setPaneShell: (paneId: string, info: PaneShell) => void
   clearPaneShell: (paneId: string) => void
+  // Both cleared together, once, from useTerminalSession's cleanup — a single
+  // action rather than two separate calls so "the pane's session and shell
+  // info both drop on teardown" is one behavior a store test can hold to,
+  // not two independent call sites that could silently drift apart.
+  clearPaneConnection: (paneId: string) => void
   open: (server: Server) => void
   openOrFocus: (server: Server) => void
   closeTab: (tabId: string) => void
@@ -129,6 +134,11 @@ export const useSessions = create<SessionsState>((set, get) => ({
   paneShell: {},
   setPaneShell: (paneId, info) => set((s) => ({ paneShell: { ...s.paneShell, [paneId]: info } })),
   clearPaneShell: (paneId) => set((s) => ({ paneShell: clearKey(s.paneShell, paneId) })),
+  clearPaneConnection: (paneId) =>
+    set((s) => ({
+      paneSession: clearKey(s.paneSession, paneId),
+      paneShell: clearKey(s.paneShell, paneId),
+    })),
 
   // A new tab, one leaf, one session. Multiple tabs to the same server are
   // allowed (each leaf id is unique, so each drives its own PTY).
