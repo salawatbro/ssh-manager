@@ -1,9 +1,10 @@
 import { FolderTree } from 'lucide-react'
-import { useSessions, tabStatus } from '../../stores/sessions'
+import { useSessions } from '../../stores/sessions'
 import { useServers } from '../../stores/servers'
 import { usePalette } from '../../stores/palette'
 import { useSftp } from '../../stores/sftp'
 import { envBorderClassOf } from '../../lib/env'
+import { tabStatus } from '../../lib/tabStatus'
 import { StatusDot } from '../server/StatusDot'
 
 // The session tab strip, merged into App.tsx's 52px title bar (dizayn manbasi:

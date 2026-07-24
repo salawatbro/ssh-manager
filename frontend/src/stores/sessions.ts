@@ -1,9 +1,8 @@
 import { create } from 'zustand'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useSftp } from './sftp'
-import { replaceLeaf, removeLeaf, firstLeaf, collectLeaves } from '../lib/paneTree'
+import { replaceLeaf, removeLeaf, firstLeaf } from '../lib/paneTree'
 import type { TermStatus } from '../hooks/useTerminalSession'
-import type { Status } from '../lib/status'
 
 // A tab's panes form a binary split tree; a leaf is one terminal session for a
 // server. Task 6 fills in splitFocused/closePane; v0.3-Task-5 only ever builds
@@ -221,26 +220,3 @@ export const useSessions = create<SessionsState>((set, get) => ({
     focusSftpIfNoTabsLeft(get().tabs)
   },
 }))
-
-const termToStatus: Record<TermStatus, Status> = {
-  connecting: 'connecting',
-  connected: 'connected',
-  error: 'failed',
-  closed: 'disc',
-  // Transient: Terminal closes the pane on the same render pass this status
-  // lands, so the tab strip rarely shows it — 'disc' is the closest steady
-  // state if it's ever observed mid-teardown.
-  exited: 'disc',
-}
-
-// tabStatus collapses a tab's pane statuses into the single dot the tab strip
-// shows (MainWindow.dc.html). A failed/connecting pane always dominates a
-// healthy sibling. A pane with no entry yet (not mounted/reported) reads as
-// connecting, matching useTerminalSession's initial state.
-export function tabStatus(tab: Tab, paneStatus: Record<string, TermStatus>): Status {
-  const statuses = collectLeaves(tab.root).map((leaf) => termToStatus[paneStatus[leaf.id] ?? 'connecting'])
-  if (statuses.includes('failed')) return 'failed'
-  if (statuses.includes('connecting')) return 'connecting'
-  if (statuses.includes('disc')) return 'disc'
-  return 'connected'
-}
