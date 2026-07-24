@@ -31,6 +31,15 @@ export interface PaneDims {
   rows: number
 }
 
+// A pane's detected shell and whether a shell-integration snippet was actually
+// injected for it, keyed by leaf (pane) id — mirrors paneStatus/paneDims. The
+// status bar reads this to report integration honestly instead of implying it
+// is always on.
+export interface PaneShell {
+  shell: string
+  integration: boolean
+}
+
 interface SessionsState {
   tabs: Tab[]
   activeTabId: string | null
@@ -46,6 +55,9 @@ interface SessionsState {
   paneSession: Record<string, string>
   setPaneSession: (paneId: string, sessionId: string) => void
   clearPaneSession: (paneId: string) => void
+  paneShell: Record<string, PaneShell>
+  setPaneShell: (paneId: string, info: PaneShell) => void
+  clearPaneShell: (paneId: string) => void
   open: (server: Server) => void
   openOrFocus: (server: Server) => void
   closeTab: (tabId: string) => void
@@ -114,6 +126,10 @@ export const useSessions = create<SessionsState>((set, get) => ({
   paneSession: {},
   setPaneSession: (paneId, sessionId) => set((s) => ({ paneSession: { ...s.paneSession, [paneId]: sessionId } })),
   clearPaneSession: (paneId) => set((s) => ({ paneSession: clearKey(s.paneSession, paneId) })),
+
+  paneShell: {},
+  setPaneShell: (paneId, info) => set((s) => ({ paneShell: { ...s.paneShell, [paneId]: info } })),
+  clearPaneShell: (paneId) => set((s) => ({ paneShell: clearKey(s.paneShell, paneId) })),
 
   // A new tab, one leaf, one session. Multiple tabs to the same server are
   // allowed (each leaf id is unique, so each drives its own PTY).

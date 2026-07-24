@@ -162,6 +162,7 @@ export function useTerminalSession(
         // unknown or unsupported shell gets nothing — that is the whole point
         // of the probe (csh used to answer the POSIX blob with a parse error).
         const snippet = useSettings.getState().settings?.shellIntegration ? snippetFor(res.shell) : null
+        useSessions.getState().setPaneShell(paneId, { shell: res.shell, integration: snippet !== null })
         if (snippet) {
           void SSHService.Write(id, strToB64(snippet + '\r')).catch(() => {})
         }
@@ -194,6 +195,7 @@ export function useTerminalSession(
       const id = sessionId.current
       sessionId.current = null
       useSessions.getState().clearPaneSession(paneId)
+      useSessions.getState().clearPaneShell(paneId)
       if (id) void SSHService.Close(id).catch(() => {})
     }
   }, [serverId, paneId, term, fit, attempt])

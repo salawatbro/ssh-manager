@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Key, Lock, UserCheck, type LucideIcon } from 'lucide-react'
 import { AuthType } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useServers } from '../../stores/servers'
-import { useSessions } from '../../stores/sessions'
+import { useSessions, type PaneShell } from '../../stores/sessions'
+import { useSettings } from '../../stores/settings'
 import { useForwards } from '../../stores/forwards'
 import { StatusDot } from '../server/StatusDot'
 
@@ -34,6 +35,16 @@ function elapsedClock(startedAt: number, now: number): string {
 
 const divider = <span className="text-border">│</span>
 
+// The honest shell-integration report (audit item 20): before the probe, an
+// unsupported shell silently got nothing and the user could not tell the
+// feature apart from a bug. Text only — UI-11 reserves squares for environment
+// and circles for connection status, so this segment adds no new glyph.
+function shellSegmentLabel(info: PaneShell | undefined): string {
+  if (!info) return 'shell unknown'
+  if (!info.shell) return 'shell unknown'
+  return `${info.shell} · integration ${info.integration ? 'on' : 'off'}`
+}
+
 // TZ 12.1: 26px status bar. When a tab is active it shows the live session's
 // auth method, target, terminal size, tunnel count and uptime (dizayn
 // manbasi: MainWindow.dc.html, content=session). With no active tab and no
@@ -47,6 +58,8 @@ export function StatusBar({ onOpenTunnels }: Props) {
   const tabs = useSessions((s) => s.tabs)
   const activeTabId = useSessions((s) => s.activeTabId)
   const paneDims = useSessions((s) => s.paneDims)
+  const paneShell = useSessions((s) => s.paneShell)
+  const shellIntegration = useSettings((s) => s.settings?.shellIntegration ?? false)
   const byServer = useForwards((s) => s.byServer)
   const statusById = useForwards((s) => s.statusById)
   const [now, setNow] = useState(() => Date.now())
@@ -149,6 +162,12 @@ export function StatusBar({ onOpenTunnels }: Props) {
             <span className="shrink-0 font-mono">
               {dims.rows}×{dims.cols}
             </span>
+          </>
+        )}
+        {shellIntegration && (
+          <>
+            {divider}
+            <span className="shrink-0 font-mono">{shellSegmentLabel(paneShell[activeTab.focusedPaneId])}</span>
           </>
         )}
       </div>
