@@ -3,6 +3,7 @@ import { useSessions } from '../stores/sessions'
 import { usePalette } from '../stores/palette'
 import { useSnippets } from '../stores/snippets'
 import { useGuard } from '../stores/guard'
+import { useSftp } from '../stores/sftp'
 import { resolveAction } from '../lib/keymap'
 
 // Terminal-scoped keymap (split / close pane / switch tab / snippet
@@ -25,6 +26,12 @@ export function useTerminalKeymap() {
       const st = useSessions.getState()
       const active = st.tabs.find((t) => t.id === st.activeTabId)
       if (!active) return
+      // The terminal area stays mounted behind a frontmost SFTP tab, so this
+      // handler is live there too. Tab switching is fine (selectTab/next/prev
+      // hand focus back), but anything that MUTATES a pane the user cannot see
+      // — split, close, snippet quick-run — must not fire.
+      const switchesTab = action === 'next-tab' || action === 'prev-tab' || (typeof action === 'object' && 'tab' in action)
+      if (useSftp.getState().active && !switchesTab) return
       if (action === 'split-v') {
         e.preventDefault()
         st.splitFocused('v')

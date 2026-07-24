@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
 import type { FileEntry } from '@bindings/github.com/salawat/sshmgr/internal/sftpx'
 import { useSftp } from '../../stores/sftp'
-import { useServers } from '../../stores/servers'
-import { envClassOf } from '../../lib/env'
 import { joinRemote } from '../../lib/remotePath'
 import { LocalPane } from './LocalPane'
 import { RemotePane } from './RemotePane'
@@ -31,9 +28,12 @@ function joinLocal(base: string, name: string): string {
 // store's `open` flag so App.tsx can mount it unconditionally.
 export default function SftpView() {
   const open = useSftp((s) => s.open)
+  // While a terminal tab is frontmost this view stays mounted but hidden
+  // (MainContent), so Escape must NOT reach it — it would close the SFTP
+  // session from under a user who is typing in the terminal.
+  const active = useSftp((s) => s.active)
   const connecting = useSftp((s) => s.connecting)
   const error = useSftp((s) => s.error)
-  const serverId = useSftp((s) => s.serverId)
   const sessionId = useSftp((s) => s.sessionId)
   const close = useSftp((s) => s.close)
   const remoteCwd = useSftp((s) => s.remoteCwd)
@@ -45,7 +45,6 @@ export default function SftpView() {
   const mkdir = useSftp((s) => s.mkdir)
   const remove = useSftp((s) => s.remove)
   const rename = useSftp((s) => s.rename)
-  const server = useServers((s) => s.servers.find((x) => x.id === serverId))
 
   const [pendingOverwrite, setPendingOverwrite] = useState<PendingOverwrite | null>(null)
   const [pendingDelete, setPendingDelete] = useState<FileEntry | null>(null)
@@ -55,14 +54,14 @@ export default function SftpView() {
   const modalOpen = !!pendingOverwrite || !!pendingDelete || !!pendingRename || mkdirOpen
 
   useEffect(() => {
-    if (!open) return
+    if (!open || !active) return
     function onKeyDown(e: KeyboardEvent) {
       // isComposing guards against an IME commit keystroke closing the view.
       if (e.key === 'Escape' && !e.isComposing && !modalOpen) close()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, close, modalOpen])
+  }, [open, active, close, modalOpen])
 
   if (!open) return null
 
@@ -111,22 +110,11 @@ export default function SftpView() {
   return (
     // relative: scopes the modals' `absolute inset-0` to this pane, not the viewport.
     <div className="relative flex min-h-0 flex-1 flex-col bg-bg1b">
-      <div className="flex h-[42px] shrink-0 items-center gap-[8px] border-b border-border px-[14px]">
-        <span className="shrink-0 text-[13px] font-semibold">SFTP</span>
-        {server && <span className={`h-[7px] w-[7px] shrink-0 rounded-env ${envClassOf(server.environment)}`} />}
-        <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-textMuted">
-          {server?.name ?? serverId ?? ''}
-        </span>
-        <button
-          type="button"
-          title="Close"
-          onClick={close}
-          className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-[4px] text-textDim hover:bg-bg2 hover:text-text"
-        >
-          <X size={14} />
-        </button>
-      </div>
-
+      {/* No header row here: the SFTP tab in the title-bar strip already carries
+          the whole identity — its icon, the server's name, the environment
+          border, and the × that closes the session — exactly like a terminal
+          tab. A second "SFTP ● <server>" bar under it said the same thing twice
+          and cost the panes 42px. */}
       {connecting ? (
         <div className="flex min-h-0 flex-1 items-center justify-center text-[13px] text-textMuted">
           Connecting to the server…

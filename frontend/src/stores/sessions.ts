@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import { useSftp } from './sftp'
 import { replaceLeaf, removeLeaf, firstLeaf, collectLeaves } from '../lib/paneTree'
 import type { TermStatus } from '../hooks/useTerminalSession'
 import type { Status } from '../lib/status'
@@ -57,6 +58,22 @@ interface SessionsState {
   closePane: (tabId: string, paneId: string) => void
 }
 
+// SFTP and the terminal area share the content slot, so every action here that
+// brings a terminal tab forward has to hand focus over (the SFTP session stays
+// open — only the frontmost-view flag moves). One choke point, rather than
+// chasing the many call sites: tab strip, ⌘K, double-click, tray, ⌘1–9, ⌘⇧]/[.
+function focusTerminals() {
+  if (useSftp.getState().active) useSftp.getState().blur()
+}
+
+// The mirror of focusTerminals, for the closing side: with the last tab gone the
+// terminal area has nothing to show, so an open SFTP session becomes the
+// frontmost view (lib/mainView.ts falls back to it) and its focus flag has to
+// say so — else its tab reads inactive and its Escape-to-close stays dead.
+function focusSftpIfNoTabsLeft(remaining: Tab[]) {
+  if (remaining.length === 0) useSftp.getState().focus()
+}
+
 function cycle(tabs: Tab[], activeId: string | null, delta: number): string | null {
   if (tabs.length === 0) return null
   const i = tabs.findIndex((t) => t.id === activeId)
@@ -111,6 +128,7 @@ export const useSessions = create<SessionsState>((set, get) => ({
       focusedPaneId: paneId,
       startedAt: Date.now(),
     }
+    focusTerminals()
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
   },
 
@@ -121,6 +139,7 @@ export const useSessions = create<SessionsState>((set, get) => ({
   openOrFocus: (server) => {
     const existing = get().tabs.find((t) => t.serverId === server.id)
     if (existing) {
+      focusTerminals()
       set({ activeTabId: existing.id })
       return
     }
@@ -129,11 +148,23 @@ export const useSessions = create<SessionsState>((set, get) => ({
 
   // Removing the tab unmounts its terminals, whose cleanup calls
   // SSHService.Close — so no explicit backend teardown is needed here.
-  closeTab: (tabId) => set((s) => closeTabState(s.tabs, tabId, s.activeTabId)),
+  closeTab: (tabId) => {
+    set((s) => closeTabState(s.tabs, tabId, s.activeTabId))
+    focusSftpIfNoTabsLeft(get().tabs)
+  },
 
-  selectTab: (tabId) => set({ activeTabId: tabId }),
-  nextTab: () => set((s) => ({ activeTabId: cycle(s.tabs, s.activeTabId, 1) })),
-  prevTab: () => set((s) => ({ activeTabId: cycle(s.tabs, s.activeTabId, -1) })),
+  selectTab: (tabId) => {
+    focusTerminals()
+    set({ activeTabId: tabId })
+  },
+  nextTab: () => {
+    focusTerminals()
+    set((s) => ({ activeTabId: cycle(s.tabs, s.activeTabId, 1) }))
+  },
+  prevTab: () => {
+    focusTerminals()
+    set((s) => ({ activeTabId: cycle(s.tabs, s.activeTabId, -1) }))
+  },
 
   focusPane: (tabId, paneId) =>
     set((s) => ({ tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, focusedPaneId: paneId } : t)) })),
@@ -160,7 +191,7 @@ export const useSessions = create<SessionsState>((set, get) => ({
   // closePane removes a leaf; when it was the tab's last pane the tab closes.
   // The removed pane's Terminal unmounts → SSHService.Close runs, so no
   // explicit backend teardown here.
-  closePane: (tabId, paneId) =>
+  closePane: (tabId, paneId) => {
     set((s) => {
       const tab = s.tabs.find((t) => t.id === tabId)
       if (!tab) return {}
@@ -168,7 +199,11 @@ export const useSessions = create<SessionsState>((set, get) => ({
       if (root === null) return closeTabState(s.tabs, tabId, s.activeTabId)
       const focusedPaneId = tab.focusedPaneId === paneId ? firstLeaf(root).id : tab.focusedPaneId
       return { tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, root, focusedPaneId } : t)) }
-    }),
+    })
+    // Only fires on the branch that removed the tab's last pane (and with it
+    // the last tab) — otherwise tabs is non-empty and this is a no-op.
+    focusSftpIfNoTabsLeft(get().tabs)
+  },
 }))
 
 const termToStatus: Record<TermStatus, Status> = {

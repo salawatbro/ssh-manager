@@ -17,6 +17,11 @@ export interface TransferProgress {
 
 interface SftpState {
   open: boolean
+  // Frontmost-view flag. `open` is the session's lifetime; `active` is whether
+  // the SFTP tab is the one being shown. The two are separate so selecting a
+  // terminal tab can hide SFTP without closing its connection (MainContent
+  // keeps both mounted — see lib/mainView.ts).
+  active: boolean
   connecting: boolean
   serverId: string | null
   sessionId: string | null
@@ -32,6 +37,10 @@ interface SftpState {
 
   openFor: (server: Server) => Promise<void>
   close: () => void
+  // Show / hide the SFTP tab without ending its session. blur() is called by
+  // every sessions-store action that brings a terminal tab forward.
+  focus: () => void
+  blur: () => void
   navLocal: (dir: string) => Promise<void>
   navRemote: (dir: string) => Promise<void>
   refresh: () => Promise<void>
@@ -47,6 +56,7 @@ interface SftpState {
 
 export const useSftp = create<SftpState>((set, get) => ({
   open: false,
+  active: false,
   connecting: false,
   serverId: null,
   sessionId: null,
@@ -63,7 +73,7 @@ export const useSftp = create<SftpState>((set, get) => ({
     if (prev) void SftpService.Close(prev).catch(() => {})
     // Show the panel right away in a connecting state (worse with 2FA prompts).
     set({
-      open: true, connecting: true, error: null, serverId: server.id,
+      open: true, active: true, connecting: true, error: null, serverId: server.id,
       sessionId: null, localCwd: '', remoteCwd: '', localEntries: [], remoteEntries: [],
     })
     try {
@@ -93,6 +103,7 @@ export const useSftp = create<SftpState>((set, get) => ({
     if (sessionId) void SftpService.Close(sessionId).catch(() => {})
     set({
       open: false,
+      active: false,
       connecting: false,
       serverId: null,
       sessionId: null,
@@ -104,6 +115,10 @@ export const useSftp = create<SftpState>((set, get) => ({
       error: null,
     })
   },
+
+  // No-ops when no session is open, so a stray click can't focus an empty view.
+  focus: () => set((s) => (s.open ? { active: true } : {})),
+  blur: () => set({ active: false }),
 
   navLocal: async (dir) => {
     try {
