@@ -6,7 +6,7 @@ import type { Terminal } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import { b64ToBytes, strToB64 } from '../lib/termbytes'
 import { createGuardBuffer, matchesDangerous, splitPatterns } from '../lib/guard'
-import { SHELL_INTEGRATION_SNIPPET } from '../lib/shellIntegration'
+import { BASH_ZSH_SNIPPET } from '../lib/shellIntegration'
 import { useServers } from '../stores/servers'
 import { useSettings } from '../stores/settings'
 import { useGuard } from '../stores/guard'
@@ -158,7 +158,7 @@ export function useTerminalSession(
         useSessions.getState().setPaneSession(paneId, id)
         setStatus('connected')
         if (useSettings.getState().settings?.shellIntegration) {
-          void SSHService.Write(id, strToB64(SHELL_INTEGRATION_SNIPPET + '\r')).catch(() => {})
+          void SSHService.Write(id, strToB64(BASH_ZSH_SNIPPET + '\r')).catch(() => {})
         }
         for (const o of preBuffer) {
           if (o.sessionID === id) ingest(o.seq, o.data)
