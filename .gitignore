@@ -28,6 +28,10 @@ frontend/node_modules/
 # Bare app binary from `go build .` at repo root (use `task` for real builds)
 /sshmgr
 
+# vitest/vite caches land here if a frontend command is run from the repo root
+# by mistake (the real dependency tree is frontend/node_modules, ignored above)
+/node_modules/
+
 # CI not needed for now (kept locally, not pushed)
 .github/workflows/
 # Superpowers implementation plans/specs — local working docs only
