@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, Zap } from 'lucide-react'
 import Fuse from 'fuse.js'
 import type { Snippet } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { useSnippets, useFocusedServer, NO_SNIPPETS } from '../../stores/snippets'
+import { useSnippets, useFocusedServer, useFocusedPaneKey, NO_SNIPPETS } from '../../stores/snippets'
+import { isLocalTarget } from '../../lib/paneTarget'
 import { envClassOf } from '../../lib/env'
 import { isMac } from '../../lib/platform'
 
@@ -19,9 +20,11 @@ function searchSnippets(snippets: Snippet[], query: string): Snippet[] {
 }
 
 // SnippetPalette (⌘E, v0.7 FR-16): an overlay listing the FOCUSED pane's
-// server's applicable snippets (global + its group + itself), with a fuzzy
-// text filter. Enter runs the selected snippet (guarded on prod — see
-// stores/snippets.ts's `run`) and closes. Mirrors CommandPalette's overlay
+// applicable snippets — global + its group + itself for a server pane,
+// global only for a local pane (it has neither) — with a fuzzy text filter.
+// Enter runs the selected snippet (guarded on prod or, for a local pane, on
+// the local pattern list — see stores/snippets.ts's `run`) and closes.
+// Mirrors CommandPalette's overlay
 // tokens/behaviour (same backdrop, frame, footer-hint bar) so the two read as
 // one family, just a second instance rather than a shared component — the
 // row shape (name/body vs server/status) differs enough that sharing
@@ -31,7 +34,19 @@ export function SnippetPalette() {
   const hide = useSnippets((s) => s.hide)
   const run = useSnippets((s) => s.run)
   const server = useFocusedServer()
-  const snippets = useSnippets((s) => (server ? (s.applicable[server.id] ?? NO_SNIPPETS) : NO_SNIPPETS))
+  const key = useFocusedPaneKey()
+  // useFocusedServer alone can't tell "no pane focused" from "the focused
+  // pane is local" — both resolve to a null server — so pair it with the
+  // pane's raw key (real server id, local sentinel, or null).
+  const local = key !== null && isLocalTarget(key)
+  const focused = local || server !== null
+  // Gated on `focused`, not just `key`: if the focused pane's server id no
+  // longer resolves (e.g. the server was deleted from the sidebar while its
+  // tab stayed open), `applicable[key]` can still hold a stale list from an
+  // earlier ⌘E on that same key. Falling through to NO_SNIPPETS here keeps
+  // that stale list from rendering as clickable rows under the "no terminal
+  // focused" message below.
+  const snippets = useSnippets((s) => (focused && key ? (s.applicable[key] ?? NO_SNIPPETS) : NO_SNIPPETS))
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
 
@@ -44,8 +59,8 @@ export function SnippetPalette() {
   // Reload the applicable list every time the palette opens, so a snippet
   // saved from the Settings manager earlier in the session shows up.
   useEffect(() => {
-    if (open && server) void useSnippets.getState().load(server.id, server.group)
-  }, [open, server])
+    if (open && key && focused) void useSnippets.getState().load(key, server?.group ?? '')
+  }, [open, key, focused, server?.group])
 
   useEffect(() => {
     if (!open) setQ('')
@@ -87,19 +102,21 @@ export function SnippetPalette() {
                 hide()
               }
             }}
-            placeholder={server ? 'Search snippets…' : 'No terminal focused'}
-            disabled={!server}
+            placeholder={focused ? 'Search snippets…' : 'No terminal focused'}
+            disabled={!focused}
             className="h-full min-w-0 flex-1 bg-transparent text-[14px] text-text outline-none placeholder:text-textDim"
           />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-[6px]">
-          {!server && (
+          {!focused && (
             <div className="px-[10px] py-[14px] text-[13px] text-textDim">
               Focus a terminal pane to see its snippets.
             </div>
           )}
-          {server && rows.length === 0 && (
-            <div className="px-[10px] py-[14px] text-[13px] text-textDim">No snippets for this server.</div>
+          {focused && rows.length === 0 && (
+            <div className="px-[10px] py-[14px] text-[13px] text-textDim">
+              {local ? 'No global snippets yet.' : 'No snippets for this server.'}
+            </div>
           )}
           {rows.map((s, idx) => (
             <SnippetRow
@@ -115,7 +132,7 @@ export function SnippetPalette() {
         <div className="flex h-[34px] shrink-0 items-center gap-[16px] border-t border-border bg-bg1 px-[14px] text-[11px] text-textDim">
           <span>
             <Search size={11} strokeWidth={2.2} className="mr-[4px] inline" />
-            Snippets for the focused pane's server
+            {local ? 'Global snippets for this local terminal' : "Snippets for the focused pane's server"}
           </span>
           <span className="flex-1" />
           <span>

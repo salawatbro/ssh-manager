@@ -106,6 +106,39 @@ func TestSettingsServiceGetDoesNotClobberCustomGuardPatterns(t *testing.T) {
 	}
 }
 
+// Same backfill as GuardPatterns, added with the local terminal tab: an
+// upgraded row carries "" for the new column and would guard nothing locally.
+func TestSettingsServiceGetBackfillsEmptyLocalGuardPatterns(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := store.NewSettingsRepo(db)
+	svc := NewSettingsService(repo, nil)
+
+	seed := domain.DefaultSettings()
+	seed.GuardPatternsLocal = ""
+	if err := repo.Save(&seed); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := svc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GuardPatternsLocal != domain.DefaultSettings().GuardPatternsLocal {
+		t.Fatalf("expected backfilled local guard patterns, got %q", got.GuardPatternsLocal)
+	}
+	// Persisted, not just patched in memory for this call.
+	again, err := repo.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.GuardPatternsLocal == "" {
+		t.Error("backfill was not saved")
+	}
+}
+
 // fakeLoginAgent records Set calls and returns a canned error, so tests can
 // assert the Update side-effect contract without touching the real OS.
 type fakeLoginAgent struct {

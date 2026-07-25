@@ -34,8 +34,20 @@ multi-tab, split-pane terminal — all from one native desktop app.
 - **Jump hosts** — `ProxyJump` relationships are modeled and imported.
 
 ### Terminal
-- **Real PTY** over SSH, rendered with [xterm.js](https://xtermjs.org/)
-  (Canvas renderer).
+- **Real PTY**, over SSH or a local shell, rendered with
+  [xterm.js](https://xtermjs.org/) (Canvas renderer).
+- **Local terminal** — `⌘K` → "Local terminal" opens a tab running your own
+  login shell, with no server involved and nothing persisted or added to the
+  sidebar. It shares the whole terminal stack below (splits, find, snippets),
+  and dangerous commands are confirmed against a separate, shorter pattern
+  list than the one used for servers (Settings → General) — an ergonomic
+  confirmation step, not a security control.
+- **Shell integration** — bash, zsh, and fish sessions get OSC 133 markers
+  automatically (detected before anything is injected, so other shells are
+  left untouched instead of guessing): a gutter bar per command, a red mark
+  and duration on failure, and jump to the previous/next command (`⌘↑` /
+  `⌘↓`). The status bar reports what it found, e.g. `zsh · integration on` or
+  `shell unknown`. Toggle under Settings → Terminal.
 - **Tabs and split panes** — split horizontally/vertically and arrange several
   live sessions side by side.
 - **Find**, **auto-copy on select**, and **right-click / ⌘V paste**.
@@ -64,9 +76,10 @@ multi-tab, split-pane terminal — all from one native desktop app.
 - **`~/.ssh/config` import** — preview every host (imported and skipped, with
   the reason), pick which to import, and map `ProxyJump` to jump hosts by name.
 - **Full settings** — General (start-at-login, keep-in-tray, confirm-on-quit,
-  connection timeout), Terminal (font size, cursor style/blink, scrollback —
-  applied live to open terminals), a read-only Shortcuts reference, Data, and
-  About.
+  connection timeout, and the guard pattern lists for servers and the local
+  terminal), Terminal (font size, cursor style/blink, scrollback, shell
+  integration — applied live to open terminals), a read-only Shortcuts
+  reference, Data, and About.
 - **Data tools** — export/import servers as JSON (secret-free), back up the
   database (WAL-safe), and reveal the data folder in Finder.
 
@@ -108,6 +121,7 @@ This app is built around a few hard invariants:
 | `⌘1`–`⌘9` | Switch to tab 1–9 |
 | `⌘⇧]` / `⌘⇧[` | Next / previous tab |
 | `⌘F` | Find in the terminal |
+| `⌘↑` / `⌘↓` | Jump to the previous / next command (needs shell integration) |
 | `⌘V` / right-click | Paste into the terminal |
 
 ---
@@ -214,10 +228,12 @@ internal/
   domain/               Models and validation (the argv-injection gate)
   secret/               OS keychain access
   sshx/                 SSH client, dialer, host-key verifier, ssh_config parser
-  term/                 PTY session manager
+  sftpx/                SFTP browsing and transfer (cgo-free)
+  localpty/             Local pty running the user's own login shell
+  term/                 PTY session manager (drives sshx and localpty alike)
   forward/              SSH tunnel manager (-L/-R/-D SOCKS5)
   store/                GORM repositories (servers, settings)
-  service/              Server, SSH, settings, import, and data services
+  service/              Server, SSH, local-terminal, settings, import, and data services
   platform/             Paths, start-at-login, reveal-in-Finder, known_hosts
 frontend/               React + TypeScript UI (Vite, Tailwind, xterm.js)
 ```

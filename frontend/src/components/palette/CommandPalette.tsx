@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { usePalette, type PaletteRowData } from '../../stores/palette'
 import { useServers } from '../../stores/servers'
-import { useSessions, tabStatus } from '../../stores/sessions'
+import { useSessions } from '../../stores/sessions'
+import { usePanes } from '../../stores/panes'
 import { useAuthenticator } from '../../stores/authenticator'
 import { useTour } from '../../stores/tour'
 import { useSftp } from '../../stores/sftp'
 import type { Status } from '../../lib/status'
+import { tabStatus } from '../../lib/tabStatus'
 import { searchServers } from '../../lib/fuzzy'
 import { PaletteRow } from './PaletteRow'
 import { ServerService } from '@bindings/github.com/salawat/sshmgr/internal/service'
@@ -81,7 +83,7 @@ export function CommandPalette({
   // the Zustand v5 selector rule — only real state changes retrigger the
   // `rows` memo below.
   const tabs = useSessions((s) => s.tabs)
-  const paneStatus = useSessions((s) => s.paneStatus)
+  const paneStatus = usePanes((s) => s.paneStatus)
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
 
@@ -96,6 +98,12 @@ export function CommandPalette({
     const ql = q.trim().toLowerCase()
     const commands: PaletteRowData[] = [
       { kind: 'command' as const, id: 'new-server', label: 'New server', run: onNewServer },
+      {
+        kind: 'command' as const,
+        id: 'local-terminal',
+        label: 'Local terminal',
+        run: () => useSessions.getState().openLocal(),
+      },
       { kind: 'command' as const, id: 'welcome-tour', label: 'Welcome tour', run: () => useTour.getState().show() },
       ...(selectedId
         ? [
@@ -144,6 +152,10 @@ export function CommandPalette({
       useServers.getState().select(null)
       useSessions.getState().open(row.server)
     } else if (row.kind === 'command') {
+      // Same reasoning as the server branch above and quickConnect(): a
+      // command (e.g. "Local terminal") opens a tab in the content area, and
+      // a selected server's open ServerForm (392px) would otherwise cover it.
+      useServers.getState().select(null)
       row.run()
     } else {
       void quickConnect(row.target)

@@ -8,6 +8,41 @@ Only **1.0.0**, **1.1.0** and **1.2.0** are packaged, published releases (macOS 
 Versions **0.1–0.7** are the development milestones that built up to 1.0; **1.1.1**
 was a version bump that first shipped packaged as part of 1.2.0.
 
+## [Unreleased]
+
+### Added
+- **Local terminal** — `⌘K` → "Local terminal" opens a tab running your own
+  login shell (`$SHELL -l`, so your rc files apply), with no server involved
+  and nothing persisted or added to the sidebar. It reuses the whole terminal
+  stack: splits (`⌘D` / `⌘⇧D`) give you a second independent local shell,
+  find and broadcast (`⇧↵`) both work, and the status bar reports it plainly
+  as "Local shell" rather than an SSH auth method. There is no dedicated
+  keyboard shortcut for opening it.
+- **A local-terminal command guard** — the same type-`run`-to-confirm modal,
+  now titled "Confirm on this Mac", also fires in the local terminal, against
+  a separate, deliberately shorter pattern list (Settings → General →
+  "Local terminal patterns"): the production list matches `rm -rf` as plain
+  text, which would fire on an everyday `rm -rf node_modules`, so the local
+  list only catches what can wreck the machine. Because matching is
+  still plain substring, its `rm -rf /` and `rm -rf ~` entries also ask for
+  confirmation on absolute- or home-relative deletes that aren't the root,
+  e.g. `rm -rf ~/Library/Caches/pip`.
+- **Shell integration for fish**, and honest reporting for every other shell
+  — the app now asks the login shell what it is before injecting anything;
+  bash, zsh, and fish get OSC 133 markers, and every other shell gets nothing
+  at all. The status bar's shell segment (shown only while Settings →
+  Terminal → Shell integration is on) reads e.g. `zsh · integration on`, or
+  `shell unknown` when the shell could not be classified.
+- **Global snippets on a local pane** — the `⌘E` palette and `⌘⇧1`–`⌘⇧9`
+  quick-slots, previously silently dead on a local pane, now offer the
+  global-scoped snippets (group- and server-scoped ones don't apply, since a
+  local pane has neither).
+
+### Fixed
+- csh and tcsh no longer print a parse error on connect — the login shell is
+  detected first, and the POSIX shell-integration snippet is now only sent to
+  a shell that can parse it.
+
 ## [1.2.0] — 2026-07-21
 
 Also carries everything from 1.1.1 below, which was never published on its own.

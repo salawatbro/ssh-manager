@@ -9,6 +9,7 @@ import { isMac } from '../../lib/platform'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { useSettings } from '../../stores/settings'
 import { useSessions } from '../../stores/sessions'
+import { usePanes } from '../../stores/panes'
 import { collectLeaves } from '../../lib/paneTree'
 import { PaneNotice } from './PaneNotice'
 import { FindBar } from './FindBar'
@@ -67,7 +68,7 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
     // MainWindow.dc.html, `40×120`) right away — the resize-observer below
     // only fires on a LATER container resize, so without this the very
     // first pane of a session would show no dims until one occurred.
-    useSessions.getState().setPaneDims(paneId, { cols: t.cols, rows: t.rows })
+    usePanes.getState().setPaneDims(paneId, { cols: t.cols, rows: t.rows })
 
     // Auto-copy on selection (user decision). Best-effort — clipboard can
     // reject when unfocused.
@@ -125,7 +126,7 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
     const ro = new ResizeObserver(() => {
       try {
         fit.fit()
-        useSessions.getState().setPaneDims(paneId, { cols: term.cols, rows: term.rows })
+        usePanes.getState().setPaneDims(paneId, { cols: term.cols, rows: term.rows })
       } catch {
         /* detached mid-teardown */
       }
@@ -151,7 +152,7 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
       fit?.fit()
       // Font size is part of `cfg` — a change resizes the grid, so the
       // status bar's dims segment needs a fresh read too.
-      useSessions.getState().setPaneDims(paneId, { cols: term.cols, rows: term.rows })
+      usePanes.getState().setPaneDims(paneId, { cols: term.cols, rows: term.rows })
     } catch {
       /* detached */
     }
@@ -165,13 +166,13 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
   // (own effect, paneId-keyed) rather than on every status change, so the
   // entry isn't dropped-then-re-added on each transition.
   useEffect(() => {
-    useSessions.getState().setPaneStatus(paneId, session.status)
+    usePanes.getState().setPaneStatus(paneId, session.status)
   }, [paneId, session.status])
-  useEffect(() => () => useSessions.getState().clearPaneStatus(paneId), [paneId])
+  useEffect(() => () => usePanes.getState().clearPaneStatus(paneId), [paneId])
   // Mirrors the paneStatus cleanup above exactly: its own effect, keyed only
   // on paneId, so a dims UPDATE never accidentally clears the entry — only
   // unmount (pane close) does.
-  useEffect(() => () => useSessions.getState().clearPaneDims(paneId), [paneId])
+  useEffect(() => () => usePanes.getState().clearPaneDims(paneId), [paneId])
 
   // A clean shell exit (`exit`/Ctrl-D) closes the pane automatically, like a
   // real terminal (iTerm) — no reconnect notice. closePane also closes the

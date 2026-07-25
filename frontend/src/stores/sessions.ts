@@ -1,9 +1,8 @@
 import { create } from 'zustand'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useSftp } from './sftp'
-import { replaceLeaf, removeLeaf, firstLeaf, collectLeaves } from '../lib/paneTree'
-import type { TermStatus } from '../hooks/useTerminalSession'
-import type { Status } from '../lib/status'
+import { replaceLeaf, removeLeaf, firstLeaf } from '../lib/paneTree'
+import { LOCAL_TARGET_ID } from '../lib/paneTarget'
 
 // A tab's panes form a binary split tree; a leaf is one terminal session for a
 // server. Task 6 fills in splitFocused/closePane; v0.3-Task-5 only ever builds
@@ -24,30 +23,12 @@ export interface Tab {
   startedAt: number
 }
 
-// A pane's live xterm grid size, keyed by leaf (pane) id — mirrors paneStatus
-// below; lets the status bar show the ACTIVE pane's dims without its own xterm.
-export interface PaneDims {
-  cols: number
-  rows: number
-}
-
 interface SessionsState {
   tabs: Tab[]
   activeTabId: string | null
-  // Per-pane connection status, keyed by leaf (pane) id — mirrored from
-  // useTerminalSession so the tab strip (no PTY of its own) can read it.
-  paneStatus: Record<string, TermStatus>
-  setPaneStatus: (paneId: string, status: TermStatus) => void
-  clearPaneStatus: (paneId: string) => void
-  paneDims: Record<string, PaneDims>
-  setPaneDims: (paneId: string, dims: PaneDims) => void
-  clearPaneDims: (paneId: string) => void
-  // paneId → live session id (useTerminalSession); BroadcastBar's source for sessionIds.
-  paneSession: Record<string, string>
-  setPaneSession: (paneId: string, sessionId: string) => void
-  clearPaneSession: (paneId: string) => void
   open: (server: Server) => void
   openOrFocus: (server: Server) => void
+  openLocal: () => void
   closeTab: (tabId: string) => void
   selectTab: (tabId: string) => void
   nextTab: () => void
@@ -91,29 +72,9 @@ function closeTabState(tabs: Tab[], closedId: string, activeId: string | null): 
   return { tabs: remaining, activeTabId: remaining.length ? remaining[Math.max(0, idx - 1)]?.id ?? remaining[0].id : null }
 }
 
-// Shared by the per-pane maps' clear* actions (paneStatus/paneDims/paneSession):
-// drop one key, or return the same record reference untouched if it's absent.
-function clearKey<T>(record: Record<string, T>, key: string): Record<string, T> {
-  if (!(key in record)) return record
-  const next = { ...record }
-  delete next[key]
-  return next
-}
-
 export const useSessions = create<SessionsState>((set, get) => ({
   tabs: [],
   activeTabId: null,
-  paneStatus: {},
-  setPaneStatus: (paneId, status) => set((s) => ({ paneStatus: { ...s.paneStatus, [paneId]: status } })),
-  clearPaneStatus: (paneId) => set((s) => ({ paneStatus: clearKey(s.paneStatus, paneId) })),
-
-  paneDims: {},
-  setPaneDims: (paneId, dims) => set((s) => ({ paneDims: { ...s.paneDims, [paneId]: dims } })),
-  clearPaneDims: (paneId) => set((s) => ({ paneDims: clearKey(s.paneDims, paneId) })),
-
-  paneSession: {},
-  setPaneSession: (paneId, sessionId) => set((s) => ({ paneSession: { ...s.paneSession, [paneId]: sessionId } })),
-  clearPaneSession: (paneId) => set((s) => ({ paneSession: clearKey(s.paneSession, paneId) })),
 
   // A new tab, one leaf, one session. Multiple tabs to the same server are
   // allowed (each leaf id is unique, so each drives its own PTY).
@@ -125,6 +86,24 @@ export const useSessions = create<SessionsState>((set, get) => ({
       title: server.name || server.host,
       hostLabel: `${server.user}@${server.host}`,
       root: { kind: 'leaf', id: paneId, serverId: server.id },
+      focusedPaneId: paneId,
+      startedAt: Date.now(),
+    }
+    focusTerminals()
+    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
+  },
+
+  // A tab on the local machine: no server, nothing persisted, not in the
+  // sidebar. splitFocused needs no special case — the new leaf inherits this
+  // sentinel and therefore opens a second local pty.
+  openLocal: () => {
+    const paneId = crypto.randomUUID()
+    const tab: Tab = {
+      id: crypto.randomUUID(),
+      serverId: LOCAL_TARGET_ID,
+      title: 'Local',
+      hostLabel: 'local',
+      root: { kind: 'leaf', id: paneId, serverId: LOCAL_TARGET_ID },
       focusedPaneId: paneId,
       startedAt: Date.now(),
     }
@@ -205,26 +184,3 @@ export const useSessions = create<SessionsState>((set, get) => ({
     focusSftpIfNoTabsLeft(get().tabs)
   },
 }))
-
-const termToStatus: Record<TermStatus, Status> = {
-  connecting: 'connecting',
-  connected: 'connected',
-  error: 'failed',
-  closed: 'disc',
-  // Transient: Terminal closes the pane on the same render pass this status
-  // lands, so the tab strip rarely shows it — 'disc' is the closest steady
-  // state if it's ever observed mid-teardown.
-  exited: 'disc',
-}
-
-// tabStatus collapses a tab's pane statuses into the single dot the tab strip
-// shows (MainWindow.dc.html). A failed/connecting pane always dominates a
-// healthy sibling. A pane with no entry yet (not mounted/reported) reads as
-// connecting, matching useTerminalSession's initial state.
-export function tabStatus(tab: Tab, paneStatus: Record<string, TermStatus>): Status {
-  const statuses = collectLeaves(tab.root).map((leaf) => termToStatus[paneStatus[leaf.id] ?? 'connecting'])
-  if (statuses.includes('failed')) return 'failed'
-  if (statuses.includes('connecting')) return 'connecting'
-  if (statuses.includes('disc')) return 'disc'
-  return 'connected'
-}

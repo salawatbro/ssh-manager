@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
-import { SSHService } from '@bindings/github.com/salawat/sshmgr/internal/service'
-import { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import { SSHService, LocalService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import type { Terminal } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import { b64ToBytes, strToB64 } from '../lib/termbytes'
-import { createGuardBuffer, matchesDangerous, splitPatterns } from '../lib/guard'
-import { SHELL_INTEGRATION_SNIPPET } from '../lib/shellIntegration'
+import { createGuardBuffer, guardDecisionFor, LOCAL_SCOPE_TARGET } from '../lib/guard'
+import { snippetFor } from '../lib/shellSnippets'
+import { paneShellInfo } from '../lib/paneShellInfo'
+import { isLocalTarget } from '../lib/paneTarget'
 import { useServers } from '../stores/servers'
 import { useSettings } from '../stores/settings'
 import { useGuard } from '../stores/guard'
-import { useSessions } from '../stores/sessions'
+import { usePanes } from '../stores/panes'
 
 // 'exited' is a clean shell exit (`exit`/Ctrl-D/`exit N`) — the pane closes
 // itself, no notice. 'closed' is an abnormal drop (dead peer, connection
@@ -75,28 +76,39 @@ export function useTerminalSession(
         void SSHService.Write(id, strToB64(d)).catch(() => {})
         return
       }
-      // d contains '\r' (Enter). Check the line as it stood right before it
-      // against the pane's server env + the guard settings.
-      const server = useServers.getState().servers.find((s) => s.id === serverId)
+      // d contains '\r' (Enter). Check the line as it stood right before it.
       const settings = useSettings.getState().settings
-      const isProd = server?.environment === Environment.EnvProd
-      const patterns = settings ? splitPatterns(settings.guardPatterns) : []
-      const dangerous = settings?.guardEnabled && matchesDangerous(lineBeforeEnter, patterns)
-      if (isProd && dangerous && server) {
+      const local = isLocalTarget(serverId)
+      const server = local ? null : useServers.getState().servers.find((s) => s.id === serverId)
+      const target = local
+        ? LOCAL_SCOPE_TARGET
+        : server && { host: server.name || server.host, env: server.environment, local: false }
+      const decision = target ? guardDecisionFor(lineBeforeEnter, [target], settings) : null
+      if (decision) {
         // Forward any pasted text before the held Enter (normally none — a
-        // real keypress sends '\r' alone), but hold the '\r' itself.
-        const head = d.slice(0, d.indexOf('\r'))
+        // real keypress sends '\r' alone), but hold everything from the
+        // Enter onward: a paste can carry further lines after it in the same
+        // chunk, and those must not be dropped just because the first line
+        // tripped the guard.
+        const splitAt = d.indexOf('\r')
+        const head = d.slice(0, splitAt)
+        const tail = d.slice(splitAt) // the held '\r' plus any later lines
         if (head) void SSHService.Write(id, strToB64(head)).catch(() => {})
         useGuard.getState().requestGuard({
           command: lineBeforeEnter,
-          targets: [{ host: server.name || server.host, env: server.environment }],
-          // Confirm sends the held Enter and clears the buffer. Cancel does
-          // neither (FR-14.11) — requestGuard's caller (GuardModal) never
-          // invokes this on cancel, so the buffer stays intact and a
-          // subsequent Enter re-triggers the guard.
+          title: decision.title,
+          targets: decision.targets,
+          // Confirm sends the held tail (the Enter and any lines pasted after
+          // it) and clears the buffer. Cancel does neither (FR-14.11) —
+          // requestGuard's caller (GuardModal) never invokes this on cancel,
+          // so the buffer stays intact and a subsequent Enter re-triggers the
+          // guard. Lines after the first are not individually re-checked
+          // against the guard here — the unguarded branch below already
+          // forwards a whole multi-line chunk once its first line passes, so
+          // this matches existing behaviour rather than opening a new gap.
           onConfirm: () => {
             guardBuf.clear()
-            void SSHService.Write(id, strToB64('\r')).catch(() => {})
+            void SSHService.Write(id, strToB64(tail)).catch(() => {})
           },
         })
         return
@@ -147,18 +159,31 @@ export function useTerminalSession(
       if (s.state === 'closed') applyClosed(s.code, s.message)
     })
 
-    void SSHService.Open(serverId, term.cols, term.rows)
-      .then((id) => {
+    // Local panes take the same path as SSH ones from here on: LocalService
+    // registers into the SAME term.Manager, so Write/Resize/Close below stay
+    // on SSHService regardless of the target.
+    const opening = isLocalTarget(serverId)
+      ? LocalService.Open(term.cols, term.rows)
+      : SSHService.Open(serverId, term.cols, term.rows)
+
+    void opening
+      .then((res) => {
+        const id = res.sessionID
         if (disposed) {
           void SSHService.Close(id).catch(() => {})
           return
         }
         myId = id
         sessionId.current = id
-        useSessions.getState().setPaneSession(paneId, id)
+        usePanes.getState().setPaneSession(paneId, id)
         setStatus('connected')
-        if (useSettings.getState().settings?.shellIntegration) {
-          void SSHService.Write(id, strToB64(SHELL_INTEGRATION_SNIPPET + '\r')).catch(() => {})
+        // Only inject a snippet the detected shell can actually parse. An
+        // unknown or unsupported shell gets nothing — that is the whole point
+        // of the probe (csh used to answer the POSIX blob with a parse error).
+        const snippet = useSettings.getState().settings?.shellIntegration ? snippetFor(res.shell) : null
+        usePanes.getState().setPaneShell(paneId, paneShellInfo(res.shell, snippet))
+        if (snippet) {
+          void SSHService.Write(id, strToB64(snippet + '\r')).catch(() => {})
         }
         for (const o of preBuffer) {
           if (o.sessionID === id) ingest(o.seq, o.data)
@@ -188,7 +213,7 @@ export function useTerminalSession(
       offState?.()
       const id = sessionId.current
       sessionId.current = null
-      useSessions.getState().clearPaneSession(paneId)
+      usePanes.getState().clearPaneConnection(paneId)
       if (id) void SSHService.Close(id).catch(() => {})
     }
   }, [serverId, paneId, term, fit, attempt])

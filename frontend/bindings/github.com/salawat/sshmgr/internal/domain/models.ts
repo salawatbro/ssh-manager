@@ -150,8 +150,11 @@ export interface Settings {
     "termScrollback": number;
 
     /**
-     * ShellIntegration injects an OSC 133 snippet on connect (bash/zsh) to mark
-     * prompt/command/output boundaries. Off = plain terminal.
+     * ShellIntegration injects an OSC 133 snippet on connect for a detected
+     * bash, zsh, or fish login shell, to mark prompt/command/output
+     * boundaries. Any other detected shell gets no snippet — the status bar
+     * reports that outcome rather than staying silent about it. Off = plain
+     * terminal, no detection probe.
      */
     "shellIntegration": boolean;
 
@@ -164,6 +167,16 @@ export interface Settings {
      */
     "guardEnabled": boolean;
     "guardPatterns": string;
+
+    /**
+     * GuardPatternsLocal is the guard list for the LOCAL terminal tab. It is
+     * separate from (and shorter than) GuardPatterns on purpose: `rm -rf` as a
+     * substring is an everyday command on a dev machine, and a barrier that
+     * fires on every `rm -rf node_modules` gets switched off — which would also
+     * disarm the production one. Same DB-default caveat as GuardPatterns: the
+     * real first-run list lives in DefaultSettings().
+     */
+    "guardPatternsLocal": string;
 
     /**
      * TourSeen is set true once the first-run welcome tour has been shown (or

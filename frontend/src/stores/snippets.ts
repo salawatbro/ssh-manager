@@ -1,12 +1,14 @@
 import { create } from 'zustand'
 import { SnippetService, SSHService } from '@bindings/github.com/salawat/sshmgr/internal/service'
-import type { Server, Snippet } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import { SnippetScope, type Server, type Snippet } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { SnippetInput } from '@bindings/github.com/salawat/sshmgr/internal/service'
-import { collectLeaves } from '../lib/paneTree'
-import { matchesDangerous, splitPatterns } from '../lib/guard'
+import { focusedLeaf } from '../lib/paneFocus'
+import { globalOnly } from '../lib/snippetScope'
+import { guardDecisionFor, LOCAL_SCOPE_TARGET } from '../lib/guard'
+import { isLocalTarget } from '../lib/paneTarget'
 import { strToB64 } from '../lib/termbytes'
 import { useSessions, type Tab } from './sessions'
+import { usePanes } from './panes'
 import { useServers } from './servers'
 import { useSettings } from './settings'
 import { useGuard } from './guard'
@@ -31,12 +33,14 @@ interface SnippetsState {
   update: (input: SnippetInput) => Promise<string | null>
   remove: (id: string) => Promise<string | null>
   // run sends snippet.body + "\r" to the focused pane's session, applying the
-  // prod guard when the focused server is prod, guarding is enabled, and the
-  // body matches a dangerous pattern. No-ops if no pane/session is focused.
+  // guard when guarding is enabled and the body matches a dangerous pattern
+  // — the prod pattern list for a server pane tagged prod, the local pattern
+  // list for a local pane. No-ops if no pane/session is focused.
   run: (snippet: Snippet) => void
-  // runSlot resolves the focused pane's server, looks up the snippet bound to
-  // slot for that server/group via SnippetService.BySlot, and runs it
-  // (guarded). No-ops if no pane is focused or nothing is bound to the slot.
+  // runSlot resolves the focused pane (server or local), looks up the
+  // snippet bound to slot via SnippetService.BySlot — empty server/group
+  // args for a local pane — and runs it (guarded). No-ops if no pane is
+  // focused or nothing is bound to the slot.
   runSlot: (slot: number) => Promise<void>
   show: () => void
   hide: () => void
@@ -44,32 +48,21 @@ interface SnippetsState {
 }
 
 // resolveFocusedServer walks tabs/activeTabId to the active tab's focused
-// leaf and resolves its server. Shared by focusedServer (imperative
-// getState() snapshot) and useFocusedServer (reactive selectors) below.
-// collectLeaves's return type is the broader PaneNode union even though
-// every element it returns is actually a leaf (a split node can't be a leaf
-// of itself), so the `kind === 'leaf'` check here is a real narrow, not dead
-// code — mirrors BroadcastBar's `if (leaf.kind !== 'leaf') continue`.
+// leaf (via lib/paneFocus's focusedLeaf) and resolves its server. Returns
+// null both when no pane is focused AND when the focused pane is local (a
+// local pane's sentinel serverId never matches a real server) — callers that
+// need to tell those two apart use useFocusedPaneKey below instead.
 function resolveFocusedServer(tabs: Tab[], activeTabId: string | null, servers: Server[]): Server | null {
-  const active = tabs.find((t) => t.id === activeTabId)
-  if (!active) return null
-  const leaf = collectLeaves(active.root).find((l) => l.id === active.focusedPaneId)
-  if (!leaf || leaf.kind !== 'leaf') return null
+  const leaf = focusedLeaf(tabs, activeTabId)
+  if (!leaf) return null
   return servers.find((s) => s.id === leaf.serverId) ?? null
 }
 
-// focusedServer resolves the active tab's focused leaf to its server, with NO
-// session requirement. Only used internally by focusedTarget below — the
-// reactive useFocusedServer hook is what SnippetPalette's render uses.
-function focusedServer(): Server | null {
-  const st = useSessions.getState()
-  return resolveFocusedServer(st.tabs, st.activeTabId, useServers.getState().servers)
-}
-
-// useFocusedServer is the reactive counterpart of focusedServer, for
+// useFocusedServer is the reactive counterpart of resolveFocusedServer, for
 // SnippetPalette's render: it subscribes via selectors (not a getState()
 // snapshot) so the palette re-renders if the focused pane/tab changes while
-// it's open.
+// it's open. null for both "no pane focused" and "the focused pane is
+// local" — pair with useFocusedPaneKey to distinguish those.
 export function useFocusedServer(): Server | null {
   const tabs = useSessions((s) => s.tabs)
   const activeTabId = useSessions((s) => s.activeTabId)
@@ -77,17 +70,33 @@ export function useFocusedServer(): Server | null {
   return resolveFocusedServer(tabs, activeTabId, servers)
 }
 
+// useFocusedPaneKey is the reactive key for the focused pane's snippet
+// scope: the real server id for a server pane, the local sentinel for a
+// local pane (via leaf.serverId — never spelled out here, see
+// lib/paneTarget.ts), or null when no pane is focused at all. SnippetPalette
+// pairs this with isLocalTarget and useFocusedServer to tell "no pane
+// focused" apart from "local pane focused", which useFocusedServer alone
+// cannot: both currently resolve to a null server.
+export function useFocusedPaneKey(): string | null {
+  const tabs = useSessions((s) => s.tabs)
+  const activeTabId = useSessions((s) => s.activeTabId)
+  return focusedLeaf(tabs, activeTabId)?.serverId ?? null
+}
+
 // focusedTarget resolves the active tab's focused leaf to its session id and
 // server — shared by run/runSlot below, which must no-op when the pane has
 // no live session yet. Not exported: only the store's own actions call it.
-function focusedTarget(): { sessionId: string; server: Server } | null {
+// A local pane has no server; the caller handles server === null (global
+// snippets, local guard patterns).
+function focusedTarget(): { sessionId: string; server: Server | null } | null {
   const st = useSessions.getState()
-  const active = st.tabs.find((t) => t.id === st.activeTabId)
-  if (!active) return null
-  const sessionId = st.paneSession[active.focusedPaneId]
+  const leaf = focusedLeaf(st.tabs, st.activeTabId)
+  if (!leaf) return null
+  const sessionId = usePanes.getState().paneSession[leaf.id]
   if (!sessionId) return null
-  const server = focusedServer()
-  if (!server) return null
+  const local = isLocalTarget(leaf.serverId)
+  const server = local ? null : useServers.getState().servers.find((s) => s.id === leaf.serverId) ?? null
+  if (!local && !server) return null
   return { sessionId, server }
 }
 
@@ -98,7 +107,10 @@ export const useSnippets = create<SnippetsState>((set, get) => ({
 
   load: async (serverId, groupName) => {
     try {
-      const list = (await SnippetService.ApplicableTo(serverId, groupName)) ?? []
+      const local = isLocalTarget(serverId)
+      const [id, group] = local ? ['', ''] : [serverId, groupName]
+      const got = (await SnippetService.ApplicableTo(id, group)) ?? []
+      const list = local ? globalOnly(got) : got
       set((s) => ({ applicable: { ...s.applicable, [serverId]: list } }))
     } catch {
       set((s) => ({ applicable: { ...s.applicable, [serverId]: [] } }))
@@ -153,12 +165,13 @@ export const useSnippets = create<SnippetsState>((set, get) => ({
     }
 
     const settings = useSettings.getState().settings
-    const patterns = settings ? splitPatterns(settings.guardPatterns) : []
-    const isProd = server.environment === Environment.EnvProd
-    if (isProd && settings?.guardEnabled && matchesDangerous(snippet.body, patterns)) {
+    const scopeTarget = server ? { host: server.name || server.host, env: server.environment, local: false } : LOCAL_SCOPE_TARGET
+    const decision = guardDecisionFor(snippet.body, [scopeTarget], settings)
+    if (decision) {
       useGuard.getState().requestGuard({
         command: snippet.body,
-        targets: [{ host: server.name || server.host, env: server.environment }],
+        title: decision.title,
+        targets: decision.targets,
         onConfirm: send,
       })
       return
@@ -170,8 +183,16 @@ export const useSnippets = create<SnippetsState>((set, get) => ({
     const target = focusedTarget()
     if (!target) return
     try {
-      const snippet = await SnippetService.BySlot(slot, target.server.id, target.server.group)
-      if (snippet) get().run(snippet)
+      const snippet = await SnippetService.BySlot(slot, target.server?.id ?? '', target.server?.group ?? '')
+      if (!snippet) return
+      // BySlot('', '') has the same Ungrouped-bucket leak as ApplicableTo('',
+      // '') (see lib/snippetScope's globalOnly) by the query's shape — a
+      // reachable row would require a group/server-scoped snippet with an
+      // empty scopeRef, which internal/domain's Validate rejects on both
+      // Create and Update. This guard is defense in depth against a future
+      // backend change or a hand-edited database.
+      if (!target.server && snippet.scope !== SnippetScope.ScopeGlobal) return
+      get().run(snippet)
     } catch {
       // No snippet bound to this slot for this server/group — no-op.
     }

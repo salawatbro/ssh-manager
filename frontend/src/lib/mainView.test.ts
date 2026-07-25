@@ -8,9 +8,15 @@ import { pickMainView } from './mainView'
 describe('pickMainView', () => {
   const base = { serverCount: 1, formOpen: false, sftpOpen: false, sftpActive: false, terminalTabCount: 0 }
 
-  it('shows the empty state only with no servers and no form open', () => {
+  it('shows the empty state only with no servers, no form open, and no terminal tab', () => {
     expect(pickMainView({ ...base, serverCount: 0 })).toBe('empty')
     expect(pickMainView({ ...base, serverCount: 0, formOpen: true })).toBe('terminal')
+  })
+
+  // The local terminal (opened via ⌘K with zero servers saved) has to be
+  // reachable even on a fresh install where serverCount is 0.
+  it('shows terminals with no servers when a local tab is open', () => {
+    expect(pickMainView({ ...base, serverCount: 0, terminalTabCount: 1 })).toBe('terminal')
   })
 
   it('shows terminals when no SFTP session is open', () => {

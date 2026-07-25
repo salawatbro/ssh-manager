@@ -15,7 +15,7 @@ export interface MainViewInput {
 }
 
 export function pickMainView(i: MainViewInput): MainView {
-  if (i.serverCount === 0 && !i.formOpen) return 'empty'
+  if (i.serverCount === 0 && !i.formOpen && i.terminalTabCount === 0) return 'empty'
   if (!i.sftpOpen) return 'terminal'
   // Blurred SFTP still wins when there is no terminal tab to fall back to,
   // otherwise the content area would go blank.

@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useSessions } from './sessions'
 import { useSftp } from './sftp'
+import { isLocalTarget } from '../lib/paneTarget'
+import { firstLeaf } from '../lib/paneTree'
 
 // The SFTP view and the terminal tabs share the content area, so exactly one of
 // them is frontmost. Anything that brings a terminal tab forward has to blur
@@ -87,5 +89,21 @@ describe('SFTP / terminal focus handoff', () => {
     expect(useSftp.getState().active).toBe(true)
     expect(useSessions.getState().tabs).toHaveLength(1)
     expect(useSessions.getState().activeTabId).toBe(tabId)
+  })
+
+  it('openLocal creates a server-less tab and blurs SFTP', () => {
+    useSessions.getState().openLocal()
+    const tabs = useSessions.getState().tabs
+    expect(tabs).toHaveLength(1)
+    expect(isLocalTarget(tabs[0].serverId)).toBe(true)
+    expect(tabs[0].title).toBe('Local')
+    expect(useSftp.getState().active).toBe(false)
+    // PaneTree.tsx passes the leaf's serverId (not the tab's) down to Terminal
+    // -> useTerminalSession, and that is the value deciding LocalService.Open
+    // vs SSHService.Open, so the leaf is what actually has to carry the sentinel.
+    const leaf = firstLeaf(tabs[0].root)
+    if (leaf.kind !== 'leaf') throw new Error('expected openLocal to build a single-leaf tree')
+    expect(isLocalTarget(leaf.serverId)).toBe(true)
+    expect(useSessions.getState().activeTabId).toBe(tabs[0].id)
   })
 })

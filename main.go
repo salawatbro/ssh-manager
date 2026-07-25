@@ -99,8 +99,8 @@ func main() {
 	repo := store.NewServerRepo(db)
 	kr := secret.NewKeyring()
 	serverService := service.NewServerService(repo, kr, dialer)
-	sshService := service.NewSSHService(prompter, repo, kr, dialer, termMgr, codePrompter)
 	settingsRepo := store.NewSettingsRepo(db)
+	sshService := service.NewSSHService(prompter, repo, settingsRepo, kr, dialer, termMgr, codePrompter)
 	settingsService := service.NewSettingsService(settingsRepo, platform.NewLoginAgent())
 	importService, err := service.NewImportService(repo)
 	if err != nil {
@@ -120,6 +120,7 @@ func main() {
 	})
 	forwardService := service.NewForwardService(forwardRepo, repo, kr, dialer, forwardMgr)
 	sftpService := service.NewSftpService(repo, kr, dialer, appEmitter{})
+	localService := service.NewLocalService(termMgr)
 
 	uninstallDataDir, _ := platform.DataDir()
 	uninstallLogDir, _ := platform.LogDir()
@@ -159,6 +160,7 @@ func main() {
 			application.NewService(forwardService),
 			application.NewService(snippetService),
 			application.NewService(sftpService),
+			application.NewService(localService),
 			application.NewService(uninstallService),
 		},
 		Assets: application.AssetOptions{

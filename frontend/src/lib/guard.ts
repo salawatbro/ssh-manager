@@ -1,5 +1,11 @@
-// Prod guard (FR-14): an ERGONOMIC barrier on dangerous commands typed
-// against a prod-tagged server, not a security control (FR-14.9/SEC-15).
+import type { Settings } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import type { GuardTarget } from '../stores/guard'
+
+// Command guard (FR-14): an ERGONOMIC barrier on dangerous commands typed
+// against a prod-tagged server OR the local terminal, not a security
+// control (FR-14.9/SEC-15). guardDecisionFor below is the single decision
+// point for both scopes, shared by all three call sites (typed input,
+// snippet run, broadcast) so the per-scope pattern choice exists once.
 // This file is framework-free (no React/Zustand) so it stays unit-testable
 // on its own — see internal/domain/guard.go for the Go original this ports.
 
@@ -66,4 +72,65 @@ export function createGuardBuffer(): GuardBuffer {
       buf = ''
     },
   }
+}
+
+// One pane/target the guard may apply to. `local` — not `env` — is what
+// distinguishes a local pane: env stays purely a UI-11 swatch value.
+export interface GuardScopeTarget {
+  host: string
+  env: string
+  local: boolean
+}
+
+// The one local-scope target, shared by every call site that can guard the
+// local terminal (useTerminalSession's typed input, BroadcastBar). `host`
+// here is display text for the modal's target row, not the pane-target
+// sentinel: it happens to be spelled the same as LOCAL_TARGET_ID
+// (lib/paneTarget.ts), but the two are read and written independently —
+// this value is never compared against a serverId, so it never leaks the
+// sentinel past paneTarget.ts.
+// Frozen because both call sites push this same object by reference into their
+// target list — a split local tab pushes it twice — so a stray mutation would
+// reach every row that shares it.
+export const LOCAL_SCOPE_TARGET: GuardScopeTarget = Object.freeze({ host: 'local', env: 'none', local: true })
+
+export interface GuardDecision {
+  title: string
+  targets: GuardTarget[]
+}
+
+const TITLE_PROD = 'Confirm on production'
+const TITLE_LOCAL = 'Confirm on this Mac'
+
+// guardDecisionFor is the single answer to "does this command need a
+// confirmation, and what should the modal say" — shared by the three
+// independent guard sites (typed input, snippet run, broadcast) so the
+// per-scope pattern choice exists once.
+//
+// null means "no confirmation": the guard is off, there are no targets, or
+// nothing matched. Callers therefore need exactly one check.
+//
+// Scope rules: a local pane is matched against guardPatternsLocal, a
+// prod-tagged server against guardPatterns, and every other server is left
+// alone — unchanged from FR-14.
+export function guardDecisionFor(
+  command: string,
+  targets: GuardScopeTarget[],
+  settings: Settings | null,
+): GuardDecision | null {
+  if (!settings?.guardEnabled) return null
+  const prodPatterns = splitPatterns(settings.guardPatterns)
+  const localPatterns = splitPatterns(settings.guardPatternsLocal)
+
+  const matched = targets.filter((t) => {
+    if (t.local) return matchesDangerous(command, localPatterns)
+    if (t.env !== 'prod') return false
+    return matchesDangerous(command, prodPatterns)
+  })
+  if (matched.length === 0) return null
+
+  // A mixed broadcast (a prod server and a local pane in one tab) reads as the
+  // more serious of the two.
+  const title = matched.some((t) => !t.local) ? TITLE_PROD : TITLE_LOCAL
+  return { title, targets: matched.map((t) => ({ host: t.host, env: t.env })) }
 }

@@ -5,12 +5,22 @@
  * SSHService is bound to the frontend. It owns host-key confirmation (v0.2)
  * and, from v0.3, the terminal session lifecycle: Open dials + starts a PTY +
  * registers it with the term.Manager; Write/Resize/Close delegate to it.
+ * 
+ * Write/Resize/Close are keyed purely by session id in the shared
+ * term.Manager, so they also drive sessions opened by LocalService.Open —
+ * not just ones opened by SSHService.Open. Anything added here that assumes
+ * a server-scoped session (e.g. looking up a Server row by session id) would
+ * break local panes.
  * @module
  */
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
 
 /**
  * Broadcast writes the same base64 payload to every listed session (FR-15). It
@@ -37,26 +47,31 @@ export function ConfirmHostKey(requestID: string, accept: boolean): $Cancellable
 }
 
 /**
- * Open connects to a server and starts an interactive PTY, returning the new
- * session id the frontend subscribes term:data on. It runs the full host-key
- * flow (a hostkey:request may fire mid-dial, exactly as in TestConnection).
- * The pty is opened at cols x rows — the frontend's already-fitted xterm
- * size — so a long-output command scrolls correctly from the first frame
- * instead of overwriting until the next resize. cols/rows under 1 (an
- * unmeasured caller) fall back to a sane 80x24 inside OpenSession. The
- * frontend still issues a Resize on every later container resize.
+ * Open connects to a server and starts an interactive PTY, returning an
+ * OpenResult carrying the new session id the frontend subscribes term:data
+ * on and the detected login shell. It runs the full host-key flow (a
+ * hostkey:request may fire mid-dial, exactly as in TestConnection). The pty
+ * is opened at cols x rows — the frontend's already-fitted xterm size — so a
+ * long-output command scrolls correctly from the first frame instead of
+ * overwriting until the next resize. cols/rows under 1 (an unmeasured
+ * caller) fall back to a sane 80x24 inside OpenSession. The frontend still
+ * issues a Resize on every later container resize.
  * 
- * No ctx timeout here — the dialer owns the whole connect ceiling via its
- * handshakeDeadline, deliberately longer than the network timeout so a
- * legitimate host-key prompt is never killed mid-decision (same reasoning as
- * TestConnection).
+ * No ctx timeout on the dial itself — the dialer owns the whole connect
+ * ceiling via its handshakeDeadline, deliberately longer than the network
+ * timeout so a legitimate host-key prompt is never killed mid-decision (same
+ * reasoning as TestConnection). That ceiling is not the whole story anymore,
+ * though: when the probe below runs, sshx.DetectShell adds its own
+ * independent ~3s timeout on top of the already-established connection, so a
+ * hung host can delay a successful Open by up to that long beyond the dial.
  */
-export function Open(serverID: string, cols: number, rows: number): $CancellablePromise<string> {
+export function Open(serverID: string, cols: number, rows: number): $CancellablePromise<$models.OpenResult> {
     return $Call.ByID(4190982559, serverID, cols, rows);
 }
 
 /**
- * Resize forwards the terminal's new (cols, rows) to the remote pty.
+ * Resize forwards the terminal's new (cols, rows) to the session's pty —
+ * remote (SSH) or local, whichever this session id was opened as.
  */
 export function Resize(sessionID: string, cols: number, rows: number): $CancellablePromise<void> {
     return $Call.ByID(3429379467, sessionID, cols, rows);

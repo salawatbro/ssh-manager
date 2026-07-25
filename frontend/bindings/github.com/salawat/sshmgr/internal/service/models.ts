@@ -120,6 +120,17 @@ export interface ImportPreview {
 }
 
 /**
+ * OpenResult is what both SSHService.Open and LocalService.Open hand the
+ * frontend. Shell is the detected login shell ("bash"/"zsh"/"fish"), or "" when
+ * it could not be classified — the frontend maps that to "inject nothing" and
+ * reports it honestly in the status bar.
+ */
+export interface OpenResult {
+    "sessionID": string;
+    "shell": string;
+}
+
+/**
  * SftpProgress is the sftp:progress event payload: one update for an in-flight
  * transfer (or its terminal Finished/Error state). Carries no secret (SEC-01).
  */
