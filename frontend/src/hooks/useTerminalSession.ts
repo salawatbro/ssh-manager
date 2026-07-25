@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
 import { SSHService, LocalService } from '@bindings/github.com/salawat/sshmgr/internal/service'
-import { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { Terminal } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import { b64ToBytes, strToB64 } from '../lib/termbytes'
-import { createGuardBuffer, matchesDangerous, splitPatterns } from '../lib/guard'
+import { createGuardBuffer, guardDecisionFor } from '../lib/guard'
 import { snippetFor } from '../lib/shellSnippets'
 import { paneShellInfo } from '../lib/paneShellInfo'
 import { isLocalTarget } from '../lib/paneTarget'
@@ -77,21 +76,23 @@ export function useTerminalSession(
         void SSHService.Write(id, strToB64(d)).catch(() => {})
         return
       }
-      // d contains '\r' (Enter). Check the line as it stood right before it
-      // against the pane's server env + the guard settings.
-      const server = useServers.getState().servers.find((s) => s.id === serverId)
+      // d contains '\r' (Enter). Check the line as it stood right before it.
       const settings = useSettings.getState().settings
-      const isProd = server?.environment === Environment.EnvProd
-      const patterns = settings ? splitPatterns(settings.guardPatterns) : []
-      const dangerous = settings?.guardEnabled && matchesDangerous(lineBeforeEnter, patterns)
-      if (isProd && dangerous && server) {
+      const local = isLocalTarget(serverId)
+      const server = local ? null : useServers.getState().servers.find((s) => s.id === serverId)
+      const target = local
+        ? { host: 'local', env: 'none', local: true }
+        : server && { host: server.name || server.host, env: server.environment, local: false }
+      const decision = target ? guardDecisionFor(lineBeforeEnter, [target], settings) : null
+      if (decision) {
         // Forward any pasted text before the held Enter (normally none — a
         // real keypress sends '\r' alone), but hold the '\r' itself.
         const head = d.slice(0, d.indexOf('\r'))
         if (head) void SSHService.Write(id, strToB64(head)).catch(() => {})
         useGuard.getState().requestGuard({
           command: lineBeforeEnter,
-          targets: [{ host: server.name || server.host, env: server.environment }],
+          title: decision.title,
+          targets: decision.targets,
           // Confirm sends the held Enter and clears the buffer. Cancel does
           // neither (FR-14.11) — requestGuard's caller (GuardModal) never
           // invokes this on cancel, so the buffer stays intact and a

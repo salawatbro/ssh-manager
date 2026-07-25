@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { SSHService } from '@bindings/github.com/salawat/sshmgr/internal/service'
-import { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { collectLeaves } from '../../lib/paneTree'
-import { matchesDangerous, splitPatterns } from '../../lib/guard'
+import { guardDecisionFor, type GuardScopeTarget } from '../../lib/guard'
+import { isLocalTarget } from '../../lib/paneTarget'
 import { strToB64 } from '../../lib/termbytes'
 import type { Tab } from '../../stores/sessions'
 import { usePanes } from '../../stores/panes'
 import { useServers } from '../../stores/servers'
 import { useSettings } from '../../stores/settings'
-import { useGuard, type GuardTarget } from '../../stores/guard'
+import { useGuard } from '../../stores/guard'
 
 // BroadcastBar (FR-15): pinned under the active tab once it has ≥2 panes
 // (TerminalArea decides when to mount it). ⇧↵ fans the typed line out to
@@ -21,15 +21,17 @@ export function BroadcastBar({ tab }: { tab: Tab }) {
   function send() {
     const servers = useServers.getState().servers
     const sessionIds: string[] = []
-    const prodTargets: GuardTarget[] = []
+    const scopeTargets: GuardScopeTarget[] = []
     for (const leaf of collectLeaves(tab.root)) {
       if (leaf.kind !== 'leaf') continue // collectLeaves only returns leaves; narrows the type
       const sessionId = paneSession[leaf.id]
       if (!sessionId) continue // pane hasn't opened its session yet — dropped
       sessionIds.push(sessionId)
-      const server = servers.find((s) => s.id === leaf.serverId)
-      if (server?.environment === Environment.EnvProd) {
-        prodTargets.push({ host: server.name || server.host, env: server.environment })
+      if (isLocalTarget(leaf.serverId)) {
+        scopeTargets.push({ host: 'local', env: 'none', local: true })
+      } else {
+        const server = servers.find((s) => s.id === leaf.serverId)
+        if (server) scopeTargets.push({ host: server.name || server.host, env: server.environment, local: false })
       }
     }
     if (sessionIds.length === 0) return
@@ -39,13 +41,13 @@ export function BroadcastBar({ tab }: { tab: Tab }) {
       setText('')
     }
 
-    // FR-15.9: guard the WHOLE broadcast (not just the prod panes) whenever
-    // any target is prod and the line matches a dangerous pattern — mirrors
-    // useTerminalSession's manual-buffer guard, reusing the same shared modal.
+    // FR-15.9: guard the WHOLE broadcast (not just the matching panes) whenever
+    // any target matches — mirrors useTerminalSession's manual-buffer guard,
+    // reusing the same shared modal and the same per-scope pattern rules.
     const settings = useSettings.getState().settings
-    const patterns = settings ? splitPatterns(settings.guardPatterns) : []
-    if (settings?.guardEnabled && prodTargets.length > 0 && matchesDangerous(text, patterns)) {
-      useGuard.getState().requestGuard({ command: text, targets: prodTargets, onConfirm: doBroadcast })
+    const decision = guardDecisionFor(text, scopeTargets, settings)
+    if (decision) {
+      useGuard.getState().requestGuard({ command: text, title: decision.title, targets: decision.targets, onConfirm: doBroadcast })
       return
     }
     doBroadcast()

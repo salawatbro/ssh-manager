@@ -12,11 +12,13 @@ export interface GuardTarget {
 interface GuardState {
   open: boolean
   command: string
+  title: string
   targets: GuardTarget[]
   onConfirm: (() => void) | null
   // Opens the modal. onConfirm runs only if the user types "run" and clicks
-  // Confirm — see GuardModal.
-  requestGuard: (args: { command: string; targets: GuardTarget[]; onConfirm: () => void }) => void
+  // Confirm — see GuardModal. title defaults to the production wording so
+  // pre-Task-10 callers (none remain, but keeps the type honest) still read.
+  requestGuard: (args: { command: string; title?: string; targets: GuardTarget[]; onConfirm: () => void }) => void
   // Closes WITHOUT invoking onConfirm. Whether that leaves the caller's own
   // input buffer intact (FR-14.11) is the caller's responsibility — this
   // store only owns the modal's visibility/content.
@@ -31,12 +33,13 @@ interface GuardState {
 // useSyncExternalStore.
 const NO_TARGETS: GuardTarget[] = []
 
-const CLOSED = { open: false, command: '', targets: NO_TARGETS, onConfirm: null } as const
+const CLOSED = { open: false, command: '', title: 'Confirm on production', targets: NO_TARGETS, onConfirm: null } as const
 
 export const useGuard = create<GuardState>((set) => ({
   ...CLOSED,
 
-  requestGuard: ({ command, targets, onConfirm }) => set({ open: true, command, targets, onConfirm }),
+  requestGuard: ({ command, title, targets, onConfirm }) =>
+    set({ open: true, command, title: title ?? 'Confirm on production', targets, onConfirm }),
   cancel: () => set(CLOSED),
   close: () => set(CLOSED),
 }))

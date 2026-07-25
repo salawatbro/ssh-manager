@@ -1,3 +1,6 @@
+import type { Settings } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import type { GuardTarget } from '../stores/guard'
+
 // Prod guard (FR-14): an ERGONOMIC barrier on dangerous commands typed
 // against a prod-tagged server, not a security control (FR-14.9/SEC-15).
 // This file is framework-free (no React/Zustand) so it stays unit-testable
@@ -66,4 +69,53 @@ export function createGuardBuffer(): GuardBuffer {
       buf = ''
     },
   }
+}
+
+// One pane/target the guard may apply to. `local` — not `env` — is what
+// distinguishes a local pane: env stays purely a UI-11 swatch value.
+export interface GuardScopeTarget {
+  host: string
+  env: string
+  local: boolean
+}
+
+export interface GuardDecision {
+  title: string
+  targets: GuardTarget[]
+}
+
+const TITLE_PROD = 'Confirm on production'
+const TITLE_LOCAL = 'Confirm on this Mac'
+
+// guardDecisionFor is the single answer to "does this command need a
+// confirmation, and what should the modal say" — shared by the three
+// independent guard sites (typed input, snippet run, broadcast) so the
+// per-scope pattern choice exists once.
+//
+// null means "no confirmation": the guard is off, there are no targets, or
+// nothing matched. Callers therefore need exactly one check.
+//
+// Scope rules: a local pane is matched against guardPatternsLocal, a
+// prod-tagged server against guardPatterns, and every other server is left
+// alone — unchanged from FR-14.
+export function guardDecisionFor(
+  command: string,
+  targets: GuardScopeTarget[],
+  settings: Settings | null,
+): GuardDecision | null {
+  if (!settings?.guardEnabled) return null
+  const prodPatterns = splitPatterns(settings.guardPatterns)
+  const localPatterns = splitPatterns(settings.guardPatternsLocal)
+
+  const matched = targets.filter((t) => {
+    if (t.local) return matchesDangerous(command, localPatterns)
+    if (t.env !== 'prod') return false
+    return matchesDangerous(command, prodPatterns)
+  })
+  if (matched.length === 0) return null
+
+  // A mixed broadcast (a prod server and a local pane in one tab) reads as the
+  // more serious of the two.
+  const title = matched.some((t) => !t.local) ? TITLE_PROD : TITLE_LOCAL
+  return { title, targets: matched.map((t) => ({ host: t.host, env: t.env })) }
 }

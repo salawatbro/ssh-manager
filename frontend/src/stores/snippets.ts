@@ -1,10 +1,9 @@
 import { create } from 'zustand'
 import { SnippetService, SSHService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import type { Server, Snippet } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { SnippetInput } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { collectLeaves } from '../lib/paneTree'
-import { matchesDangerous, splitPatterns } from '../lib/guard'
+import { guardDecisionFor } from '../lib/guard'
 import { strToB64 } from '../lib/termbytes'
 import { useSessions, type Tab } from './sessions'
 import { usePanes } from './panes'
@@ -154,12 +153,14 @@ export const useSnippets = create<SnippetsState>((set, get) => ({
     }
 
     const settings = useSettings.getState().settings
-    const patterns = settings ? splitPatterns(settings.guardPatterns) : []
-    const isProd = server.environment === Environment.EnvProd
-    if (isProd && settings?.guardEnabled && matchesDangerous(snippet.body, patterns)) {
+    const decision = guardDecisionFor(snippet.body, [
+      { host: server.name || server.host, env: server.environment, local: false },
+    ], settings)
+    if (decision) {
       useGuard.getState().requestGuard({
         command: snippet.body,
-        targets: [{ host: server.name || server.host, env: server.environment }],
+        title: decision.title,
+        targets: decision.targets,
         onConfirm: send,
       })
       return
