@@ -40,7 +40,19 @@ export function SnippetPalette() {
   // pane's raw key (real server id, local sentinel, or null).
   const local = key !== null && isLocalTarget(key)
   const focused = local || server !== null
-  const snippets = useSnippets((s) => (key ? (s.applicable[key] ?? NO_SNIPPETS) : NO_SNIPPETS))
+  // Gated on `focused`, not just `key`: if the focused pane's server id no
+  // longer resolves (e.g. the server was deleted from the sidebar while its
+  // tab stayed open), `applicable[key]` can still hold a stale list from an
+  // earlier ⌘E on that same key. Falling through to NO_SNIPPETS here keeps
+  // that stale list from rendering as clickable rows under the "no terminal
+  // focused" message below.
+  // Gated on `focused`, not just `key`: if the focused pane's server id no
+  // longer resolves (e.g. the server was deleted from the sidebar while its
+  // tab stayed open), `applicable[key]` can still hold a stale list from an
+  // earlier ⌘E on that same key. Falling through to NO_SNIPPETS here keeps
+  // that stale list from rendering as clickable rows under the "no terminal
+  // focused" message below.
+  const snippets = useSnippets((s) => (focused && key ? (s.applicable[key] ?? NO_SNIPPETS) : NO_SNIPPETS))
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
 

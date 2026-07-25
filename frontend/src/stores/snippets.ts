@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import { SnippetService, SSHService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { SnippetScope, type Server, type Snippet } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { SnippetInput } from '@bindings/github.com/salawat/sshmgr/internal/service'
-import { collectLeaves } from '../lib/paneTree'
+import { focusedLeaf } from '../lib/paneFocus'
+import { globalOnly } from '../lib/snippetScope'
 import { guardDecisionFor, LOCAL_SCOPE_TARGET } from '../lib/guard'
 import { isLocalTarget } from '../lib/paneTarget'
 import { strToB64 } from '../lib/termbytes'
@@ -16,14 +17,6 @@ import { useGuard } from './guard'
 // closed/unloaded state's array reference stable across renders (Zustand v5's
 // unmemoized useSyncExternalStore needs snapshot identity to stay put).
 const NO_SNIPPETS: Snippet[] = []
-
-// A local pane has no server and no group, so only GLOBAL snippets apply.
-// SnippetService.ApplicableTo('', '') would also return anything scoped to the
-// empty group (the "Ungrouped" bucket), which is unrelated — hence the filter
-// rather than trusting the query's shape.
-export function globalOnly(snippets: Snippet[]): Snippet[] {
-  return snippets.filter((s) => s.scope === SnippetScope.ScopeGlobal)
-}
 
 interface SnippetsState {
   // Applicable snippets per server (global + matching group + matching
@@ -55,20 +48,13 @@ interface SnippetsState {
 }
 
 // resolveFocusedServer walks tabs/activeTabId to the active tab's focused
-// leaf and resolves its server. Returns null both when no pane is focused
-// AND when the focused pane is local (a local pane's sentinel serverId never
-// matches a real server) — callers that need to tell those two apart use
-// useFocusedPaneKey below instead. Shared by useFocusedServer (reactive
-// selectors) below. collectLeaves's return type is the broader PaneNode
-// union even though every element it returns is actually a leaf (a split
-// node can't be a leaf of itself), so the `kind === 'leaf'` check here is a
-// real narrow, not dead code — mirrors BroadcastBar's `if (leaf.kind !==
-// 'leaf') continue`.
+// leaf (via lib/paneFocus's focusedLeaf) and resolves its server. Returns
+// null both when no pane is focused AND when the focused pane is local (a
+// local pane's sentinel serverId never matches a real server) — callers that
+// need to tell those two apart use useFocusedPaneKey below instead.
 function resolveFocusedServer(tabs: Tab[], activeTabId: string | null, servers: Server[]): Server | null {
-  const active = tabs.find((t) => t.id === activeTabId)
-  if (!active) return null
-  const leaf = collectLeaves(active.root).find((l) => l.id === active.focusedPaneId)
-  if (!leaf || leaf.kind !== 'leaf') return null
+  const leaf = focusedLeaf(tabs, activeTabId)
+  if (!leaf) return null
   return servers.find((s) => s.id === leaf.serverId) ?? null
 }
 
@@ -94,10 +80,7 @@ export function useFocusedServer(): Server | null {
 export function useFocusedPaneKey(): string | null {
   const tabs = useSessions((s) => s.tabs)
   const activeTabId = useSessions((s) => s.activeTabId)
-  const active = tabs.find((t) => t.id === activeTabId)
-  if (!active) return null
-  const leaf = collectLeaves(active.root).find((l) => l.id === active.focusedPaneId)
-  return leaf && leaf.kind === 'leaf' ? leaf.serverId : null
+  return focusedLeaf(tabs, activeTabId)?.serverId ?? null
 }
 
 // focusedTarget resolves the active tab's focused leaf to its session id and
@@ -107,16 +90,13 @@ export function useFocusedPaneKey(): string | null {
 // snippets, local guard patterns).
 function focusedTarget(): { sessionId: string; server: Server | null } | null {
   const st = useSessions.getState()
-  const active = st.tabs.find((t) => t.id === st.activeTabId)
-  if (!active) return null
-  const sessionId = usePanes.getState().paneSession[active.focusedPaneId]
+  const leaf = focusedLeaf(st.tabs, st.activeTabId)
+  if (!leaf) return null
+  const sessionId = usePanes.getState().paneSession[leaf.id]
   if (!sessionId) return null
-  const leaf = collectLeaves(active.root).find((l) => l.id === active.focusedPaneId)
-  if (!leaf || leaf.kind !== 'leaf') return null
-  const server = isLocalTarget(leaf.serverId)
-    ? null
-    : useServers.getState().servers.find((s) => s.id === leaf.serverId) ?? null
-  if (!isLocalTarget(leaf.serverId) && !server) return null
+  const local = isLocalTarget(leaf.serverId)
+  const server = local ? null : useServers.getState().servers.find((s) => s.id === leaf.serverId) ?? null
+  if (!local && !server) return null
   return { sessionId, server }
 }
 
@@ -127,8 +107,10 @@ export const useSnippets = create<SnippetsState>((set, get) => ({
 
   load: async (serverId, groupName) => {
     try {
-      const got = (await SnippetService.ApplicableTo(isLocalTarget(serverId) ? '' : serverId, groupName)) ?? []
-      const list = isLocalTarget(serverId) ? globalOnly(got) : got
+      const local = isLocalTarget(serverId)
+      const [id, group] = local ? ['', ''] : [serverId, groupName]
+      const got = (await SnippetService.ApplicableTo(id, group)) ?? []
+      const list = local ? globalOnly(got) : got
       set((s) => ({ applicable: { ...s.applicable, [serverId]: list } }))
     } catch {
       set((s) => ({ applicable: { ...s.applicable, [serverId]: [] } }))
@@ -204,8 +186,11 @@ export const useSnippets = create<SnippetsState>((set, get) => ({
       const snippet = await SnippetService.BySlot(slot, target.server?.id ?? '', target.server?.group ?? '')
       if (!snippet) return
       // BySlot('', '') has the same Ungrouped-bucket leak as ApplicableTo('',
-      // '') (see globalOnly above) — a group-scoped slot binding in the
-      // empty group could otherwise fire on a local pane.
+      // '') (see lib/snippetScope's globalOnly) by the query's shape — a
+      // reachable row would require a group/server-scoped snippet with an
+      // empty scopeRef, which internal/domain's Validate rejects on both
+      // Create and Update. This guard is defense in depth against a future
+      // backend change or a hand-edited database.
       if (!target.server && snippet.scope !== SnippetScope.ScopeGlobal) return
       get().run(snippet)
     } catch {

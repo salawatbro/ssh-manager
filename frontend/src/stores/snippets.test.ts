@@ -7,7 +7,7 @@ import { usePanes } from './panes'
 import { useServers } from './servers'
 import { useSettings } from './settings'
 import { useGuard } from './guard'
-import { useSnippets, globalOnly } from './snippets'
+import { useSnippets } from './snippets'
 
 // snippets.ts calls SSHService.Write directly (no SnippetService involved in
 // `run`) — stub the bindings module so no real Wails call happens. vitest
@@ -143,10 +143,12 @@ describe('useSnippets.runSlot on a local pane', () => {
     expect(writeMock).toHaveBeenCalledWith('sess-1', strToB64('ls -la\r'))
   })
 
-  // BySlot('', '') carries the same Ungrouped-bucket leak as
-  // ApplicableTo('', ''): a group-scoped snippet whose scopeRef is the empty
-  // group can still be bound to a slot and come back from this call. Local
-  // panes only offer GLOBAL snippets, so runSlot must not run it.
+  // BySlot('', '') carries the same Ungrouped-bucket leak as ApplicableTo('',
+  // '') by the query's shape — internal/domain rejects a group-scoped
+  // snippet with an empty scopeRef, so this row is not actually reachable
+  // today, but the guard is defense in depth against a future backend change
+  // or a hand-edited database. Local panes only offer GLOBAL snippets, so
+  // runSlot must not run it.
   it('does not run a group-scoped snippet leaked from the Ungrouped bucket', async () => {
     bySlotMock.mockResolvedValue({ ...snippet('echo ungrouped'), scope: SnippetScope.ScopeGroup } as Snippet)
 
@@ -176,22 +178,26 @@ describe('useSnippets.load on a local pane', () => {
   })
 })
 
-describe('globalOnly', () => {
-  const snip = (id: string, scope: SnippetScope, scopeRef = ''): Snippet =>
-    ({ id, name: id, body: 'echo ' + id, scope, scopeRef, slot: 0 }) as Snippet
-
-  // ApplicableTo('', '') also returns snippets scoped to the EMPTY group (the
-  // "Ungrouped" bucket), which have nothing to do with a local pane.
-  it('keeps global snippets and drops group- and server-scoped ones', () => {
-    const all = [
-      snip('g', SnippetScope.ScopeGlobal),
-      snip('grp', SnippetScope.ScopeGroup, ''),
-      snip('srv', SnippetScope.ScopeServer, ''),
-    ]
-    expect(globalOnly(all).map((s) => s.id)).toEqual(['g'])
+describe('useSnippets.load on a server pane', () => {
+  beforeEach(() => {
+    applicableToMock.mockReset()
   })
 
-  it('is empty for an empty input', () => {
-    expect(globalOnly([])).toEqual([])
+  // Regression coverage for the local-pane filter in load(): it must stay
+  // conditional on isLocalTarget, not apply to every pane. A server pane's
+  // ApplicableTo response is already scoped server-side (global + its group
+  // + itself), so load() must forward the real serverId/groupName to the
+  // backend call and must NOT run it through globalOnly — group- and
+  // server-scoped snippets have to survive into `applicable`.
+  it('forwards the real server id and group, and keeps non-global snippets', async () => {
+    const globalSnip = snippet('echo global')
+    const groupSnip = { ...snippet('echo group'), id: 'sn2', scope: SnippetScope.ScopeGroup } as Snippet
+    const serverSnip = { ...snippet('echo server'), id: 'sn3', scope: SnippetScope.ScopeServer } as Snippet
+    applicableToMock.mockResolvedValue([globalSnip, groupSnip, serverSnip])
+
+    await useSnippets.getState().load(server.id, 'db-group')
+
+    expect(applicableToMock).toHaveBeenCalledWith(server.id, 'db-group')
+    expect(useSnippets.getState().applicable[server.id].map((s) => s.id)).toEqual(['sn1', 'sn2', 'sn3'])
   })
 })
