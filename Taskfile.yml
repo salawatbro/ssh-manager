@@ -36,19 +36,21 @@ tasks:
     # value: the DMG would be built as "Zish-.dmg" and the drift guard would
     # compare empty against empty and pass. Everything that uses VERSION runs
     # this first.
+    # A shell glob (case ... [0-9]*.[0-9]*.[0-9]*) is not semver validation:
+    # `.` matches any character and `*` matches anything, including empty, so
+    # it would wave through "1.2.3.4", "1a.2b.3c" or "1 2.3.4". grep -E with
+    # anchors gives an actual x.y.z check instead.
     # Same mvdan/sh trap as the guards in `check`: a false `if` with no `else`
-    # returns the condition's status, so this needs its own trailing `exit 0`.
+    # returns the condition's status, so this needs its own trailing `exit 0`
+    # regardless of which branch of the `if` below ran.
     cmds:
       - cmd: |
           v="{{.VERSION}}"
-          case "$v" in
-            [0-9]*.[0-9]*.[0-9]*) ;;
-            *)
-              echo "XATO: build/config.yml dan versiya o'qilmadi (topilgani: '$v')"
-              echo "  Kutilgan qator: '  version: \"x.y.z\"' (info: ostida, ikki bo'sh joy, qo'shtirnoq)"
-              exit 1
-              ;;
-          esac
+          if ! printf '%s' "$v" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "XATO: build/config.yml dan versiya o'qilmadi (topilgani: '$v')"
+            echo "  Kutilgan qator: '  version: \"x.y.z\"' (info: ostida, ikki bo'sh joy, qo'shtirnoq)"
+            exit 1
+          fi
           exit 0
 
   bump:
@@ -63,20 +65,27 @@ tasks:
     # which makes macOS prefer a nonexistent Assets.car over icons.icns.
     #
     # sed writes through a temp file rather than -i, because BSD sed (macOS)
-    # requires an argument to -i and GNU sed refuses one.
+    # requires an argument to -i and GNU sed refuses one. Each sed/mv pair is
+    # joined with && so mv only ever promotes a temp file that sed actually
+    # succeeded in writing — go-task's cmd blocks are not run under `set -e`,
+    # so a bare sed failure followed by an unconditional mv would silently
+    # overwrite the real tracked file with an empty or partial temp file.
+    #
+    # NEW is validated with grep -E, not a shell glob: a glob's `.` matches
+    # any character and `*` matches anything including empty, so it would let
+    # through "1.2.3.4", "1a.2b.3c", "1.0.0-rc1" or a value crafted to break
+    # out of the sed expression below. grep -E with anchors is an actual
+    # x.y.z check, and mirrors the same check in version:verify.
     deps:
       - task: version:verify
     cmds:
       - cmd: |
           new="{{.NEW}}"
-          case "$new" in
-            [0-9]*.[0-9]*.[0-9]*) ;;
-            *)
-              echo "XATO: NEW semver x.y.z bo'lishi kerak (berilgani: '$new')"
-              echo "  Masalan: task bump NEW=1.3.0"
-              exit 1
-              ;;
-          esac
+          if ! printf '%s' "$new" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "XATO: NEW semver x.y.z bo'lishi kerak (berilgani: '$new')"
+            echo "  Masalan: task bump NEW=1.3.0"
+            exit 1
+          fi
           old="{{.VERSION}}"
           if [ "$old" = "$new" ]; then
             echo "Versiya allaqachon $new — o'zgarish yo'q."
@@ -85,14 +94,11 @@ tasks:
           # Dots are regex wildcards; escape them so 1.2.0 cannot match 1x2y0.
           esc=$(printf '%s' "$old" | sed 's|\.|\\.|g')
 
-          sed "s|^  version: \"$esc\"|  version: \"$new\"|" build/config.yml > build/config.yml.tmp
-          mv build/config.yml.tmp build/config.yml
+          sed "s|^  version: \"$esc\"|  version: \"$new\"|" build/config.yml > build/config.yml.tmp && mv build/config.yml.tmp build/config.yml
 
-          sed "s|<string>$esc</string>|<string>$new</string>|g" build/darwin/Info.plist > build/darwin/Info.plist.tmp
-          mv build/darwin/Info.plist.tmp build/darwin/Info.plist
+          sed "s|<string>$esc</string>|<string>$new</string>|g" build/darwin/Info.plist > build/darwin/Info.plist.tmp && mv build/darwin/Info.plist.tmp build/darwin/Info.plist
 
-          sed "s|Zish-$esc\.dmg|Zish-$new.dmg|g" README.md > README.md.tmp
-          mv README.md.tmp README.md
+          sed "s|Zish-$esc\.dmg|Zish-$new.dmg|g" README.md > README.md.tmp && mv README.md.tmp README.md
 
           echo "Versiya $old -> $new"
           git diff --stat -- build/config.yml build/darwin/Info.plist README.md
