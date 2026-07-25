@@ -38,7 +38,7 @@ tasks:
     # this first.
     # A shell glob (case ... [0-9]*.[0-9]*.[0-9]*) is not semver validation:
     # `.` matches any character and `*` matches anything, including empty, so
-    # it would wave through "1.2.3.4", "1a.2b.3c" or "1 2.3.4". grep -E with
+    # it would wave through "9.9.9.9", "9a.9b.9c" or "9 9.9.9". grep -E with
     # anchors gives an actual x.y.z check instead.
     # Same mvdan/sh trap as the guards in `check`: a false `if` with no `else`
     # returns the condition's status, so this needs its own trailing `exit 0`
@@ -54,7 +54,7 @@ tasks:
           exit 0
 
   bump:
-    desc: "Set the app version everywhere: task bump NEW=1.3.0"
+    desc: "Set the app version everywhere: task bump NEW=x.y.z"
     # Three files, and that is the whole list: the darwin Taskfile and the
     # About screen derive their value from build/config.yml rather than
     # carrying a copy, so there is nothing to write there.
@@ -73,7 +73,7 @@ tasks:
     #
     # NEW is validated with grep -E, not a shell glob: a glob's `.` matches
     # any character and `*` matches anything including empty, so it would let
-    # through "1.2.3.4", "1a.2b.3c", "1.0.0-rc1" or a value crafted to break
+    # through "9.9.9.9", "9a.9b.9c", "9.9.9-rc1" or a value crafted to break
     # out of the sed expression below. grep -E with anchors is an actual
     # x.y.z check, and mirrors the same check in version:verify.
     deps:
@@ -83,7 +83,7 @@ tasks:
           new="{{.NEW}}"
           if ! printf '%s' "$new" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "XATO: NEW semver x.y.z bo'lishi kerak (berilgani: '$new')"
-            echo "  Masalan: task bump NEW=1.3.0"
+            echo "  Masalan: task bump NEW=x.y.z"
             exit 1
           fi
           old="{{.VERSION}}"
@@ -91,7 +91,7 @@ tasks:
             echo "Versiya allaqachon $new — o'zgarish yo'q."
             exit 0
           fi
-          # Dots are regex wildcards; escape them so 1.2.3 cannot match 1x2y3.
+          # Dots are regex wildcards; escape them so x.y.z cannot match xXyYz.
           esc=$(printf '%s' "$old" | sed 's|\.|\\.|g')
 
           sed "s|^  version: \"$esc\"|  version: \"$new\"|" build/config.yml > build/config.yml.tmp && mv build/config.yml.tmp build/config.yml
@@ -195,7 +195,11 @@ tasks:
               exit 1
             fi
           done
-          if ! grep -q "Zish-$v\.dmg" README.md; then
+          # Dots in $v are regex wildcards to grep; escape them the same way
+          # `bump` does, so the presence check cannot be satisfied by a
+          # near-miss like "Zish-1x2y0.dmg".
+          esc=$(printf '%s' "$v" | sed 's|\.|\\.|g')
+          if ! grep -q "Zish-$esc\.dmg" README.md; then
             echo "XATO: README.md da Zish-$v.dmg topilmadi"
             echo "  Tuzatish: task bump NEW=$v"
             exit 1
@@ -214,7 +218,10 @@ tasks:
       #
       # git ls-files rather than find, so gitignored trees (node_modules,
       # dist, bin, .superpowers) are excluded for free and stay excluded.
-      # The files below are the ones that legitimately hold the version.
+      # The files below are excluded, and why. build/config.yml,
+      # build/darwin/Info.plist, and README.md legitimately hold the version
+      # (stage one above already checks those, so a match there is not news).
+      # CHANGELOG.md legitimately holds a history of past versions.
       # package-lock.json is excluded because a dependency constraint can
       # coincidentally match the app version — it carries
       # "use-sync-external-store": ">=9.9.9" today, which is not a copy of
@@ -230,11 +237,18 @@ tasks:
       # the single source (VERSION, version:verify, bump all live here), so
       # it is the most likely place a future maintainer would reintroduce a
       # hardcoded pin, and it must stay in scope for this scan to catch that.
-      # The two comments elsewhere in this file that used to illustrate their
-      # point with today's literal version (the regex-escaping note above and
-      # the package-lock.json note two paragraphs up) have been reworded to
-      # use a version that is not, and will not become, the app version, so
-      # this file has nothing left to coincidentally match.
+      # grep -IlF below is a substring match, not a whole-line one, so any
+      # text in this file — comment or otherwise — that merely *contains* the
+      # current version as a substring is enough to name Taskfile.yml here.
+      # The illustrative version literals in this file (the regex-escaping
+      # note above, the two grep -E validation notes, the package-lock.json
+      # note two paragraphs up, and the `task bump NEW=...` usage examples in
+      # `bump`'s desc and its own error message) are placeholders — x.y.z or
+      # the 9.9.9 family — picked so no plausible near-future app version is
+      # a substring of them. That is a property of today's placeholders, not
+      # a permanent guarantee: if any text in this file ever does collide
+      # with the current version, the fix is to reword that text, not to
+      # re-add an exclusion for Taskfile.yml.
       # Same mvdan/sh trap — trailing `exit 0` required.
       - cmd: |
           v="{{.VERSION}}"
@@ -245,7 +259,7 @@ tasks:
             ':!:CHANGELOG.md' \
             ':!:docs/' \
             ':!:frontend/package-lock.json' \
-            | xargs -0 grep -lF "$v" 2>/dev/null || true)
+            | xargs -0 grep -IlF "$v" 2>/dev/null || true)
           if [ -n "$hits" ]; then
             echo "XATO: versiya $v ruxsat etilmagan fayl(lar)da qattiq yozilgan:"
             echo "$hits"
