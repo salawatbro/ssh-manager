@@ -81,7 +81,7 @@ type Session struct {
 	waitOnce sync.Once
 	waitErr  error
 	// reaped is set by wait() once cmd.Wait has returned. It guards the
-	// syscall.Kill calls in Close and reapWithEscalation: syscall.Kill
+	// killProcessGroup calls in Close and reapWithEscalation: a raw kill
 	// bypasses Go's os.Process bookkeeping, so nothing else stops it from
 	// signalling a pid the OS has already recycled as an unrelated process
 	// group leader. A reaped child has nothing left to signal, so skipping
@@ -231,9 +231,12 @@ func (s *Session) wait() error {
 // the SIGKILL escalation below exists for. If the shell ignores SIGHUP
 // outright (trap "" HUP), the background reap started here escalates to
 // SIGKILL after reapGrace so it cannot spin forever, orphaned, with its pty
-// gone. Double quotes on purpose: this toolchain's gofmt rewrites a pair of
-// adjacent straight single quotes inside a comment into a smart quote, which
-// would garble the incantation for anyone copying it.
+// gone. Double quotes on purpose: gofmt's doc-comment reformatting (Go 1.19+)
+// treats a pair of adjacent straight single quotes as a TeX-style closing
+// double quote and rewrites it to a smart quote, which would garble the
+// incantation for anyone copying it. That is documented behaviour, not a local
+// quirk, and it applies only to doc comments — the same text inside a function
+// body survives untouched.
 func (s *Session) Close() error {
 	s.closeOnce.Do(func() {
 		pid := 0
@@ -253,7 +256,8 @@ func (s *Session) Close() error {
 
 // reapWithEscalation waits for the child to be reaped, and if it is still
 // alive after reapGrace, sends SIGKILL to the whole process group before
-// waiting again. syscall.Kill bypasses Go's os.Process "already done" guard,
+// waiting again. killProcessGroup's raw kill bypasses Go's os.Process
+// "already done" guard,
 // so the kill is gated on reaped: if wait() finished (even concurrently, via
 // WaitExitClean) there is nothing left to signal, and the pid could since
 // have been recycled as an unrelated process group leader.
