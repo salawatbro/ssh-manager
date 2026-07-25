@@ -194,11 +194,6 @@ tasks:
 
   dmg:
     summary: Builds a drag-to-install DMG from the ad-hoc-signed .app (macOS only)
-    vars:
-      VERSION: "1.2.0"        # keep in sync with build/config.yml `version`
-      VOLNAME: "Zish"
-      STAGING: "{{.BIN_DIR}}/dmg-staging"
-      DMG_OUT: "{{.BIN_DIR}}/Zish-{{.VERSION}}.dmg"
     deps:
       - task: package
     cmds:
@@ -207,10 +202,11 @@ tasks:
   dmg:build:
     internal: true
     vars:
-      VERSION: "1.2.0"
       VOLNAME: "Zish"
       STAGING: "{{.BIN_DIR}}/dmg-staging"
       DMG_OUT: "{{.BIN_DIR}}/Zish-{{.VERSION}}.dmg"
+    deps:
+      - task: :version:verify
     cmds:
       - rm -rf "{{.STAGING}}" "{{.DMG_OUT}}"
       - mkdir -p "{{.STAGING}}"

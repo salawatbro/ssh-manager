@@ -9,6 +9,16 @@ vars:
   # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
   # tasks below dispatch to the matching platform Taskfile via this variable.
   GOOS: '{{.GOOS | default OS}}'
+  # The app version has exactly one home: build/config.yml's info.version.
+  # Everything else — Info.plist, the DMG name, the About screen — is derived
+  # from it, and `task check` proves they agree. Bump it with `task bump`.
+  #
+  # The two-space indent and the double quotes in the pattern are load-bearing:
+  # config.yml also has an unindented, single-quoted `version: '3'` on line 4,
+  # which is the schema version and must not be picked up.
+  VERSION:
+    sh: |
+      sed -n 's/^  version: "\([^"]*\)".*/\1/p' build/config.yml
 
 includes:
   common: ./build/Taskfile.yml
@@ -19,6 +29,28 @@ includes:
   android: ./build/android/Taskfile.yml
 
 tasks:
+  version:verify:
+    internal: true
+    summary: Fails if the version could not be read out of build/config.yml
+    # A failed extraction yields an EMPTY VERSION, and empty is the dangerous
+    # value: the DMG would be built as "Zish-.dmg" and the drift guard would
+    # compare empty against empty and pass. Everything that uses VERSION runs
+    # this first.
+    # Same mvdan/sh trap as the guards in `check`: a false `if` with no `else`
+    # returns the condition's status, so this needs its own trailing `exit 0`.
+    cmds:
+      - cmd: |
+          v="{{.VERSION}}"
+          case "$v" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *)
+              echo "XATO: build/config.yml dan versiya o'qilmadi (topilgani: '$v')"
+              echo "  Kutilgan qator: '  version: \"x.y.z\"' (info: ostida, ikki bo'sh joy, qo'shtirnoq)"
+              exit 1
+              ;;
+          esac
+          exit 0
+
   check:
     desc: Bosqich darvozasi — TZ 15.1
     cmds:
