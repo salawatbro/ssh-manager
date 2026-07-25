@@ -126,7 +126,8 @@ users' data or keychain secrets. Only the _display_ name ("Zish": `config.yml`
   Everything else is scanned too, minus a pathspec exclusion list for files
   whose text can coincidentally *contain* a version-shaped substring without
   being a copy of it: dependency manifests (`go.mod`, `go.sum`,
-  `frontend/package-lock.json`), dated docs (`docs/`), and
+  `frontend/package.json`, `frontend/package-lock.json`), dated docs
+  (`docs/`), and
   `build/darwin/Info.dev.plist` (a fixed `0.1.0` dev-only placeholder for the
   unpackaged `task darwin:run` build, not a version consumer). The pathspec
   list inside `task check`'s stage-two guard in `Taskfile.yml` is the

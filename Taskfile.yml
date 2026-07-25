@@ -229,13 +229,15 @@ tasks:
       # README.md also legitimately hold the version (stage one above already
       # checks those, so a match there is not news either).
       # CHANGELOG.md legitimately holds a history of past versions.
-      # package-lock.json, go.mod and go.sum are excluded for the same class
-      # of reason: a dependency constraint can coincidentally match the app
-      # version as a substring. package-lock.json carries a
-      # use-sync-external-store constraint whose value happens to equal the
-      # app version today; go.mod and go.sum are full of third-party semver
-      # requirements (go-ole, google/uuid, and whatever the next `go get`
-      # pulls in) that are never a copy of anything this project owns. docs/
+      # frontend/package.json, frontend/package-lock.json, go.mod and go.sum
+      # are excluded as one category: dependency manifests whose constraints
+      # can coincidentally match the app version as a substring without being
+      # a copy of anything. package.json and package-lock.json each pin an
+      # npm dependency whose version happens to line up with the app version
+      # today; go.mod and go.sum are full of third-party semver requirements
+      # that drift on every `go get`/`go mod tidy`. package.json's own
+      # top-level "version" field is a private, unpublished placeholder — not
+      # the app version — so excluding the file loses nothing real. docs/
       # holds dated snapshots, not consumers. build/darwin/Info.dev.plist is
       # excluded too: both its bundle-version keys are fixed at a "0.1.0" dev
       # placeholder for `task darwin:run`'s unpackaged dev build, predate this
@@ -266,9 +268,10 @@ tasks:
       # version, the fix is to reword that text, not to re-add an exclusion
       # for Taskfile.yml — this file's prose is ours to write and rewrite.
       # That does not generalize to files this project does not author: a
-      # dependency manifest like go.mod or go.sum cannot be reworded away
-      # from a colliding third-party version, so excluding it (above) is the
-      # correct, permanent answer there, not a workaround to later remove.
+      # dependency manifest — go.mod, go.sum, package.json,
+      # package-lock.json — cannot be reworded away from a colliding
+      # third-party version, so excluding it (above) is the correct,
+      # permanent answer there, not a workaround to later remove.
       # Same mvdan/sh trap — trailing `exit 0` required.
       - cmd: |
           v="{{.VERSION}}"
@@ -287,6 +290,7 @@ tasks:
             ':!:README.md' \
             ':!:CHANGELOG.md' \
             ':!:docs/' \
+            ':!:frontend/package.json' \
             ':!:frontend/package-lock.json' \
             ':!:go.mod' \
             ':!:go.sum' \
@@ -302,6 +306,7 @@ tasks:
             ':!:README.md' \
             ':!:CHANGELOG.md' \
             ':!:docs/' \
+            ':!:frontend/package.json' \
             ':!:frontend/package-lock.json' \
             ':!:go.mod' \
             ':!:go.sum' \
