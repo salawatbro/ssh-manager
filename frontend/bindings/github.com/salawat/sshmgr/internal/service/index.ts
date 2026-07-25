@@ -3,6 +3,7 @@
 
 import * as ForwardService from "./forwardservice.js";
 import * as ImportService from "./importservice.js";
+import * as LocalService from "./localservice.js";
 import * as SSHService from "./sshservice.js";
 import * as ServerService from "./serverservice.js";
 import * as SettingsService from "./settingsservice.js";
@@ -12,6 +13,7 @@ import * as UninstallService from "./uninstallservice.js";
 export {
     ForwardService,
     ImportService,
+    LocalService,
     SSHService,
     ServerService,
     SettingsService,
