@@ -4,7 +4,7 @@ import { SSHService, LocalService } from '@bindings/github.com/salawat/sshmgr/in
 import type { Terminal } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import { b64ToBytes, strToB64 } from '../lib/termbytes'
-import { createGuardBuffer, guardDecisionFor } from '../lib/guard'
+import { createGuardBuffer, guardDecisionFor, LOCAL_SCOPE_TARGET } from '../lib/guard'
 import { snippetFor } from '../lib/shellSnippets'
 import { paneShellInfo } from '../lib/paneShellInfo'
 import { isLocalTarget } from '../lib/paneTarget'
@@ -81,7 +81,7 @@ export function useTerminalSession(
       const local = isLocalTarget(serverId)
       const server = local ? null : useServers.getState().servers.find((s) => s.id === serverId)
       const target = local
-        ? { host: 'local', env: 'none', local: true }
+        ? LOCAL_SCOPE_TARGET
         : server && { host: server.name || server.host, env: server.environment, local: false }
       const decision = target ? guardDecisionFor(lineBeforeEnter, [target], settings) : null
       if (decision) {

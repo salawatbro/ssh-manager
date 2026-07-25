@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { useGuard } from '../../stores/guard'
 import { envClassOf } from '../../lib/env'
 
-// The SHARED production-guard modal (FR-14): one instance, mounted once in
-// App.tsx, driven entirely by stores/guard.ts. Reused by the manual buffer
-// (this task), and by the reliable snippet/broadcast paths (Tasks 8/9) —
-// which is why it renders a LIST of targets, not just one.
+// The SHARED guard confirmation modal (FR-14): one instance, mounted once
+// in App.tsx, driven entirely by stores/guard.ts. Covers both scopes it can
+// be asked to confirm — "Confirm on production" for a prod-tagged server,
+// "Confirm on this Mac" for the local terminal — and every call site
+// (typed input, snippet run, broadcast), which is why it renders a LIST of
+// targets, not just one.
 //
 // FR-14.9/SEC-15: this is an ergonomic barrier, never a security control —
 // the copy must never claim "protected" or "secure".

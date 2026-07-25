@@ -1,8 +1,11 @@
 import type { Settings } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { GuardTarget } from '../stores/guard'
 
-// Prod guard (FR-14): an ERGONOMIC barrier on dangerous commands typed
-// against a prod-tagged server, not a security control (FR-14.9/SEC-15).
+// Command guard (FR-14): an ERGONOMIC barrier on dangerous commands typed
+// against a prod-tagged server OR the local terminal, not a security
+// control (FR-14.9/SEC-15). guardDecisionFor below is the single decision
+// point for both scopes, shared by all three call sites (typed input,
+// snippet run, broadcast) so the per-scope pattern choice exists once.
 // This file is framework-free (no React/Zustand) so it stays unit-testable
 // on its own — see internal/domain/guard.go for the Go original this ports.
 
@@ -78,6 +81,15 @@ export interface GuardScopeTarget {
   env: string
   local: boolean
 }
+
+// The one local-scope target, shared by every call site that can guard the
+// local terminal (useTerminalSession's typed input, BroadcastBar). `host`
+// here is display text for the modal's target row, not the pane-target
+// sentinel: it happens to be spelled the same as LOCAL_TARGET_ID
+// (lib/paneTarget.ts), but the two are read and written independently —
+// this value is never compared against a serverId, so it never leaks the
+// sentinel past paneTarget.ts.
+export const LOCAL_SCOPE_TARGET: GuardScopeTarget = { host: 'local', env: 'none', local: true }
 
 export interface GuardDecision {
   title: string

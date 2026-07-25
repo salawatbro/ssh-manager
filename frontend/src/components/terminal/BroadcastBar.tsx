@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { SSHService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { collectLeaves } from '../../lib/paneTree'
-import { guardDecisionFor, type GuardScopeTarget } from '../../lib/guard'
+import { guardDecisionFor, LOCAL_SCOPE_TARGET, type GuardScopeTarget } from '../../lib/guard'
 import { isLocalTarget } from '../../lib/paneTarget'
 import { strToB64 } from '../../lib/termbytes'
 import type { Tab } from '../../stores/sessions'
@@ -28,7 +28,7 @@ export function BroadcastBar({ tab }: { tab: Tab }) {
       if (!sessionId) continue // pane hasn't opened its session yet — dropped
       sessionIds.push(sessionId)
       if (isLocalTarget(leaf.serverId)) {
-        scopeTargets.push({ host: 'local', env: 'none', local: true })
+        scopeTargets.push(LOCAL_SCOPE_TARGET)
       } else {
         const server = servers.find((s) => s.id === leaf.serverId)
         if (server) scopeTargets.push({ host: server.name || server.host, env: server.environment, local: false })

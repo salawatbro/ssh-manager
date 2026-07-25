@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { guardDecisionFor, type GuardScopeTarget } from './guard'
+import { createGuardBuffer, guardDecisionFor, type GuardScopeTarget } from './guard'
 
 // A minimal stand-in for the generated Settings model — only the fields the
 // decision reads.
@@ -53,5 +53,48 @@ describe('guardDecisionFor', () => {
 
   it('returns null with no targets at all', () => {
     expect(guardDecisionFor('rm -rf /', [], settingsWith())).toBeNull()
+  })
+})
+
+// createGuardBuffer is what actually makes FR-14.11 hold: Confirm sends the
+// held Enter and clears the buffer, Cancel does neither, so a later Enter
+// re-triggers the guard. That behavior lives entirely in the buffer's
+// feed/clear contract, not in the callers — cover it directly here.
+describe('createGuardBuffer', () => {
+  it('feed with a \\r returns the line as it stood right before Enter', () => {
+    const buf = createGuardBuffer()
+    expect(buf.feed('r')).toBeNull()
+    expect(buf.feed('m -rf /')).toBeNull()
+    expect(buf.feed('\r')).toBe('rm -rf /')
+  })
+
+  it('\\x7f backspaces one character', () => {
+    const buf = createGuardBuffer()
+    buf.feed('rm -rf x')
+    buf.feed('\x7f')
+    expect(buf.line()).toBe('rm -rf ')
+  })
+
+  it('\\x15 and \\x03 clear the line', () => {
+    const buf = createGuardBuffer()
+    buf.feed('rm -rf /')
+    buf.feed('\x15')
+    expect(buf.line()).toBe('')
+
+    buf.feed('shutdown now')
+    buf.feed('\x03')
+    expect(buf.line()).toBe('')
+  })
+
+  // FR-14.11: Cancel must NOT call clear(), so the line typed before the
+  // held Enter survives until the caller explicitly clears it (on Confirm)
+  // — a bare feed() past the '\r' does not drop it on its own.
+  it('the line survives across feeds until clear() is called', () => {
+    const buf = createGuardBuffer()
+    buf.feed('rm -rf /')
+    buf.feed('\r')
+    expect(buf.line()).toBe('rm -rf /')
+    buf.clear()
+    expect(buf.line()).toBe('')
   })
 })
