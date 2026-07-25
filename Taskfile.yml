@@ -51,6 +51,54 @@ tasks:
           esac
           exit 0
 
+  bump:
+    desc: "Set the app version everywhere: task bump NEW=1.3.0"
+    # Three files, and that is the whole list: the darwin Taskfile and the
+    # About screen derive their value from build/config.yml rather than
+    # carrying a copy, so there is nothing to write there.
+    #
+    # Info.plist is edited IN PLACE. Do not reach for
+    # `wails3 task common:update:build-assets` -- CLAUDE.md forbids it: it
+    # rebuilds Info.plist from a template and can reintroduce CFBundleIconName,
+    # which makes macOS prefer a nonexistent Assets.car over icons.icns.
+    #
+    # sed writes through a temp file rather than -i, because BSD sed (macOS)
+    # requires an argument to -i and GNU sed refuses one.
+    deps:
+      - task: version:verify
+    cmds:
+      - cmd: |
+          new="{{.NEW}}"
+          case "$new" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *)
+              echo "XATO: NEW semver x.y.z bo'lishi kerak (berilgani: '$new')"
+              echo "  Masalan: task bump NEW=1.3.0"
+              exit 1
+              ;;
+          esac
+          old="{{.VERSION}}"
+          if [ "$old" = "$new" ]; then
+            echo "Versiya allaqachon $new — o'zgarish yo'q."
+            exit 0
+          fi
+          # Dots are regex wildcards; escape them so 1.2.0 cannot match 1x2y0.
+          esc=$(printf '%s' "$old" | sed 's|\.|\\.|g')
+
+          sed "s|^  version: \"$esc\"|  version: \"$new\"|" build/config.yml > build/config.yml.tmp
+          mv build/config.yml.tmp build/config.yml
+
+          sed "s|<string>$esc</string>|<string>$new</string>|g" build/darwin/Info.plist > build/darwin/Info.plist.tmp
+          mv build/darwin/Info.plist.tmp build/darwin/Info.plist
+
+          sed "s|Zish-$esc\.dmg|Zish-$new.dmg|g" README.md > README.md.tmp
+          mv README.md.tmp README.md
+
+          echo "Versiya $old -> $new"
+          git diff --stat -- build/config.yml build/darwin/Info.plist README.md
+          echo "CHANGELOG.md qo'lda yangilanadi."
+          exit 0
+
   check:
     desc: Bosqich darvozasi — TZ 15.1
     cmds:
