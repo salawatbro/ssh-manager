@@ -1,6 +1,8 @@
 package service
 
 import (
+	"fmt"
+
 	"github.com/google/uuid"
 
 	"github.com/salawat/sshmgr/internal/domain"
@@ -31,7 +33,12 @@ func NewLocalService(mgr *term.Manager) *LocalService {
 func (s *LocalService) Open(cols, rows int) (OpenResult, error) {
 	sess, err := localpty.Open(cols, rows)
 	if err != nil {
-		return OpenResult{}, domain.NewError(domain.CodeConnRefused, "Could not start a local shell.")
+		// Nothing under internal/ logs anywhere, and the frontend's only
+		// channel for this failure is the error message rendered inline with
+		// a Retry button — so the cause (e.g. "$SHELL" pointing at a missing
+		// binary, or ErrUnsupported on Windows) must travel in the message
+		// itself or it is lost for good.
+		return OpenResult{}, domain.NewError(domain.CodeConnRefused, fmt.Sprintf("Could not start a local shell: %v", err))
 	}
 	sessionID := uuid.NewString()
 	s.mgr.Add(sessionID, sess)

@@ -5,6 +5,12 @@
  * SSHService is bound to the frontend. It owns host-key confirmation (v0.2)
  * and, from v0.3, the terminal session lifecycle: Open dials + starts a PTY +
  * registers it with the term.Manager; Write/Resize/Close delegate to it.
+ * 
+ * Write/Resize/Close are keyed purely by session id in the shared
+ * term.Manager, so they also drive sessions opened by LocalService.Open —
+ * not just ones opened by SSHService.Open. Anything added here that assumes
+ * a server-scoped session (e.g. looking up a Server row by session id) would
+ * break local panes.
  * @module
  */
 
@@ -64,7 +70,8 @@ export function Open(serverID: string, cols: number, rows: number): $Cancellable
 }
 
 /**
- * Resize forwards the terminal's new (cols, rows) to the remote pty.
+ * Resize forwards the terminal's new (cols, rows) to the session's pty —
+ * remote (SSH) or local, whichever this session id was opened as.
  */
 export function Resize(sessionID: string, cols: number, rows: number): $CancellablePromise<void> {
     return $Call.ByID(3429379467, sessionID, cols, rows);

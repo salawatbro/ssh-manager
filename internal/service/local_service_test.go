@@ -9,6 +9,7 @@ import (
 
 func TestLocalOpenReturnsSessionAndShell(t *testing.T) {
 	mgr := term.NewManager(nopEmitter{}, 16*time.Millisecond, 30*time.Second)
+	t.Cleanup(func() { mgr.CloseAll() })
 	svc := NewLocalService(mgr)
 
 	res, err := svc.Open(80, 24)
