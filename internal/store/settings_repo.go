@@ -35,8 +35,14 @@ func (r *SettingsRepo) Get() (*domain.Settings, error) {
 	return &s, nil
 }
 
-// Save writes the settings row (ID forced to 1). Save creates the row if it is
-// somehow missing, so it never fails on a fresh database.
+// Save writes the settings row (ID forced to 1). Against an empty table gorm
+// falls back to an INSERT, so Save never fails on a fresh database — but it does
+// not write the row faithfully there: an INSERT omits every field with a
+// `gorm:"default:…"` tag whose Go value is the zero value, so a false or 0 is
+// silently replaced by the column default. Both production callers Get() first
+// (SettingsService.Get's backfill works on the row it just read, and Update's
+// first statement is a Get), so a Save always lands as an UPDATE and writes
+// what it was given. A caller that Saves into an empty table must Get() first.
 func (r *SettingsRepo) Save(s *domain.Settings) error {
 	s.ID = 1
 	if err := r.db.Save(s).Error; err != nil {

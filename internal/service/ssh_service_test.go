@@ -287,14 +287,14 @@ func newProbeFixture(t *testing.T, addr string, hostKey ssh.PublicKey) probeFixt
 // gate.
 //
 // The row is seeded via Get() before Save(), not Save() on a bare
-// domain.DefaultSettings() alone: gorm's Save on a struct with an explicit
-// primary key issues an UPDATE, which affects zero rows against an empty
-// table and silently does nothing — a later Get() would then hit
-// ErrRecordNotFound and seed its OWN default row (ShellIntegration always
-// true), discarding whatever this helper asked for. That failure mode is
-// invisible exactly when enabled=true, since it happens to match the
-// default — which is how the pre-fix version of this fixture (Save() with no
-// prior Get()) passed every existing test while never actually exercising a
+// domain.DefaultSettings() alone. Against an empty table gorm's Save does fall
+// back to an INSERT, so a row IS created — the loss happens inside that INSERT:
+// every field carrying a `gorm:"default:…"` tag whose Go value is the zero value
+// is omitted from the statement, so the column default wins. Seeding
+// ShellIntegration=false that way therefore stores TRUE. Get()-then-Save is an
+// UPDATE and writes the false. The failure mode is invisible when enabled=true
+// because it happens to match the default, which is how the pre-fix version of
+// this fixture passed every existing test while never once exercising a
 // persisted "false".
 func settingsRepoWithShellIntegration(t *testing.T, enabled bool) *store.SettingsRepo {
 	t.Helper()

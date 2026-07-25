@@ -385,6 +385,10 @@ func TestCloseReturnsTheUnderlyingFileCloseError(t *testing.T) {
 // shipped version of this test that finished in well under reapGrace would
 // be measuring a plain SIGHUP kill, not the escalation this test exists to
 // cover.
+// Must not use t.Parallel: it rewrites the package-global reapGrace for its
+// duration, so a concurrent sibling closing a session would see this test's
+// 200ms grace instead of the production one, or race the cleanup restoring it.
+// reapGraceMu makes that safe from a data race, not from a wrong value.
 func TestCloseEscalatesToSigkillWhenShellIgnoresSighup(t *testing.T) {
 	origGrace := setReapGrace(200 * time.Millisecond)
 	t.Cleanup(func() { setReapGrace(origGrace) })
