@@ -275,16 +275,14 @@ tasks:
       # Same mvdan/sh trap — trailing `exit 0` required.
       - cmd: |
           v="{{.VERSION}}"
-          # git ls-files feeds this scan; if it fails outright it prints
-          # nothing on stdout, and empty input makes `xargs -0 grep` exit 0
-          # (verified on macOS xargs — it never invokes grep at all), which
-          # would otherwise turn a broken scan into a silent green stage two.
-          # The repo can never legitimately have zero tracked files after
-          # this pathspec, so an empty list here is treated as a hard error
-          # rather than "no hits". This runs ls-files a second time (below)
-          # for the actual -z/xargs scan; that duplication is the price of
-          # not stuffing NUL-separated output into a shell variable.
-          files=$(git ls-files -- . \
+          # The pathspec is declared once, via `set --`, and reused for both
+          # git ls-files calls below through "$@" — so the emptiness check
+          # and the real scan can never drift apart by someone editing one
+          # copy of the exclusion list and not the other. What must stay out
+          # of a shell variable is the NUL-separated *output* of `git
+          # ls-files -z`, not these plain pathspec arguments, so `set --`
+          # (positional parameters, not a string) is safe here.
+          set -- . \
             ':!:build/config.yml' \
             ':!:build/darwin/Info.plist' \
             ':!:README.md' \
@@ -294,24 +292,23 @@ tasks:
             ':!:frontend/package-lock.json' \
             ':!:go.mod' \
             ':!:go.sum' \
-            ':!:build/darwin/Info.dev.plist')
+            ':!:build/darwin/Info.dev.plist'
+          # git ls-files still runs twice: once (without -z) purely to check
+          # the pathspec above resolves to a non-empty tracked-file list, and
+          # once (with -z, below) for the actual NUL-safe scan. An empty
+          # result from the first call is a hard error, not "no hits": the
+          # repo can never legitimately have zero tracked files after this
+          # pathspec, and empty input makes `xargs -0 grep` exit 0 (verified
+          # on macOS xargs — it never invokes grep at all), which would
+          # otherwise turn a broken `git ls-files` into a silent green stage
+          # two.
+          files=$(git ls-files -- "$@")
           if [ -z "$files" ]; then
             echo "XATO: git ls-files versiya skaneri uchun bo'sh natija qaytardi"
             echo "  (git buyrug'i muvaffaqiyatsiz bo'lgan bo'lishi mumkin)"
             exit 1
           fi
-          hits=$(git ls-files -z -- . \
-            ':!:build/config.yml' \
-            ':!:build/darwin/Info.plist' \
-            ':!:README.md' \
-            ':!:CHANGELOG.md' \
-            ':!:docs/' \
-            ':!:frontend/package.json' \
-            ':!:frontend/package-lock.json' \
-            ':!:go.mod' \
-            ':!:go.sum' \
-            ':!:build/darwin/Info.dev.plist' \
-            | xargs -0 grep -IlF "$v" 2>/dev/null || true)
+          hits=$(git ls-files -z -- "$@" | xargs -0 grep -IlF "$v" 2>/dev/null || true)
           if [ -n "$hits" ]; then
             echo "XATO: versiya $v ruxsat etilmagan fayl(lar)da qattiq yozilgan:"
             echo "$hits"
