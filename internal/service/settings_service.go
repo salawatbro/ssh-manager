@@ -41,6 +41,12 @@ func (s *SettingsService) Get() (*domain.Settings, error) {
 		cur.GuardPatterns = domain.DefaultSettings().GuardPatterns
 		_ = s.repo.Save(cur) // best-effort: a save failure still returns usable defaults in-memory this session
 	}
+	// Same backfill for the local list, added with the local terminal tab: an
+	// upgraded row carries "" and would guard nothing locally.
+	if cur.GuardPatternsLocal == "" {
+		cur.GuardPatternsLocal = domain.DefaultSettings().GuardPatternsLocal
+		_ = s.repo.Save(cur)
+	}
 	cur.Sanitise()
 	return cur, nil
 }

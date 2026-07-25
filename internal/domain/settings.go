@@ -32,6 +32,14 @@ type Settings struct {
 	GuardEnabled  bool   `gorm:"not null;default:true" json:"guardEnabled"`
 	GuardPatterns string `gorm:"not null;default:''" json:"guardPatterns"`
 
+	// GuardPatternsLocal is the guard list for the LOCAL terminal tab. It is
+	// separate from (and shorter than) GuardPatterns on purpose: `rm -rf` as a
+	// substring is an everyday command on a dev machine, and a barrier that
+	// fires on every `rm -rf node_modules` gets switched off — which would also
+	// disarm the production one. Same DB-default caveat as GuardPatterns: the
+	// real first-run list lives in DefaultSettings().
+	GuardPatternsLocal string `gorm:"not null;default:''" json:"guardPatternsLocal"`
+
 	// TourSeen is set true once the first-run welcome tour has been shown (or
 	// skipped); false on a fresh install so the tour auto-opens exactly once.
 	// Not a secret — a plain onboarding flag.
@@ -56,6 +64,7 @@ func DefaultSettings() Settings {
 		ShellIntegration:   true,
 		GuardEnabled:       true,
 		GuardPatterns:      defaultGuardPatterns,
+		GuardPatternsLocal: defaultLocalGuardPatterns,
 	}
 }
 
@@ -69,6 +78,16 @@ const defaultGuardPatterns = "rm -rf\n" +
 	"chmod -R 777\n" +
 	"shutdown\n" +
 	"reboot\n" +
+	":(){ :|:& };:"
+
+// defaultLocalGuardPatterns is the newline-separated first-run value of
+// Settings.GuardPatternsLocal — only the commands that would wreck the
+// machine, so everyday `rm -rf <dir>` passes untouched.
+const defaultLocalGuardPatterns = "rm -rf /\n" +
+	"rm -rf ~\n" +
+	"mkfs\n" +
+	"dd of=/dev/\n" +
+	"> /dev/sd\n" +
 	":(){ :|:& };:"
 
 // Sanitise clamps stored/incoming values to safe ranges so a corrupt row or a

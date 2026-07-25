@@ -17,6 +17,11 @@ export function GeneralSection() {
     if (s) setPatterns(s.guardPatterns)
   }, [s?.guardPatterns])
 
+  const [localPatterns, setLocalPatterns] = useState(s?.guardPatternsLocal ?? '')
+  useEffect(() => {
+    if (s) setLocalPatterns(s.guardPatternsLocal)
+  }, [s?.guardPatternsLocal])
+
   if (!s) return null
   return (
     <div className="flex flex-col">
@@ -47,6 +52,21 @@ export function GeneralSection() {
           value={patterns}
           onChange={(e) => setPatterns(e.target.value)}
           onBlur={() => void update({ guardPatterns: patterns })}
+        />
+      </div>
+      <div className="flex flex-col gap-[4px] border-b border-border py-[13px]">
+        <span className="text-[13px] text-text">Local terminal patterns</span>
+        <span className="text-[11.5px] text-textDim">
+          Asked for in the local terminal tab. Kept shorter than the list above on purpose — a bare
+          <span className="font-mono"> rm -rf </span>
+          is an everyday command on your own machine.
+        </span>
+        <textarea
+          className="mt-[4px] h-[92px] resize-none rounded-[5px] border border-border bg-bg0 px-[8px] py-[6px] font-mono text-[12px] text-text outline-none focus:border-accent"
+          spellCheck={false}
+          value={localPatterns}
+          onChange={(e) => setLocalPatterns(e.target.value)}
+          onBlur={() => void update({ guardPatternsLocal: localPatterns })}
         />
       </div>
       <Row label="Connection timeout" hint="Give up if the host does not answer." last>

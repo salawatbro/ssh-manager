@@ -166,6 +166,16 @@ export interface Settings {
     "guardPatterns": string;
 
     /**
+     * GuardPatternsLocal is the guard list for the LOCAL terminal tab. It is
+     * separate from (and shorter than) GuardPatterns on purpose: `rm -rf` as a
+     * substring is an everyday command on a dev machine, and a barrier that
+     * fires on every `rm -rf node_modules` gets switched off — which would also
+     * disarm the production one. Same DB-default caveat as GuardPatterns: the
+     * real first-run list lives in DefaultSettings().
+     */
+    "guardPatternsLocal": string;
+
+    /**
      * TourSeen is set true once the first-run welcome tour has been shown (or
      * skipped); false on a fresh install so the tour auto-opens exactly once.
      * Not a secret — a plain onboarding flag.
