@@ -38,3 +38,7 @@ frontend/node_modules/
 docs/superpowers/
 # Internal version notes — local working docs only
 docs/*-notes.md
+
+# Leftover temp file from an interrupted `task bump` sed/mv chain
+# (e.g. build/config.yml.tmp) — see Taskfile.yml's `bump` task.
+*.tmp

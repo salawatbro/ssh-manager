@@ -122,12 +122,18 @@ users' data or keychain secrets. Only the _display_ name ("Zish": `config.yml`
   `frontend/src/components/settings/AboutSection.tsx` derive their value instead
   of holding a copy. `task check` fails if any of them drift, or if a new copy
   appears in a tracked file outside the ones that legitimately hold it
-  (`build/config.yml`, `build/darwin/Info.plist`, `README.md`, `CHANGELOG.md`) or
-  are excluded for an unrelated reason (`docs/`, whose snapshots are dated, not
-  consumers; `frontend/package-lock.json`, whose dependency constraints can
-  coincidentally match the app version). Add a `CHANGELOG.md` section by hand —
-  `bump` does not touch it. (`build/android/app/build.gradle`'s `1.1.0` is an
-  Android _dependency_ version, not the app version.)
+  (`build/config.yml`, `build/darwin/Info.plist`, `README.md`, `CHANGELOG.md`).
+  Everything else is scanned too, minus a pathspec exclusion list for files
+  whose text can coincidentally *contain* a version-shaped substring without
+  being a copy of it: dependency manifests (`go.mod`, `go.sum`,
+  `frontend/package-lock.json`), dated docs (`docs/`), and
+  `build/darwin/Info.dev.plist` (a fixed `0.1.0` dev-only placeholder for the
+  unpackaged `task darwin:run` build, not a version consumer). The pathspec
+  list inside `task check`'s stage-two guard in `Taskfile.yml` is the
+  authoritative, up-to-date source for that list — this paragraph is a
+  summary and can drift, that one is enforced. Add a `CHANGELOG.md` section by
+  hand — `bump` does not touch it. (`build/android/app/build.gradle`'s
+  `1.1.0` is an Android _dependency_ version, not the app version.)
 - **The macOS icon is icns-only.** `build/darwin/icons.icns` is generated from
   `build/appicon.png` (source vector: `build/appicon.svg`); there is intentionally
   no `Assets.car` and no `CFBundleIconName`. **Do not run

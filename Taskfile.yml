@@ -70,6 +70,11 @@ tasks:
     # succeeded in writing — go-task's cmd blocks are not run under `set -e`,
     # so a bare sed failure followed by an unconditional mv would silently
     # overwrite the real tracked file with an empty or partial temp file.
+    # Each chain also ends in `|| exit 1`: without it, a failure on the first
+    # file would fall through to the next sed/mv pair and still reach the
+    # "Versiya old -> new" echo and the implicit success at the end of the
+    # block, reporting a clean bump when only some of the three files were
+    # actually rewritten.
     #
     # NEW is validated with grep -E, not a shell glob: a glob's `.` matches
     # any character and `*` matches anything including empty, so it would let
@@ -94,11 +99,11 @@ tasks:
           # Dots are regex wildcards; escape them so x.y.z cannot match xXyYz.
           esc=$(printf '%s' "$old" | sed 's|\.|\\.|g')
 
-          sed "s|^  version: \"$esc\"|  version: \"$new\"|" build/config.yml > build/config.yml.tmp && mv build/config.yml.tmp build/config.yml
+          sed "s|^  version: \"$esc\"|  version: \"$new\"|" build/config.yml > build/config.yml.tmp && mv build/config.yml.tmp build/config.yml || exit 1
 
-          sed "s|<string>$esc</string>|<string>$new</string>|g" build/darwin/Info.plist > build/darwin/Info.plist.tmp && mv build/darwin/Info.plist.tmp build/darwin/Info.plist
+          sed "s|<string>$esc</string>|<string>$new</string>|g" build/darwin/Info.plist > build/darwin/Info.plist.tmp && mv build/darwin/Info.plist.tmp build/darwin/Info.plist || exit 1
 
-          sed "s|Zish-$esc\.dmg|Zish-$new.dmg|g" README.md > README.md.tmp && mv README.md.tmp README.md
+          sed "s|Zish-$esc\.dmg|Zish-$new.dmg|g" README.md > README.md.tmp && mv README.md.tmp README.md || exit 1
 
           echo "Versiya $old -> $new"
           git diff --stat -- build/config.yml build/darwin/Info.plist README.md
@@ -224,11 +229,18 @@ tasks:
       # README.md also legitimately hold the version (stage one above already
       # checks those, so a match there is not news either).
       # CHANGELOG.md legitimately holds a history of past versions.
-      # package-lock.json is excluded because a dependency constraint can
-      # coincidentally match the app version — it carries a
+      # package-lock.json, go.mod and go.sum are excluded for the same class
+      # of reason: a dependency constraint can coincidentally match the app
+      # version as a substring. package-lock.json carries a
       # use-sync-external-store constraint whose value happens to equal the
-      # app version today, which is not a copy of anything. docs/ holds dated
-      # snapshots, not consumers.
+      # app version today; go.mod and go.sum are full of third-party semver
+      # requirements (go-ole, google/uuid, and whatever the next `go get`
+      # pulls in) that are never a copy of anything this project owns. docs/
+      # holds dated snapshots, not consumers. build/darwin/Info.dev.plist is
+      # excluded too: both its bundle-version keys are fixed at a "0.1.0" dev
+      # placeholder for `task darwin:run`'s unpackaged dev build, predate this
+      # branch, are never distributed, and are not a version consumer — bump
+      # does not write this file and stage one does not inspect it.
       #
       # Honest limit: this catches a new FILE. It cannot catch a new copy
       # added inside an already-allowlisted file, such as a second hardcoded
@@ -245,17 +257,45 @@ tasks:
       # current version as a substring is enough to name Taskfile.yml here.
       # The illustrative version literals in this file (the two regex-escaping
       # notes above — bump's dot-escaping comment and stage one's
-      # "Zish-1x2y0.dmg" note — the two grep -E validation notes, the
-      # package-lock.json note two paragraphs up, and the `task bump NEW=...`
-      # usage examples in `bump`'s desc and its own error message) are
-      # placeholders — x.y.z or the 9.9.9 family — picked so no plausible
-      # near-future app version is a substring of them. That is a property of
-      # today's placeholders, not a permanent guarantee: if any text in this
-      # file ever does collide with the current version, the fix is to reword
-      # that text, not to re-add an exclusion for Taskfile.yml.
+      # "Zish-1x2y0.dmg" note — the two grep -E validation notes, and the
+      # `task bump NEW=...` usage examples in `bump`'s desc and its own error
+      # message) are placeholders — x.y.z or the 9.9.9 family — picked so no
+      # plausible near-future app version is a substring of them. That is a
+      # property of today's placeholders, not a permanent guarantee: if any
+      # comment or string added to THIS FILE ever collides with the current
+      # version, the fix is to reword that text, not to re-add an exclusion
+      # for Taskfile.yml — this file's prose is ours to write and rewrite.
+      # That does not generalize to files this project does not author: a
+      # dependency manifest like go.mod or go.sum cannot be reworded away
+      # from a colliding third-party version, so excluding it (above) is the
+      # correct, permanent answer there, not a workaround to later remove.
       # Same mvdan/sh trap — trailing `exit 0` required.
       - cmd: |
           v="{{.VERSION}}"
+          # git ls-files feeds this scan; if it fails outright it prints
+          # nothing on stdout, and empty input makes `xargs -0 grep` exit 0
+          # (verified on macOS xargs — it never invokes grep at all), which
+          # would otherwise turn a broken scan into a silent green stage two.
+          # The repo can never legitimately have zero tracked files after
+          # this pathspec, so an empty list here is treated as a hard error
+          # rather than "no hits". This runs ls-files a second time (below)
+          # for the actual -z/xargs scan; that duplication is the price of
+          # not stuffing NUL-separated output into a shell variable.
+          files=$(git ls-files -- . \
+            ':!:build/config.yml' \
+            ':!:build/darwin/Info.plist' \
+            ':!:README.md' \
+            ':!:CHANGELOG.md' \
+            ':!:docs/' \
+            ':!:frontend/package-lock.json' \
+            ':!:go.mod' \
+            ':!:go.sum' \
+            ':!:build/darwin/Info.dev.plist')
+          if [ -z "$files" ]; then
+            echo "XATO: git ls-files versiya skaneri uchun bo'sh natija qaytardi"
+            echo "  (git buyrug'i muvaffaqiyatsiz bo'lgan bo'lishi mumkin)"
+            exit 1
+          fi
           hits=$(git ls-files -z -- . \
             ':!:build/config.yml' \
             ':!:build/darwin/Info.plist' \
@@ -263,6 +303,9 @@ tasks:
             ':!:CHANGELOG.md' \
             ':!:docs/' \
             ':!:frontend/package-lock.json' \
+            ':!:go.mod' \
+            ':!:go.sum' \
+            ':!:build/darwin/Info.dev.plist' \
             | xargs -0 grep -IlF "$v" 2>/dev/null || true)
           if [ -n "$hits" ]; then
             echo "XATO: versiya $v ruxsat etilmagan fayl(lar)da qattiq yozilgan:"
