@@ -8,7 +8,7 @@ import { useSettings } from '../../stores/settings'
 import { useForwards } from '../../stores/forwards'
 import { StatusDot } from '../server/StatusDot'
 import { shellSegmentLabel } from '../../lib/shellSegmentLabel'
-import { isLocalTarget, resolveBarServerId } from '../../lib/paneTarget'
+import { isLocalTarget, serverTargetId } from '../../lib/paneTarget'
 
 interface Props {
   onOpenTunnels: (serverId: string) => void
@@ -73,9 +73,12 @@ export function StatusBar({ onOpenTunnels }: Props) {
   // opens that server's tunnels panel). Load its forward definitions so the
   // count is accurate even before that server's panel has ever been opened —
   // statusById alone is keyed by forward id and can't be mapped to a server
-  // without the defs. resolveBarServerId keeps the local sentinel from ever
-  // being treated as a real server id here.
-  const barServerId = resolveBarServerId(activeTab, selectedId)
+  // without the defs. serverTargetId keeps the local sentinel from ever being
+  // treated as a real server id here; the `?? selectedId` idle fallback only
+  // applies with no active tab at all — a local tab has a real target (none),
+  // it just isn't a server, so it must not fall through to the sidebar
+  // selection.
+  const barServerId = activeTab ? serverTargetId(activeTab) : selectedId
   useEffect(() => {
     if (barServerId) void useForwards.getState().load(barServerId)
   }, [barServerId])
@@ -139,11 +142,14 @@ export function StatusBar({ onOpenTunnels }: Props) {
   // would be a plain lie about what the session is.
   const auth = local ? { icon: Terminal, label: 'Local shell' } : authMeta(server?.authType ?? AuthType.AuthKey)
   const AuthIcon = auth.icon
-  const target = local
-    ? 'local'
-    : server
-      ? `${server.user}@${server.host}${server.port === 22 ? '' : `:${server.port}`}`
-      : activeTab.hostLabel
+  // A local tab has `server === null` (see above), so this already falls
+  // through to `activeTab.hostLabel` — which `openLocal` (stores/sessions.ts)
+  // sets to the literal `'local'`. No separate `local` arm here: that would
+  // re-spell the sentinel outside paneTarget.ts and silently go stale if
+  // `hostLabel` ever became a friendlier string.
+  const target = server
+    ? `${server.user}@${server.host}${server.port === 22 ? '' : `:${server.port}`}`
+    : activeTab.hostLabel
   const dims = paneDims[activeTab.focusedPaneId]
 
   return (
@@ -172,7 +178,7 @@ export function StatusBar({ onOpenTunnels }: Props) {
       </div>
       <div className="flex-1" />
       <div className="flex shrink-0 items-center gap-[10px]">
-        {tunnelsSegment(local ? null : activeTab.serverId)}
+        {tunnelsSegment(serverTargetId(activeTab))}
         {divider}
         <span className="font-mono">{elapsedClock(activeTab.startedAt, now)}</span>
       </div>
