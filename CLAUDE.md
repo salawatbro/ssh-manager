@@ -116,11 +116,15 @@ users' data or keychain secrets. Only the _display_ name ("Zish": `config.yml`
 
 ### Release / build assets
 
-- **The app version is hardcoded in ~7 places:** `build/config.yml`,
-  `build/darwin/Info.plist` (×2), `build/darwin/Taskfile.yml` `VERSION` (×2),
-  `AboutSection.tsx`, and the README DMG names. Bump them together and add a
-  `CHANGELOG.md` section. (`build/android/app/build.gradle`'s `1.1.0` is an Android
-  _dependency_ version, not the app version.)
+- **The app version has one home:** `build/config.yml`'s `info.version`. Bump it
+  with **`task bump NEW=x.y.z`**, which also rewrites `build/darwin/Info.plist`
+  (both strings) and the README's DMG names. The darwin Taskfile and the About
+  screen derive their value instead of holding a copy. `task check` fails if any
+  of them drift, or if a new copy appears in a tracked file outside
+  `build/config.yml`, `build/darwin/Info.plist`, `README.md` and `CHANGELOG.md`.
+  Add a `CHANGELOG.md` section by hand — `bump` does not touch it.
+  (`build/android/app/build.gradle`'s `1.1.0` is an Android _dependency_
+  version, not the app version.)
 - **The macOS icon is icns-only.** `build/darwin/icons.icns` is generated from
   `build/appicon.png` (source vector: `build/appicon.svg`); there is intentionally
   no `Assets.car` and no `CFBundleIconName`. **Do not run
