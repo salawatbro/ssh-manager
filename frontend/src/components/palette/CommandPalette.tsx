@@ -152,6 +152,10 @@ export function CommandPalette({
       useServers.getState().select(null)
       useSessions.getState().open(row.server)
     } else if (row.kind === 'command') {
+      // Same reasoning as the server branch above and quickConnect(): a
+      // command (e.g. "Local terminal") opens a tab in the content area, and
+      // a selected server's open ServerForm (392px) would otherwise cover it.
+      useServers.getState().select(null)
       row.run()
     } else {
       void quickConnect(row.target)
