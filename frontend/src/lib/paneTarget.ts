@@ -11,3 +11,15 @@ export const LOCAL_TARGET_ID = 'local'
 export function isLocalTarget(serverId: string): boolean {
   return serverId === LOCAL_TARGET_ID
 }
+
+// Resolves which server id the status bar's forwards lookup should use.
+// Never the local sentinel: ForwardService.List would be asked for a server
+// that does not exist. Falls back to the idle-selection id when there is no
+// active tab, or when the active tab is local.
+export function resolveBarServerId(
+  activeTab: { serverId: string } | null,
+  selectedId: string | null,
+): string | null {
+  const activeServerId = activeTab && !isLocalTarget(activeTab.serverId) ? activeTab.serverId : null
+  return activeServerId ?? selectedId
+}
