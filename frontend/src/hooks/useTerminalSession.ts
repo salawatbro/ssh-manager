@@ -86,20 +86,29 @@ export function useTerminalSession(
       const decision = target ? guardDecisionFor(lineBeforeEnter, [target], settings) : null
       if (decision) {
         // Forward any pasted text before the held Enter (normally none — a
-        // real keypress sends '\r' alone), but hold the '\r' itself.
-        const head = d.slice(0, d.indexOf('\r'))
+        // real keypress sends '\r' alone), but hold everything from the
+        // Enter onward: a paste can carry further lines after it in the same
+        // chunk, and those must not be dropped just because the first line
+        // tripped the guard.
+        const splitAt = d.indexOf('\r')
+        const head = d.slice(0, splitAt)
+        const tail = d.slice(splitAt) // the held '\r' plus any later lines
         if (head) void SSHService.Write(id, strToB64(head)).catch(() => {})
         useGuard.getState().requestGuard({
           command: lineBeforeEnter,
           title: decision.title,
           targets: decision.targets,
-          // Confirm sends the held Enter and clears the buffer. Cancel does
-          // neither (FR-14.11) — requestGuard's caller (GuardModal) never
-          // invokes this on cancel, so the buffer stays intact and a
-          // subsequent Enter re-triggers the guard.
+          // Confirm sends the held tail (the Enter and any lines pasted after
+          // it) and clears the buffer. Cancel does neither (FR-14.11) —
+          // requestGuard's caller (GuardModal) never invokes this on cancel,
+          // so the buffer stays intact and a subsequent Enter re-triggers the
+          // guard. Lines after the first are not individually re-checked
+          // against the guard here — the unguarded branch below already
+          // forwards a whole multi-line chunk once its first line passes, so
+          // this matches existing behaviour rather than opening a new gap.
           onConfirm: () => {
             guardBuf.clear()
-            void SSHService.Write(id, strToB64('\r')).catch(() => {})
+            void SSHService.Write(id, strToB64(tail)).catch(() => {})
           },
         })
         return

@@ -240,6 +240,14 @@ func TestDetectShellUnknownOnTimeout(t *testing.T) {
 // in the timeout branch makes this test fail (no goroutine is ever reaped),
 // which is what proves this test covers the fix rather than just the
 // return value asserted by TestDetectShellUnknownOnTimeout.
+//
+// Do not add t.Parallel() to this test. It asserts on process-global
+// goroutine state via countGoroutinesOnStack, so any other in-flight
+// sshx.detectShell probe running concurrently elsewhere in this package (a
+// future test that, say, probes through the production ~3s timeout) leaves
+// its own goroutine on the same stack snapshot and can outlast this test's
+// poll window — failing this test for a leak that belongs to that other
+// probe, not to this one.
 func TestDetectShellDoesNotLeakGoroutineOnTimeout(t *testing.T) {
 	const testTimeout = 100 * time.Millisecond
 
@@ -267,7 +275,11 @@ func TestDetectShellDoesNotLeakGoroutineOnTimeout(t *testing.T) {
 }
 
 // countGoroutinesOnStack snapshots every goroutine's stack via runtime.Stack
-// and counts how many mention marker, e.g. "sshx.detectShell".
+// and counts how many mention marker, e.g. "sshx.detectShell". This inspects
+// process-global state, not anything scoped to the calling test — a caller
+// must not run under t.Parallel(), or a concurrent probe elsewhere in the
+// package can leave a goroutine on the snapshot that has nothing to do with
+// the caller's own assertion.
 func countGoroutinesOnStack(t *testing.T, marker string) int {
 	t.Helper()
 	buf := make([]byte, 1<<20)

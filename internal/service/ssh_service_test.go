@@ -238,22 +238,23 @@ func TestBroadcastUnknownSessionDoesNotAbortOthersAndReturnsFirstError(t *testin
 	}
 }
 
-// TestOpenRequestsPTYAtThePassedSize proves the actual bug end-to-end: Open
-// must request the remote PTY at the xterm size the frontend passed in, not
-// a hardcoded 80x24 (see internal/sshx/session.go's OpenSession, which
-// requests whatever cols/rows it is given). The bug lives entirely in what
-// Open itself hands to sshx.OpenSession — a call fakeDialer/fakePTY never
-// exercise, since fakeDialer.DialChain returns no real *sshx.Conn and
-// fakePTY.Resize just records an in-memory struct field. So unlike every
-// other test in this file, this one stands up a real in-process SSH server
-// (mirroring internal/sshx's own test doubles, e.g. session_test.go's
-// newEchoServer) and a real *sshx.Dialer, and inspects the literal pty-req
-// wire message — the only vantage point from which "Open asked for the
-// wrong size" is actually observable.
-func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
-	addr, hostKey, dims, execs := newPTYCapturingServer(t, "")
-	host, port := splitTestAddr(t, addr)
+// probeFixture bundles the wiring every Open-against-a-real-server test in
+// this file repeats: a server row with a stored password, a known_hosts
+// seeded with the server's host key, a matching verifier/dialer pair, and a
+// fresh term.Manager. It deliberately stops short of a settings repo — the
+// four probe-gate tests below differ on exactly that (nil, persisted-true,
+// persisted-false), so this helper leaves the exec answer and the setting as
+// the only visible differences between them.
+type probeFixture struct {
+	repo   *store.ServerRepo
+	sec    secret.Store
+	dialer *sshx.Dialer
+	mgr    *term.Manager
+}
 
+func newProbeFixture(t *testing.T, addr string, hostKey ssh.PublicKey) probeFixture {
+	t.Helper()
+	host, port := splitTestAddr(t, addr)
 	repo := newRepo(t)
 	srv := &domain.Server{ID: "s1", Name: "box", Host: host, Port: port, User: "u", AuthType: domain.AuthPassword}
 	if err := repo.Create(srv); err != nil {
@@ -270,9 +271,65 @@ func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dialer := sshx.NewDialer(v, 5*time.Second, 20*time.Second)
-	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
-	svc := NewSSHService(nil, repo, nil, sec, dialer, mgr, nil)
+	return probeFixture{
+		repo:   repo,
+		sec:    sec,
+		dialer: sshx.NewDialer(v, 5*time.Second, 20*time.Second),
+		mgr:    term.NewManager(nopEmitter{}, time.Hour, time.Hour),
+	}
+}
+
+// settingsRepoWithShellIntegration returns a real, DB-backed settings repo
+// whose single persisted row has ShellIntegration set to enabled. This is
+// deliberately not the same thing as a nil settings repo (which Open never
+// even calls .Get() on): it exercises the s.settings != nil branch and lets a
+// test pin what Open does with an actual stored value, on either side of the
+// gate.
+//
+// The row is seeded via Get() before Save(), not Save() on a bare
+// domain.DefaultSettings() alone: gorm's Save on a struct with an explicit
+// primary key issues an UPDATE, which affects zero rows against an empty
+// table and silently does nothing — a later Get() would then hit
+// ErrRecordNotFound and seed its OWN default row (ShellIntegration always
+// true), discarding whatever this helper asked for. That failure mode is
+// invisible exactly when enabled=true, since it happens to match the
+// default — which is how the pre-fix version of this fixture (Save() with no
+// prior Get()) passed every existing test while never actually exercising a
+// persisted "false".
+func settingsRepoWithShellIntegration(t *testing.T, enabled bool) *store.SettingsRepo {
+	t.Helper()
+	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	settingsRepo := store.NewSettingsRepo(db)
+	seed, err := settingsRepo.Get() // seeds the row so Save below is an UPDATE that actually lands
+	if err != nil {
+		t.Fatal(err)
+	}
+	seed.ShellIntegration = enabled
+	if err := settingsRepo.Save(seed); err != nil {
+		t.Fatal(err)
+	}
+	return settingsRepo
+}
+
+// TestOpenRequestsPTYAtThePassedSize proves the actual bug end-to-end: Open
+// must request the remote PTY at the xterm size the frontend passed in, not
+// a hardcoded 80x24 (see internal/sshx/session.go's OpenSession, which
+// requests whatever cols/rows it is given). The bug lives entirely in what
+// Open itself hands to sshx.OpenSession — a call fakeDialer/fakePTY never
+// exercise, since fakeDialer.DialChain returns no real *sshx.Conn and
+// fakePTY.Resize just records an in-memory struct field. So unlike every
+// other test in this file, this one stands up a real in-process SSH server
+// (mirroring internal/sshx's own test doubles, e.g. session_test.go's
+// newEchoServer) and a real *sshx.Dialer, and inspects the literal pty-req
+// wire message — the only vantage point from which "Open asked for the
+// wrong size" is actually observable.
+func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
+	addr, hostKey, dims, execs := newPTYCapturingServer(t, "")
+	fx := newProbeFixture(t, addr, hostKey)
+	svc := NewSSHService(nil, fx.repo, nil, fx.sec, fx.dialer, fx.mgr, nil)
 
 	res, err := svc.Open("s1", 120, 40)
 	if err != nil {
@@ -312,38 +369,10 @@ func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
 // A probe failure is never a connect failure.
 func TestOpenWithProbeEnabledSurvivesAnUnprobeableServer(t *testing.T) {
 	addr, hostKey, _, execs := newPTYCapturingServer(t, "") // "" = refuse every exec request
-	host, port := splitTestAddr(t, addr)
+	fx := newProbeFixture(t, addr, hostKey)
+	settingsRepo := settingsRepoWithShellIntegration(t, true)
 
-	repo := newRepo(t)
-	srv := &domain.Server{ID: "s1", Name: "box", Host: host, Port: port, User: "u", AuthType: domain.AuthPassword}
-	if err := repo.Create(srv); err != nil {
-		t.Fatal(err)
-	}
-	sec := secret.NewFake()
-	if err := sec.SetPassword("s1", "pw"); err != nil {
-		t.Fatal(err)
-	}
-
-	khPath := filepath.Join(t.TempDir(), "known_hosts")
-	seedKnownHostForTest(t, khPath, addr, hostKey)
-	v, err := sshx.NewVerifier(khPath, acceptAllHostKeys{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	dialer := sshx.NewDialer(v, 5*time.Second, 20*time.Second)
-	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
-
-	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	settingsRepo := store.NewSettingsRepo(db)
-	seed := domain.DefaultSettings() // ShellIntegration is true by default
-	if err := settingsRepo.Save(&seed); err != nil {
-		t.Fatal(err)
-	}
-
-	svc := NewSSHService(nil, repo, settingsRepo, sec, dialer, mgr, nil)
+	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil)
 	res, err := svc.Open("s1", 80, 24)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
@@ -373,38 +402,10 @@ func TestOpenWithProbeEnabledSurvivesAnUnprobeableServer(t *testing.T) {
 // result.
 func TestOpenReportsDetectedShellWhenIntegrationEnabled(t *testing.T) {
 	addr, hostKey, _, execs := newPTYCapturingServer(t, "/bin/bash\n")
-	host, port := splitTestAddr(t, addr)
+	fx := newProbeFixture(t, addr, hostKey)
+	settingsRepo := settingsRepoWithShellIntegration(t, true)
 
-	repo := newRepo(t)
-	srv := &domain.Server{ID: "s1", Name: "box", Host: host, Port: port, User: "u", AuthType: domain.AuthPassword}
-	if err := repo.Create(srv); err != nil {
-		t.Fatal(err)
-	}
-	sec := secret.NewFake()
-	if err := sec.SetPassword("s1", "pw"); err != nil {
-		t.Fatal(err)
-	}
-
-	khPath := filepath.Join(t.TempDir(), "known_hosts")
-	seedKnownHostForTest(t, khPath, addr, hostKey)
-	v, err := sshx.NewVerifier(khPath, acceptAllHostKeys{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	dialer := sshx.NewDialer(v, 5*time.Second, 20*time.Second)
-	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
-
-	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	settingsRepo := store.NewSettingsRepo(db)
-	seed := domain.DefaultSettings() // ShellIntegration is true by default
-	if err := settingsRepo.Save(&seed); err != nil {
-		t.Fatal(err)
-	}
-
-	svc := NewSSHService(nil, repo, settingsRepo, sec, dialer, mgr, nil)
+	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil)
 	res, err := svc.Open("s1", 80, 24)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
@@ -418,6 +419,39 @@ func TestOpenReportsDetectedShellWhenIntegrationEnabled(t *testing.T) {
 	case <-execs:
 	default:
 		t.Error("expected Open to attempt the exec probe when shell integration is enabled")
+	}
+}
+
+// TestOpenSkipsProbeWhenShellIntegrationPersistedFalse covers the side of the
+// gate that e4ed007 claimed but never actually tested: a REAL settings row
+// whose ShellIntegration is false. Every existing "probe skipped" test (see
+// TestOpenRequestsPTYAtThePassedSize) passes a nil settings repo, which the
+// outer `s.settings != nil` guard in Open short-circuits before the inner
+// `cur.ShellIntegration` check is ever reached — so none of them would catch
+// a regression in that inner condition (inverted, dropped, or otherwise
+// broken) as long as the nil-repo path stayed correct. A user who explicitly
+// turned shell integration off would then silently pay an extra exec channel
+// and up to ~3s of added connect latency on every Open, with nothing visible
+// to show it (the status-bar segment is hidden when the setting is off).
+func TestOpenSkipsProbeWhenShellIntegrationPersistedFalse(t *testing.T) {
+	addr, hostKey, _, execs := newPTYCapturingServer(t, "/bin/bash\n")
+	fx := newProbeFixture(t, addr, hostKey)
+	settingsRepo := settingsRepoWithShellIntegration(t, false)
+
+	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil)
+	res, err := svc.Open("s1", 80, 24)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = svc.Close(res.SessionID) }()
+
+	if res.Shell != "" {
+		t.Errorf("Shell = %q, want \"\" (ShellIntegration persisted false)", res.Shell)
+	}
+	select {
+	case cmd := <-execs:
+		t.Fatalf("exec attempted (%q) though ShellIntegration is persisted false", cmd)
+	default:
 	}
 }
 

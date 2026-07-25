@@ -13,11 +13,6 @@ export interface CommandBlock {
   durationMs: number
 }
 
-// The snippet strings moved to lib/shellSnippets.ts when fish was added (this
-// file owns the OSC 133 state machine; that one owns the shell-side text).
-// Re-exported so existing importers keep working.
-export { snippetFor, BASH_ZSH_SNIPPET, FISH_SNIPPET } from './shellSnippets'
-
 export function createOsc133Machine(): { push(ev: Osc133Event): CommandBlock | null } {
   let promptLine = -1, commandLine = -1, commandCol = -1
   let outputLine = -1, startedMs = -1

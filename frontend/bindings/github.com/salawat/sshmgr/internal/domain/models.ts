@@ -150,8 +150,11 @@ export interface Settings {
     "termScrollback": number;
 
     /**
-     * ShellIntegration injects an OSC 133 snippet on connect (bash/zsh) to mark
-     * prompt/command/output boundaries. Off = plain terminal.
+     * ShellIntegration injects an OSC 133 snippet on connect for a detected
+     * bash, zsh, or fish login shell, to mark prompt/command/output
+     * boundaries. Any other detected shell gets no snippet — the status bar
+     * reports that outcome rather than staying silent about it. Off = plain
+     * terminal, no detection probe.
      */
     "shellIntegration": boolean;
 

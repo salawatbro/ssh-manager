@@ -245,13 +245,28 @@ func TestResizeAndKeepAlive(t *testing.T) {
 	}
 }
 
-// A too-large dimension must clamp to the uint16 max, not wrap around
-// (65616 truncates to 80 via a bare uint16(65616) conversion).
-func TestResizeClampsOversizedDimensions(t *testing.T) {
-	s := openForTest(t, 80, 24)
+// A too-large dimension must clamp to the uint16 max, not wrap around (65616
+// truncates to 80 via a bare uint16(65616) conversion). This asserts on
+// clampDim directly rather than on Resize's return value: pty.Setsize
+// succeeds either way, so a Resize(65616, 24)-returns-nil assertion stays
+// green even with the max clamp deleted entirely — it was never exercising
+// the thing its docstring claimed to prove.
+func TestClampDimClampsInsteadOfWrapping(t *testing.T) {
+	if got := clampDim(65616, 80); got != maxPtyDim {
+		t.Errorf("clampDim(65616, 80) = %d, want %d (the uint16 max, not the 80 a bare uint16(65616) conversion wraps to)", got, maxPtyDim)
+	}
+}
 
-	if err := s.Resize(65616, 24); err != nil {
-		t.Errorf("Resize(65616, 24): %v", err)
+// -l is a spec requirement (see Open's doc comment): without it the shell is
+// not a login shell, so the user's rc files never run and PATH/the prompt are
+// whatever the app process inherited — silently wrong rather than broken, so
+// nothing else in this suite catches its absence. This asserts on the actual
+// argv rather than on shell behaviour.
+func TestOpenRunsTheShellAsALoginShell(t *testing.T) {
+	s := openForTest(t, 80, 24)
+	args := s.cmd.Args
+	if len(args) < 2 || args[1] != "-l" {
+		t.Fatalf("cmd.Args = %v, want a -l login-shell flag as the first argument", args)
 	}
 }
 
