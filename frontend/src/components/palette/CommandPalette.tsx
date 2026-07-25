@@ -98,6 +98,12 @@ export function CommandPalette({
     const ql = q.trim().toLowerCase()
     const commands: PaletteRowData[] = [
       { kind: 'command' as const, id: 'new-server', label: 'New server', run: onNewServer },
+      {
+        kind: 'command' as const,
+        id: 'local-terminal',
+        label: 'Local terminal',
+        run: () => useSessions.getState().openLocal(),
+      },
       { kind: 'command' as const, id: 'welcome-tour', label: 'Welcome tour', run: () => useTour.getState().show() },
       ...(selectedId
         ? [

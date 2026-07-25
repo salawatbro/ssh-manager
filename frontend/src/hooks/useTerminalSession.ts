@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
-import { SSHService } from '@bindings/github.com/salawat/sshmgr/internal/service'
+import { SSHService, LocalService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { Terminal } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
@@ -8,6 +8,7 @@ import { b64ToBytes, strToB64 } from '../lib/termbytes'
 import { createGuardBuffer, matchesDangerous, splitPatterns } from '../lib/guard'
 import { snippetFor } from '../lib/shellSnippets'
 import { paneShellInfo } from '../lib/paneShellInfo'
+import { isLocalTarget } from '../lib/paneTarget'
 import { useServers } from '../stores/servers'
 import { useSettings } from '../stores/settings'
 import { useGuard } from '../stores/guard'
@@ -148,7 +149,14 @@ export function useTerminalSession(
       if (s.state === 'closed') applyClosed(s.code, s.message)
     })
 
-    void SSHService.Open(serverId, term.cols, term.rows)
+    // Local panes take the same path as SSH ones from here on: LocalService
+    // registers into the SAME term.Manager, so Write/Resize/Close below stay
+    // on SSHService regardless of the target.
+    const opening = isLocalTarget(serverId)
+      ? LocalService.Open(term.cols, term.rows)
+      : SSHService.Open(serverId, term.cols, term.rows)
+
+    void opening
       .then((res) => {
         const id = res.sessionID
         if (disposed) {

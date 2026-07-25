@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useSftp } from './sftp'
 import { replaceLeaf, removeLeaf, firstLeaf } from '../lib/paneTree'
+import { LOCAL_TARGET_ID } from '../lib/paneTarget'
 
 // A tab's panes form a binary split tree; a leaf is one terminal session for a
 // server. Task 6 fills in splitFocused/closePane; v0.3-Task-5 only ever builds
@@ -27,6 +28,7 @@ interface SessionsState {
   activeTabId: string | null
   open: (server: Server) => void
   openOrFocus: (server: Server) => void
+  openLocal: () => void
   closeTab: (tabId: string) => void
   selectTab: (tabId: string) => void
   nextTab: () => void
@@ -84,6 +86,24 @@ export const useSessions = create<SessionsState>((set, get) => ({
       title: server.name || server.host,
       hostLabel: `${server.user}@${server.host}`,
       root: { kind: 'leaf', id: paneId, serverId: server.id },
+      focusedPaneId: paneId,
+      startedAt: Date.now(),
+    }
+    focusTerminals()
+    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
+  },
+
+  // A tab on the local machine: no server, nothing persisted, not in the
+  // sidebar. splitFocused needs no special case — the new leaf inherits this
+  // sentinel and therefore opens a second local pty.
+  openLocal: () => {
+    const paneId = crypto.randomUUID()
+    const tab: Tab = {
+      id: crypto.randomUUID(),
+      serverId: LOCAL_TARGET_ID,
+      title: 'Local',
+      hostLabel: 'local',
+      root: { kind: 'leaf', id: paneId, serverId: LOCAL_TARGET_ID },
       focusedPaneId: paneId,
       startedAt: Date.now(),
     }
