@@ -83,7 +83,7 @@ tasks:
           new="{{.NEW}}"
           if ! printf '%s' "$new" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "XATO: NEW semver x.y.z bo'lishi kerak (berilgani: '$new')"
-            echo "  Masalan: task bump NEW=x.y.z"
+            echo "  Shakl: task bump NEW=x.y.z"
             exit 1
           fi
           old="{{.VERSION}}"
@@ -218,14 +218,17 @@ tasks:
       #
       # git ls-files rather than find, so gitignored trees (node_modules,
       # dist, bin, .superpowers) are excluded for free and stay excluded.
-      # The files below are excluded, and why. build/config.yml,
-      # build/darwin/Info.plist, and README.md legitimately hold the version
-      # (stage one above already checks those, so a match there is not news).
+      # The files below are excluded, and why. build/config.yml legitimately
+      # holds the version — it is the source (version:verify above already
+      # checks it, so a match there is not news). build/darwin/Info.plist and
+      # README.md also legitimately hold the version (stage one above already
+      # checks those, so a match there is not news either).
       # CHANGELOG.md legitimately holds a history of past versions.
       # package-lock.json is excluded because a dependency constraint can
-      # coincidentally match the app version — it carries
-      # "use-sync-external-store": ">=9.9.9" today, which is not a copy of
-      # anything. docs/ holds dated snapshots, not consumers.
+      # coincidentally match the app version — it carries a
+      # use-sync-external-store constraint whose value happens to equal the
+      # app version today, which is not a copy of anything. docs/ holds dated
+      # snapshots, not consumers.
       #
       # Honest limit: this catches a new FILE. It cannot catch a new copy
       # added inside an already-allowlisted file, such as a second hardcoded
@@ -240,15 +243,16 @@ tasks:
       # grep -IlF below is a substring match, not a whole-line one, so any
       # text in this file — comment or otherwise — that merely *contains* the
       # current version as a substring is enough to name Taskfile.yml here.
-      # The illustrative version literals in this file (the regex-escaping
-      # note above, the two grep -E validation notes, the package-lock.json
-      # note two paragraphs up, and the `task bump NEW=...` usage examples in
-      # `bump`'s desc and its own error message) are placeholders — x.y.z or
-      # the 9.9.9 family — picked so no plausible near-future app version is
-      # a substring of them. That is a property of today's placeholders, not
-      # a permanent guarantee: if any text in this file ever does collide
-      # with the current version, the fix is to reword that text, not to
-      # re-add an exclusion for Taskfile.yml.
+      # The illustrative version literals in this file (the two regex-escaping
+      # notes above — bump's dot-escaping comment and stage one's
+      # "Zish-1x2y0.dmg" note — the two grep -E validation notes, the
+      # package-lock.json note two paragraphs up, and the `task bump NEW=...`
+      # usage examples in `bump`'s desc and its own error message) are
+      # placeholders — x.y.z or the 9.9.9 family — picked so no plausible
+      # near-future app version is a substring of them. That is a property of
+      # today's placeholders, not a permanent guarantee: if any text in this
+      # file ever does collide with the current version, the fix is to reword
+      # that text, not to re-add an exclusion for Taskfile.yml.
       # Same mvdan/sh trap — trailing `exit 0` required.
       - cmd: |
           v="{{.VERSION}}"
