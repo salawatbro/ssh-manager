@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 
 // GuardTarget is one row in the modal: env drives the square swatch (UI-11),
-// host is the label shown next to it. Shared shape for every call site:
-// typed input always passes exactly one target, while snippet run and
-// broadcast can each pass many.
+// host is the label shown next to it. Shared shape for every call site: typed
+// input and snippet run each pass exactly one target (the focused pane's), and
+// only broadcast can pass many.
 export interface GuardTarget {
   host: string
   env: string

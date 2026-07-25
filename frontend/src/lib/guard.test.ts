@@ -56,10 +56,20 @@ describe('guardDecisionFor', () => {
   })
 })
 
-// createGuardBuffer is what actually makes FR-14.11 hold: Confirm sends the
-// held Enter and clears the buffer, Cancel does neither, so a later Enter
-// re-triggers the guard. That behavior lives entirely in the buffer's
-// feed/clear contract, not in the callers — cover it directly here.
+// FR-14.11 — Confirm sends the held Enter and clears the buffer, Cancel does
+// neither, so a later Enter re-triggers the guard — is split across two places,
+// and only ONE of them is covered here.
+//
+// Covered: the buffer half. Enter never self-clears; only an explicit clear()
+// empties the line. That is what the last case in this block pins.
+//
+// NOT covered: who calls clear() and who writes the held '\r'. That lives in
+// useTerminalSession's onConfirm and in GuardModal's cancel path, and testing
+// it needs a DOM harness this project deliberately does not have. The gap is
+// not theoretical: moving guardBuf.clear() out of onConfirm keeps every test in
+// this suite green, and it fails in the DANGEROUS direction — after a Cancel
+// the buffer is empty, so the next Enter matches nothing and the line still
+// sitting in the pty runs unguarded.
 describe('createGuardBuffer', () => {
   it('feed with a \\r returns the line as it stood right before Enter', () => {
     const buf = createGuardBuffer()

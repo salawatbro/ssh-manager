@@ -89,7 +89,10 @@ export interface GuardScopeTarget {
 // (lib/paneTarget.ts), but the two are read and written independently —
 // this value is never compared against a serverId, so it never leaks the
 // sentinel past paneTarget.ts.
-export const LOCAL_SCOPE_TARGET: GuardScopeTarget = { host: 'local', env: 'none', local: true }
+// Frozen because both call sites push this same object by reference into their
+// target list — a split local tab pushes it twice — so a stray mutation would
+// reach every row that shares it.
+export const LOCAL_SCOPE_TARGET: GuardScopeTarget = Object.freeze({ host: 'local', env: 'none', local: true })
 
 export interface GuardDecision {
   title: string
