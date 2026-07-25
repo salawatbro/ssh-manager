@@ -121,6 +121,7 @@ This app is built around a few hard invariants:
 | `⌘1`–`⌘9` | Switch to tab 1–9 |
 | `⌘⇧]` / `⌘⇧[` | Next / previous tab |
 | `⌘F` | Find in the terminal |
+| `⌘↑` / `⌘↓` | Jump to the previous / next command (needs shell integration) |
 | `⌘V` / right-click | Paste into the terminal |
 
 ---
