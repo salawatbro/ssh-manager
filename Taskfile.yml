@@ -107,6 +107,8 @@ tasks:
 
   check:
     desc: Bosqich darvozasi — TZ 15.1
+    deps:
+      - task: version:verify
     cmds:
       # The frontend goes first and the order is not cosmetic: main.go carries
       # //go:embed all:frontend/dist and dist/ is gitignored. On a clean clone
@@ -173,6 +175,78 @@ tasks:
           if [ -n "$offenders" ]; then
             echo "XATO: 250 qatordan oshgan fayl(lar) (Global Constraint):"
             echo "$offenders"
+            exit 1
+          fi
+          exit 0
+
+      # The app version lives in build/config.yml's info.version and nowhere
+      # else. These two guards prove the derived copies still agree with it,
+      # because a release that ships with one file left behind is silent: the
+      # DMG carries the new name while macOS reads the old CFBundleVersion.
+      # Fix any failure with `task bump NEW=<version>`.
+      # Same mvdan/sh trap as the guards above — trailing `exit 0` required.
+      - cmd: |
+          v="{{.VERSION}}"
+          for key in CFBundleShortVersionString CFBundleVersion; do
+            got=$(grep -A1 "<key>$key</key>" build/darwin/Info.plist | tail -1 | tr -d ' \t')
+            if [ "$got" != "<string>$v</string>" ]; then
+              echo "XATO: build/darwin/Info.plist $key = $got, kutilgan <string>$v</string>"
+              echo "  Tuzatish: task bump NEW=$v"
+              exit 1
+            fi
+          done
+          if ! grep -q "Zish-$v.dmg" README.md; then
+            echo "XATO: README.md da Zish-$v.dmg topilmadi"
+            echo "  Tuzatish: task bump NEW=$v"
+            exit 1
+          fi
+          stale=$(grep -oE 'Zish-[0-9]+\.[0-9]+\.[0-9]+\.dmg' README.md | grep -v "^Zish-$v\.dmg$" || true)
+          if [ -n "$stale" ]; then
+            echo "XATO: README.md da eskirgan DMG nomi:"
+            echo "$stale"
+            exit 1
+          fi
+          exit 0
+
+      # Stage two: catch a NEW copy of the version appearing somewhere the
+      # first guard does not know to look — which is exactly how the version
+      # ended up in nine places to begin with.
+      #
+      # git ls-files rather than find, so gitignored trees (node_modules,
+      # dist, bin, .superpowers) are excluded for free and stay excluded.
+      # The four allowlisted files are the ones that legitimately hold the
+      # version. package-lock.json is excluded because a dependency
+      # constraint can coincidentally match the app version — it carries
+      # "use-sync-external-store": ">=1.2.0" today, which is not a copy of
+      # anything. docs/ holds dated snapshots, not consumers.
+      #
+      # Honest limit: this catches a new FILE. It cannot catch a new copy
+      # added inside an already-allowlisted file, such as a third DMG link
+      # in README.md.
+      #
+      # Taskfile.yml itself is excluded too: this very guard's comments (the
+      # package-lock.json note two paragraphs up, plus a regex-escaping
+      # example in the `bump` task) illustrate today's version as a literal
+      # string, so once written they coincidentally match {{.VERSION}} just
+      # like the package-lock constraint does. Neither is a copy that needs
+      # to track config.yml -- they're prose that happens to share digits
+      # with the current release, same as the package-lock.json case above.
+      # Same mvdan/sh trap — trailing `exit 0` required.
+      - cmd: |
+          v="{{.VERSION}}"
+          hits=$(git ls-files -z -- . \
+            ':!:build/config.yml' \
+            ':!:build/darwin/Info.plist' \
+            ':!:README.md' \
+            ':!:CHANGELOG.md' \
+            ':!:docs/' \
+            ':!:frontend/package-lock.json' \
+            ':!:Taskfile.yml' \
+            | xargs -0 grep -lF "$v" 2>/dev/null || true)
+          if [ -n "$hits" ]; then
+            echo "XATO: versiya $v ruxsat etilmagan fayl(lar)da qattiq yozilgan:"
+            echo "$hits"
+            echo "  Yagona manba: build/config.yml info.version"
             exit 1
           fi
           exit 0
