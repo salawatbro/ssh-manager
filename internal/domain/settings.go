@@ -82,12 +82,26 @@ const defaultGuardPatterns = "rm -rf\n" +
 
 // defaultLocalGuardPatterns is the newline-separated first-run value of
 // Settings.GuardPatternsLocal — only the commands that would wreck the
-// machine, so everyday `rm -rf <dir>` passes untouched.
+// machine. Relative-path deletes like `rm -rf node_modules` pass untouched,
+// but the "rm -rf /" and "rm -rf ~" anchors are bare substrings: they also
+// fire on any absolute- or ~-relative recursive delete (e.g. `rm -rf /tmp/x`
+// or `rm -rf ~/Library/Caches/pip`), because substring matching has no notion
+// of end-of-path and cannot tell the root from a path under it. That is
+// accepted, not overlooked — a false positive on a deep clean costs less than
+// missing a real `rm -rf /`. This app ships on macOS, so the disk-destroyer
+// entries name Darwin tools (diskutil, newfs_, /dev/disk*, /dev/rdisk*); mkfs
+// is kept too since internal/ cross-compiles for Linux, where it is the
+// right name.
 const defaultLocalGuardPatterns = "rm -rf /\n" +
 	"rm -rf ~\n" +
 	"mkfs\n" +
-	"dd of=/dev/\n" +
-	"> /dev/sd\n" +
+	"of=/dev/\n" +
+	"> /dev/disk\n" +
+	"> /dev/rdisk\n" +
+	"diskutil erase\n" +
+	"diskutil apfs delete\n" +
+	"newfs_\n" +
+	"--no-preserve-root\n" +
 	":(){ :|:& };:"
 
 // Sanitise clamps stored/incoming values to safe ranges so a corrupt row or a

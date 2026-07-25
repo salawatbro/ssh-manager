@@ -57,7 +57,8 @@ export function GeneralSection() {
       <div className="flex flex-col gap-[4px] border-b border-border py-[13px]">
         <span className="text-[13px] text-text">Local terminal patterns</span>
         <span className="text-[11.5px] text-textDim">
-          Asked for in the local terminal tab. Kept shorter than the list above on purpose — a bare
+          Confirmation is asked in the local terminal tab, matched as plain text against what you
+          type. Kept shorter than the list above on purpose — a bare
           <span className="font-mono"> rm -rf </span>
           is an everyday command on your own machine.
         </span>
