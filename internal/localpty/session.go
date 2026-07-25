@@ -37,8 +37,35 @@ const maxPtyDim = 65535
 
 // reapGrace is how long Close waits for a shell to act on SIGHUP before
 // escalating to SIGKILL. Most shells tear down within milliseconds; this
-// only matters for one that traps or ignores SIGHUP outright.
-const reapGrace = 2 * time.Second
+// only matters for one that traps or ignores SIGHUP outright. A var, not a
+// const, so the test for the escalation path can shrink it and keep the
+// suite fast instead of waiting out the real production grace window.
+// Reapers are fire-and-forget goroutines (see Close) that can outlive the
+// test that spawned them, so a bare var here would race under "go test
+// -race" against a later test's t.Cleanup restoring it — reapGraceMu guards
+// every read and write instead.
+var (
+	reapGraceMu sync.Mutex
+	reapGrace   = 2 * time.Second
+)
+
+// getReapGrace returns the current grace window under reapGraceMu.
+func getReapGrace() time.Duration {
+	reapGraceMu.Lock()
+	defer reapGraceMu.Unlock()
+	return reapGrace
+}
+
+// setReapGrace overwrites the grace window under reapGraceMu and returns the
+// previous value, so a caller (a test) can restore it afterwards. Exported
+// within the package only — production code never calls this.
+func setReapGrace(d time.Duration) time.Duration {
+	reapGraceMu.Lock()
+	defer reapGraceMu.Unlock()
+	old := reapGrace
+	reapGrace = d
+	return old
+}
 
 // Session is a login shell on a local pty. It satisfies term.PTY, plus the
 // optional WaitExitClean the manager's pump asserts for to tell a clean shell
@@ -197,15 +224,16 @@ func (s *Session) wait() error {
 // bash and zsh forward SIGHUP to their job table when the shell exits; a job
 // that was explicitly disown'd, nohup'd, or setsid'd opts out of that
 // forwarding and correctly survives, exactly as it would on a real terminal
-// hangup. (Measured on darwin/arm64: closing the pty master on its own
-// already makes the kernel deliver a hangup to the tty's foreground process
-// group — an idle shell is reaped within milliseconds of Close, before the
-// explicit signal below could even be the cause. That is tty-driver
-// behaviour this package should not depend on cross-platform, so the
-// explicit SIGHUP stays as the thing this code actually controls.) If the
-// shell ignores SIGHUP outright (trap ” HUP), the background reap started
-// here escalates to SIGKILL after reapGrace so it cannot spin forever,
-// orphaned, with its pty gone.
+// hangup. Closing the pty master on its own is not sufficient on darwin: a
+// shell that is SIGHUP-immune (traps or ignores the signal) keeps running
+// after the master is closed — measured surviving for minutes, still holding
+// the tty, until something explicitly signals it. That is exactly the case
+// the SIGKILL escalation below exists for. If the shell ignores SIGHUP
+// outright (trap "" HUP), the background reap started here escalates to
+// SIGKILL after reapGrace so it cannot spin forever, orphaned, with its pty
+// gone. Double quotes on purpose: this toolchain's gofmt rewrites a pair of
+// adjacent straight single quotes inside a comment into a smart quote, which
+// would garble the incantation for anyone copying it.
 func (s *Session) Close() error {
 	s.closeOnce.Do(func() {
 		pid := 0
@@ -213,7 +241,7 @@ func (s *Session) Close() error {
 			pid = s.cmd.Process.Pid
 		}
 		if pid != 0 && !s.reaped.Load() {
-			_ = syscall.Kill(-pid, syscall.SIGHUP)
+			_ = killProcessGroup(pid, syscall.SIGHUP)
 		}
 		s.closeErr = s.f.Close()
 		// Reap in the background: Close must not block the manager's shutdown
@@ -239,13 +267,13 @@ func (s *Session) reapWithEscalation(pid int) {
 		<-done
 		return
 	}
-	timer := time.NewTimer(reapGrace)
+	timer := time.NewTimer(getReapGrace())
 	defer timer.Stop()
 	select {
 	case <-done:
 	case <-timer.C:
 		if !s.reaped.Load() {
-			_ = syscall.Kill(-pid, syscall.SIGKILL)
+			_ = killProcessGroup(pid, syscall.SIGKILL)
 		}
 		<-done
 	}

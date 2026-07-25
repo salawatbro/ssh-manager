@@ -4,6 +4,9 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -49,6 +52,65 @@ func waitGone(t *testing.T, pid int, d time.Duration) bool {
 		time.Sleep(50 * time.Millisecond)
 	}
 	return false
+}
+
+// waitFileExists polls for path to appear on disk. Used as a readiness signal
+// that is immune to the false-positive that sank an earlier version of
+// TestCloseEscalatesToSigkillWhenShellIgnoresSighup: zsh's line editor plus
+// bracketed paste redraws the typed command as it is entered, so a marker
+// read back from the pty's own output can appear twice from echo alone, with
+// the command that was supposed to produce it never having run. A file only
+// exists once `touch` has actually executed, so there is no echo path that
+// can fake it.
+func waitFileExists(t *testing.T, path string, d time.Duration) bool {
+	t.Helper()
+	deadline := time.Now().Add(d)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return false
+}
+
+// waitProcRunning polls `ps -o state=` for pid until it reports a running
+// state (leading 'R', e.g. "R" or "Rs+") or the deadline passes. This is the
+// second half of proving the busy loop is actually spinning rather than
+// merely having been typed: the marker file confirms the trap line ran, this
+// confirms the `while :; do :; done` after it is genuinely executing, not
+// just sitting in the tty's echo buffer.
+func waitProcRunning(t *testing.T, pid int, d time.Duration) bool {
+	t.Helper()
+	deadline := time.Now().Add(d)
+	for time.Now().Before(deadline) {
+		out, err := exec.Command("ps", "-o", "state=", "-p", strconv.Itoa(pid)).Output()
+		if err == nil {
+			if state := strings.TrimSpace(string(out)); strings.HasPrefix(state, "R") {
+				return true
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return false
+}
+
+// drainInBackground discards s's output on a background goroutine until Read
+// errors (the pty closes or the shell exits). A test that waits on an
+// external readiness signal (a file, a process state) instead of reading s
+// itself must still drain it: the pty's output buffer is finite, and a shell
+// that blocks mid-write() because nobody is reading its tty cannot go on to
+// execute the very commands the test is waiting for. The goroutine exits on
+// its own once the session is closed, so callers do not need to stop it.
+func drainInBackground(s *Session) {
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			if _, err := s.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
 }
 
 // readUntil reads from s until want appears or the deadline passes. A pty echoes
@@ -288,38 +350,73 @@ func TestCloseReturnsTheUnderlyingFileCloseError(t *testing.T) {
 
 // Important finding 3: a shell that ignores SIGHUP must not be left running.
 // Without the SIGKILL escalation, this shell survives Close() indefinitely,
-// pinned at 100% CPU with its pty gone. The t.Cleanup below is a safety net
-// independent of Close's own behaviour, so a regression here fails the test
-// instead of leaving a spinning process behind on the machine running it.
+// pinned at 100% CPU with its pty gone.
 //
-// The trap has to be confirmed actually installed and in effect — via a
-// readback marker that only appears from the command's real stdout, waited
-// for twice (see readUntilCount) — rather than assumed after a fixed sleep
-// or a single occurrence. Two earlier versions of this test got this wrong:
-// one used a 300ms guess that raced the shell's own rc-file startup; the
-// next waited for a single occurrence of the marker text, which the pty's
-// local echo of the typed command line satisfies on its own, before the
-// shell has executed anything. Both variants could measure a plain
-// (non-trapped) SIGHUP kill and still pass, regardless of whether the
-// escalation path worked at all.
+// Readiness cannot be proven by reading the marker back from the pty's own
+// output: zsh's line editor plus bracketed paste redraws the typed command as
+// it is entered, so the marker text can appear twice from echo alone — with
+// the command that was supposed to produce it never having run. (Two earlier
+// versions of this test got fooled this way: a 300ms guess that raced the
+// shell's own rc-file startup, then a pty-readback marker waited for twice,
+// which is exactly the count the redraw produces on its own.) Readiness here
+// is instead proven two ways that echo cannot fake: a file that only exists
+// once `touch` has actually run, and `ps -o state=` showing the process is
+// genuinely executing (R*), not merely sitting on a typed-but-unexecuted
+// line.
+//
+// reapGrace is shrunk for the duration of this test so the suite stays fast;
+// asserting elapsed >= reapGrace below pins that the SIGKILL escalation —
+// not a plain hangup racing it — is what actually reaped the child. A
+// shipped version of this test that finished in well under reapGrace would
+// be measuring a plain SIGHUP kill, not the escalation this test exists to
+// cover.
 func TestCloseEscalatesToSigkillWhenShellIgnoresSighup(t *testing.T) {
+	origGrace := setReapGrace(200 * time.Millisecond)
+	t.Cleanup(func() { setReapGrace(origGrace) })
+
 	s := openForTest(t, 80, 24)
 	pid := s.cmd.Process.Pid
-	t.Cleanup(func() { _ = syscall.Kill(-pid, syscall.SIGKILL) })
+	// Safety net independent of Close's own behaviour, so a regression here
+	// fails the test instead of leaving a spinning process behind on the
+	// machine running it. Gated on stillAlive: by the time this cleanup
+	// runs, Close's own reaper has (if it worked) already reaped the child,
+	// and signalling an already-reaped pid risks hitting an unrelated
+	// process group the OS has since recycled it as — the exact hazard
+	// Session.reaped exists to prevent in production code.
+	t.Cleanup(func() {
+		if stillAlive(pid) {
+			_ = killProcessGroup(pid, syscall.SIGKILL)
+		}
+	})
 
-	if _, err := s.Write([]byte("trap '' HUP; echo zish-trap-ready; while :; do :; done\n")); err != nil {
+	// The test drives readiness off a file and `ps`, not off reading s, but
+	// the pty still has to be drained: otherwise the shell's own startup
+	// output (prompt, rc files) can fill the tty buffer and block the shell
+	// in write() before it ever reaches the touch/loop line below.
+	drainInBackground(s)
+
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "zish-trap-ready")
+	cmd := "trap '' HUP; touch " + marker + "; while :; do :; done\n"
+	if _, err := s.Write([]byte(cmd)); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
-	// First occurrence is the pty's echo of the typed line; second is the
-	// echo command's actual stdout, which only appears once trap has run.
-	if got := readUntilCount(t, s, "zish-trap-ready", 2, 5*time.Second); strings.Count(got, "zish-trap-ready") < 2 {
-		t.Fatalf("never saw the trap-installed marker run (only typed, not executed); read %q", got)
+
+	if !waitFileExists(t, marker, 5*time.Second) {
+		t.Fatal("trap-installed marker file never appeared; the shell may not have reached the busy loop")
+	}
+	if !waitProcRunning(t, pid, 5*time.Second) {
+		t.Fatalf("shell %d was never observed in a running (R*) state; the busy loop may not actually be executing", pid)
 	}
 
+	start := time.Now()
 	if err := s.Close(); err != nil {
 		t.Errorf("Close: %v", err)
 	}
 	if !waitGone(t, pid, 5*time.Second) {
 		t.Fatalf("child %d (SIGHUP-immune) survived Close's SIGKILL escalation", pid)
+	}
+	if elapsed, grace := time.Since(start), getReapGrace(); elapsed < grace {
+		t.Errorf("child was reaped after %s, less than reapGrace (%s); a plain SIGHUP appears to have killed it, so this test isn't exercising the SIGKILL escalation", elapsed, grace)
 	}
 }
