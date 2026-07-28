@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
-import { parseQuickConnect, formatQuickTarget } from './quickConnect'
+import { describe, expect, it, vi } from 'vitest'
+import { parseQuickConnect, formatQuickTarget, findExistingServer, runQuickConnect } from './quickConnect'
+import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import type { CreateServerInput } from '@bindings/github.com/salawat/sshmgr/internal/service'
 
 describe('parseQuickConnect', () => {
   it('parses user@host with the default port 22', () => {
@@ -70,5 +72,88 @@ describe('formatQuickTarget', () => {
 
   it('shows a non-default port', () => {
     expect(formatQuickTarget({ user: 'deploy', host: 'web', port: 2222 })).toBe('deploy@web:2222')
+  })
+})
+
+function server(over: Partial<Server> = {}): Server {
+  return { id: 'a', name: 'web-01', host: 'example.com', port: 22, user: 'deploy', group: 'Prod', ...over } as Server
+}
+
+describe('findExistingServer', () => {
+  const target = { user: 'deploy', host: 'example.com', port: 22 }
+
+  it('matches on host, user and port regardless of the name', () => {
+    const s = server({ name: 'something else entirely' })
+    expect(findExistingServer([s], target)).toBe(s)
+  })
+
+  it('does not match a different port', () => {
+    expect(findExistingServer([server({ port: 2222 })], target)).toBeUndefined()
+  })
+
+  it('does not match a different user', () => {
+    expect(findExistingServer([server({ user: 'root' })], target)).toBeUndefined()
+  })
+})
+
+describe('runQuickConnect', () => {
+  const target = { user: 'deploy', host: 'example.com', port: 22 }
+
+  function deps(over: Partial<Parameters<typeof runQuickConnect>[1]> = {}) {
+    // Object.assign (not `{ ...base, ...over }`) so TS keeps each default's
+    // Mock-typed intersection -- a trailing spread of the `Partial<...>`
+    // override widens overridden keys back down to the plain interface type,
+    // which drops `.mock` even though every override here is itself a
+    // `vi.fn()`.
+    const base = {
+      servers: [] as Server[],
+      select: vi.fn(),
+      create: vi.fn<(input: CreateServerInput) => Promise<Server | null>>(async () => server({ id: 'new' })),
+      open: vi.fn(),
+      openOrFocus: vi.fn(),
+      reload: vi.fn(async () => {}),
+      onError: vi.fn(),
+    }
+    return Object.assign(base, over)
+  }
+
+  it('focuses the existing server and creates nothing', async () => {
+    const existing = server({ id: 'existing' })
+    const d = deps({ servers: [existing] })
+    await runQuickConnect(target, d)
+    expect(d.openOrFocus).toHaveBeenCalledWith(existing)
+    expect(d.create).not.toHaveBeenCalled()
+    expect(d.open).not.toHaveBeenCalled()
+  })
+
+  it('creates an agent-auth server in Quick connects, opens it, then reloads', async () => {
+    const d = deps()
+    await runQuickConnect(target, d)
+    const payload = d.create.mock.calls[0][0]
+    expect(payload).toMatchObject({
+      name: 'deploy@example.com',
+      host: 'example.com',
+      port: 22,
+      user: 'deploy',
+      group: 'Quick connects',
+    })
+    // SEC-01: empty string means "do not write" -- an agent server has no secret.
+    expect(payload.password).toBe('')
+    expect(payload.passphrase).toBe('')
+    expect(d.open).toHaveBeenCalled()
+    expect(d.reload).toHaveBeenCalled()
+  })
+
+  it('reports a backend error without opening anything', async () => {
+    const d = deps({ create: vi.fn(async () => { throw new Error('host already exists') }) })
+    await runQuickConnect(target, d)
+    expect(d.onError).toHaveBeenCalledWith('host already exists')
+    expect(d.open).not.toHaveBeenCalled()
+  })
+
+  it('closes any open edit form first so the terminal is visible', async () => {
+    const d = deps()
+    await runQuickConnect(target, d)
+    expect(d.select).toHaveBeenCalledWith(null)
   })
 })

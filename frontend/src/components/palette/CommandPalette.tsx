@@ -12,53 +12,8 @@ import { tabStatus } from '../../lib/tabStatus'
 import { searchServers } from '../../lib/fuzzy'
 import { PaletteRow } from './PaletteRow'
 import { ServerService } from '@bindings/github.com/salawat/sshmgr/internal/service'
-import { AuthType, Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { parseQuickConnect, formatQuickTarget, type QuickConnectTarget } from '../../lib/quickConnect'
+import { parseQuickConnect, runQuickConnect } from '../../lib/quickConnect'
 import { toastError } from '../../stores/toasts'
-
-// Quick connect (spec 2026-07-20): reuse an existing server when the
-// host+user+port triple already exists (ImportJSON's identity rule — the
-// name is NOT the identity), otherwise auto-save into "Quick connects" and
-// open. select(null) first for the same reason the server branch of choose()
-// does it: close any open edit form so the terminal is visible.
-async function quickConnect(target: QuickConnectTarget) {
-  useServers.getState().select(null)
-  const existing = useServers
-    .getState()
-    .servers.find((s) => s.host === target.host && s.user === target.user && s.port === target.port)
-  if (existing) {
-    useSessions.getState().openOrFocus(existing)
-    return
-  }
-  try {
-    const created = await ServerService.Create({
-      name: formatQuickTarget(target),
-      host: target.host,
-      port: target.port,
-      user: target.user,
-      authType: AuthType.AuthAgent,
-      keyPath: '',
-      // Empty string = "do not write" (SEC-01) — an agent server has no secret.
-      password: '',
-      passphrase: '',
-      totpSecret: '',
-      twoFactor: false,
-      jumpId: null,
-      group: 'Quick connects',
-      environment: Environment.EnvNone,
-      tags: [],
-      notes: '',
-    })
-    if (!created) return
-    useSessions.getState().open(created)
-    // Refresh so the sidebar shows the new "Quick connects" row right away.
-    await useServers.getState().load()
-  } catch (e) {
-    // The backend's domain.Error message is user-ready; unwrap .message so
-    // the binding's "RuntimeError: " prefix never reaches the toast.
-    toastError(e instanceof Error ? e.message : String(e))
-  }
-}
 
 // The ⌘K command palette (FR-08). A quick-connect row when the input parses
 // as user@host[:port] (spec 2026-07-20), then servers (fuzzy / recency),
@@ -152,13 +107,21 @@ export function CommandPalette({
       useServers.getState().select(null)
       useSessions.getState().open(row.server)
     } else if (row.kind === 'command') {
-      // Same reasoning as the server branch above and quickConnect(): a
+      // Same reasoning as the server branch above and runQuickConnect(): a
       // command (e.g. "Local terminal") opens a tab in the content area, and
       // a selected server's open ServerForm (392px) would otherwise cover it.
       useServers.getState().select(null)
       row.run()
     } else {
-      void quickConnect(row.target)
+      void runQuickConnect(row.target, {
+        servers,
+        select: useServers.getState().select,
+        create: ServerService.Create,
+        open: useSessions.getState().open,
+        openOrFocus: useSessions.getState().openOrFocus,
+        reload: useServers.getState().load,
+        onError: toastError,
+      })
     }
   }
 
