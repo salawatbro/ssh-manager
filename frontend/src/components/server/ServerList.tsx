@@ -95,6 +95,7 @@ export function ServerList({ onOpenTunnels }: Props) {
           onClose={() => setMenu(null)}
           onEdit={() => select(menu.server.id)}
           onTunnels={() => onOpenTunnels(menu.server.id)}
+          filtering={filtering}
         />
       )}
     </div>
