@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import type { DragEvent } from 'react'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { ServerService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { useServers } from '../stores/servers'
-import { toastError } from '../stores/toasts'
+import { reorderWithinGroup } from '../lib/serverOrder'
 
 type Ev = DragEvent<HTMLElement>
 
@@ -35,21 +34,11 @@ export function useServerDrag(enabled: boolean) {
     const d = drag
     setDrag(null)
     setOver(null)
-    if (!d || d.id === targetId) return
-    const { servers, load } = useServers.getState()
-    const ids = servers.filter((s) => s.group === d.group).map((s) => s.id)
-    const from = ids.indexOf(d.id)
-    if (from < 0) return
-    ids.splice(from, 1)
-    const to = ids.indexOf(targetId)
-    if (to < 0) return
-    ids.splice(to + (after ? 1 : 0), 0, d.id)
-    try {
-      await ServerService.SetGroupOrder(d.group, ids)
-      await load()
-    } catch (e) {
-      toastError(e instanceof Error ? e.message : String(e))
-    }
+    if (!d) return
+    const { servers, setGroupOrder } = useServers.getState()
+    const ids = reorderWithinGroup(servers, d.group, d.id, targetId, after)
+    if (!ids) return
+    await setGroupOrder(d.group, ids)
   }
 
   function rowProps(server: Server): RowDrag {

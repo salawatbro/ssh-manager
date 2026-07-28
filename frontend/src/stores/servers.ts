@@ -18,6 +18,7 @@ interface ServersState {
   duplicate: (id: string) => Promise<string | null>
   copySSHCommand: (id: string) => Promise<void>
   setPinned: (id: string, pinned: boolean) => Promise<void>
+  setGroupOrder: (group: string, ids: string[]) => Promise<void>
   select: (id: string | null) => void
   detectKeys: () => Promise<KeyInfo[]>
   testConnection: (id: string) => Promise<TestResult | null>
@@ -91,6 +92,19 @@ export const useServers = create<ServersState>((set, get) => ({
   setPinned: async (id, pinned) => {
     try {
       await ServerService.SetPinned(id, pinned)
+      await get().load()
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : String(e))
+    }
+  },
+
+  // The sole caller of ServerService.SetGroupOrder — both the sidebar drag
+  // hook and the context menu's Move up/down route through here so the
+  // sort_order write always happens in one place. Mirrors `setPinned`: no
+  // inline error surface at the call sites, so failures show as a toast.
+  setGroupOrder: async (group, ids) => {
+    try {
+      await ServerService.SetGroupOrder(group, ids)
       await get().load()
     } catch (e) {
       toastError(e instanceof Error ? e.message : String(e))
