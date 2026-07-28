@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react'
 import { AppInfoService } from '@bindings/github.com/salawat/sshmgr/internal/service'
+import type { PlatformInfo } from '@bindings/github.com/salawat/sshmgr/internal/service'
 
 export function AboutSection() {
   // Reported by the backend rather than hardcoded: Go knows the target the
   // binary was built for, and a literal here would silently go wrong the day
   // a universal or Intel build exists. Rendered only once it resolves, so a
   // wrong architecture can never flash on screen.
-  const [platform, setPlatform] = useState<{ os: string; arch: string } | null>(null)
+  const [platform, setPlatform] = useState<PlatformInfo | null>(null)
   useEffect(() => {
-    AppInfoService.Platform()
-      .then((p) => setPlatform({ os: p.os, arch: p.arch }))
-      .catch(() => {})
+    const call = AppInfoService.Platform()
+    call
+      .then((p) => setPlatform(p))
+      .catch((err) => console.error('AppInfoService.Platform failed:', err))
+    return () => {
+      call.cancel()
+    }
   }, [])
 
   return (

@@ -10,6 +10,9 @@ import "github.com/salawat/sshmgr/internal/platform"
 // would end up accumulating in the same place.
 type AppInfoService struct{}
 
+// NewAppInfoService constructs the service. It takes no dependencies because
+// every fact it reports comes from the Go runtime itself, not from a store or
+// repo.
 func NewAppInfoService() *AppInfoService { return &AppInfoService{} }
 
 // PlatformInfo is what the About screen renders beside the app version.
