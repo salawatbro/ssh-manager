@@ -46,6 +46,23 @@ describe('reorderWithinGroup', () => {
     expect(reorderWithinGroup(group('a', 'b', 'c'), 'Prod', 'a', 'c', true)).toEqual(['b', 'c', 'a'])
   })
 
+  // Pins the remove-then-find statement order. A mutant that computes
+  // `to = ids.indexOf(targetId)` before `ids.splice(from, 1)` passes every
+  // other case in this file -- the id-removal case lands the target at index
+  // 0 either way, and the after-target case happens to land on the last
+  // element in both versions. It only diverges on a downward move onto a
+  // non-last row, where the un-decremented index overshoots by one slot.
+  // Also carries `other`, so this is the one reorderWithinGroup case that
+  // exercises the out-of-group guard on the drag path.
+  it('moves a server past a later target without overshooting (kills the find-before-remove mutant)', () => {
+    expect(reorderWithinGroup([...group('a', 'b', 'c', 'd'), other], 'Prod', 'a', 'c', true)).toEqual([
+      'b',
+      'c',
+      'a',
+      'd',
+    ])
+  })
+
   it('refuses a drop onto itself', () => {
     expect(reorderWithinGroup(group('a', 'b'), 'Prod', 'a', 'a', false)).toBeNull()
   })

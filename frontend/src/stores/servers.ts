@@ -98,10 +98,11 @@ export const useServers = create<ServersState>((set, get) => ({
     }
   },
 
-  // The sole caller of ServerService.SetGroupOrder — both the sidebar drag
-  // hook and the context menu's Move up/down route through here so the
-  // sort_order write always happens in one place. Mirrors `setPinned`: no
-  // inline error surface at the call sites, so failures show as a toast.
+  // The sole path that persists a within-group order: any caller that wants
+  // to commit a new order for `group` goes through here, so
+  // ServerService.SetGroupOrder -- the sole writer of sort_order -- is never
+  // called from more than one place. Mirrors `setPinned`: no inline error
+  // surface at the call sites, so failures show as a toast.
   setGroupOrder: async (group, ids) => {
     try {
       await ServerService.SetGroupOrder(group, ids)
