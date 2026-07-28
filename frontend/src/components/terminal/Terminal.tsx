@@ -4,7 +4,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { CanvasAddon } from '@xterm/addon-canvas'
 import { SearchAddon } from '@xterm/addon-search'
 import '@xterm/xterm/css/xterm.css'
-import { graphiteTheme, findDecorations } from '../../lib/termTheme'
+import { graphiteTheme } from '../../lib/termTheme'
 import type { FindResults } from '../../lib/findStatus'
 import { isMac } from '../../lib/platform'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
@@ -18,6 +18,7 @@ import { FindBar } from './FindBar'
 import { ContextMenu } from '../ui/ContextMenu'
 import { installOsc133, type PromptMarker } from './commandDecorations'
 import { terminalMenuItems } from './terminalMenu'
+import { runFind, closeFind } from './terminalFind'
 
 interface Props {
   paneId: string
@@ -30,6 +31,9 @@ interface Props {
 export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<SearchAddon | null>(null)
+  // Mirrors findOpen for the mount-once key handler below, whose closure
+  // over React state would otherwise always see the initial value.
+  const findOpenRef = useRef(false)
   // Ordered OSC 133 prompt markers, populated by installOsc133 on mount.
   // Read (not written) by Task 5's jump-to-command navigation.
   const promptMarkersRef = useRef<PromptMarker[]>([])
@@ -68,8 +72,8 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
     t.loadAddon(new CanvasAddon())
     fitAddon.fit()
     searchRef.current = search
-    // Only fires while decorations are enabled — see the options passed in
-    // find() below. Disposed with the terminal.
+    // Only fires while decorations are enabled — see terminalFind.ts's
+    // runFind(). Disposed with the terminal.
     search.onDidChangeResults((r) => setFindResults(r))
     // Seed the status bar's dimensions segment (dizayn manbasi:
     // MainWindow.dc.html, `40×120`) right away — the resize-observer below
@@ -93,7 +97,8 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
         case 'pass':
           return true // plain Ctrl+C etc. -> host
         case 'find':
-          setFindOpen((o) => !o)
+          if (findOpenRef.current) closeFind(searchRef.current, setFindResults, setFindOpen)
+          else setFindOpen(true)
           return false
         case 'jump-prev':
         case 'jump-next': {
@@ -123,7 +128,11 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
 
     setTerm(t)
     setFit(fitAddon)
-    return () => t.dispose()
+    return () => {
+      // Stops the addon's debounced re-search timer from firing post-dispose.
+      search.clearDecorations()
+      t.dispose()
+    }
   }, [])
 
   useEffect(() => {
@@ -144,6 +153,8 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
   useEffect(() => {
     if (focused && term) term.focus()
   }, [focused, term])
+
+  useEffect(() => { findOpenRef.current = findOpen }, [findOpen])
 
   // Live-apply the mutable subset of terminal settings to an already-open
   // session when they change; scrollback can't change post-creation on xterm,
@@ -187,21 +198,6 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
     if (session.status === 'exited') useSessions.getState().closePane(tabId, paneId)
   }, [session.status, tabId, paneId])
 
-  function find(query: string, dir: 'next' | 'prev') {
-    const s = searchRef.current
-    if (!s) return
-    if (!query) {
-      s.clearDecorations()
-      setFindResults(null)
-      return
-    }
-    // decorations are what make onDidChangeResults fire at all, so the match
-    // counter and the highlighting are one feature, not two.
-    const opts = { decorations: findDecorations() }
-    if (dir === 'next') s.findNext(query, opts)
-    else s.findPrevious(query, opts)
-  }
-
   return (
     <div
       className={`relative h-full w-full bg-bg0 ${focused && isSplit ? 'shadow-[inset_0_0_0_1px_var(--color-accent)]' : ''}`}
@@ -227,13 +223,9 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
       )}
       {findOpen && (
         <FindBar
-          onFind={find}
+          onFind={(query, dir) => runFind(searchRef.current, query, dir, setFindResults)}
           results={findResults}
-          onClose={() => {
-            searchRef.current?.clearDecorations()
-            setFindResults(null)
-            setFindOpen(false)
-          }}
+          onClose={() => closeFind(searchRef.current, setFindResults, setFindOpen)}
         />
       )}
       {(session.status === 'error' || session.status === 'closed') && (
