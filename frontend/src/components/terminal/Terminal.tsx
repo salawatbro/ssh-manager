@@ -11,6 +11,7 @@ import { useSettings } from '../../stores/settings'
 import { useSessions } from '../../stores/sessions'
 import { usePanes } from '../../stores/panes'
 import { collectLeaves } from '../../lib/paneTree'
+import { terminalKeyAction } from '../../lib/terminalKeys'
 import { PaneNotice } from './PaneNotice'
 import { FindBar } from './FindBar'
 import { ContextMenu, type MenuEntry } from '../ui/ContextMenu'
@@ -77,32 +78,27 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
       if (sel) void navigator.clipboard.writeText(sel).catch(() => {})
     })
 
-    // App-combos are shortcuts, never terminal input (dizayn manbasi / FR-09.1):
-    // drop them from the pty. On macOS that is any ⌘ combo; on Windows/Linux it
-    // is Ctrl+Shift+<key> and Ctrl+<digit> (FR-09.3) — plain Ctrl+C / Ctrl+D /
-    // Ctrl+W MUST reach the host, so they are NOT blocked. Find and paste are
-    // handled here (⌘F/⌘V on mac, Ctrl+Shift+F/V on Windows); the rest are done
-    // by the document-level keymaps.
+    // Key policy lives in lib/terminalKeys.ts so it can be tested; this block
+    // only performs the action it returns.
     t.attachCustomKeyEventHandler((e) => {
-      if (e.type !== 'keydown') return true
-      const digit = /^[1-9]$/.test(e.key)
-      const isAppCombo = isMac
-        ? e.metaKey
-        : (e.ctrlKey && e.shiftKey) || (e.ctrlKey && !e.shiftKey && digit)
-      if (!isAppCombo) return true // plain Ctrl+C etc. → host
-      const k = e.key.toLowerCase()
-      if (k === 'f') {
+      const action = terminalKeyAction(e, isMac)
+      if (action === 'pass') return true // plain Ctrl+C etc. -> host
+      // 'paste-native' and 'drop' both fall through WITHOUT preventDefault, and
+      // that is deliberate for both. For paste it is the whole fix: cancelling
+      // the default and reading the clipboard ourselves trips macOS's
+      // pasteboard confirmation (the "Paste" button the user has to click),
+      // whereas the native paste is delivered straight to xterm's own paste
+      // listener and on to the pty -- the guard on term.onData still sees it.
+      // For 'drop' it preserves native Cmd+C copy, which the terminal relies on.
+      if (action === 'find') {
         e.preventDefault()
         setFindOpen((o) => !o)
-      } else if (k === 'v') {
-        e.preventDefault()
-        void navigator.clipboard.readText().then((txt) => t.paste(txt)).catch(() => {})
-      } else if (k === 'arrowup' || k === 'arrowdown') {
+      } else if (action === 'jump-prev' || action === 'jump-next') {
         e.preventDefault()
         const markers = promptMarkersRef.current
         const top = t.buffer.active.viewportY
         const lines = markers.map((m) => m.marker.line).filter((l) => l >= 0).sort((a, b) => a - b)
-        const target = k === 'arrowup'
+        const target = action === 'jump-prev'
           ? [...lines].reverse().find((l) => l < top)
           : lines.find((l) => l > top)
         if (target !== undefined) t.scrollToLine(target)
