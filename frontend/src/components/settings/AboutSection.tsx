@@ -12,7 +12,12 @@ export function AboutSection() {
     const call = AppInfoService.Platform()
     call
       .then((p) => setPlatform(p))
-      .catch((err) => console.error('AppInfoService.Platform failed:', err))
+      .catch((err) => {
+        // StrictMode mounts this effect twice in dev, so the first call is
+        // routinely cancelled by the cleanup below; that rejects with a
+        // CancelError, not a real failure, so don't log it as one.
+        if (err?.name !== 'CancelError') console.error('AppInfoService.Platform failed:', err)
+      })
     return () => {
       call.cancel()
     }
