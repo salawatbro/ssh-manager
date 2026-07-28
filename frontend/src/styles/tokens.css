@@ -56,6 +56,15 @@
   --term-cursor-accent: #04252a;
   --term-selection: rgba(53, 201, 214, 0.28);
 
+  /* addon-search decorations. The addon requires #RRGGBB with no alpha, so
+     these are pre-blended against --term-bg rather than reusing
+     --term-selection (which carries alpha). The two ruler colours are
+     mandatory options, not optional like the backgrounds. */
+  --term-find-match: #1f4a52;
+  --term-find-match-ruler: #2a7c86;
+  --term-find-active: #35c9d6;
+  --term-find-active-ruler: #7fe6ef;
+
   --term-black: #2a313b;   --term-bright-black: #69727f;
   --term-red: #e5544b;     --term-bright-red: #ff6f66;
   --term-green: #6cc06c;   --term-bright-green: #86d986;

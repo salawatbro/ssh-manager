@@ -4,7 +4,8 @@ import { FitAddon } from '@xterm/addon-fit'
 import { CanvasAddon } from '@xterm/addon-canvas'
 import { SearchAddon } from '@xterm/addon-search'
 import '@xterm/xterm/css/xterm.css'
-import { graphiteTheme } from '../../lib/termTheme'
+import { graphiteTheme, findDecorations } from '../../lib/termTheme'
+import type { FindResults } from '../../lib/findStatus'
 import { isMac } from '../../lib/platform'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { useSettings } from '../../stores/settings'
@@ -14,8 +15,9 @@ import { collectLeaves } from '../../lib/paneTree'
 import { terminalKeyAction } from '../../lib/terminalKeys'
 import { PaneNotice } from './PaneNotice'
 import { FindBar } from './FindBar'
-import { ContextMenu, type MenuEntry } from '../ui/ContextMenu'
+import { ContextMenu } from '../ui/ContextMenu'
 import { installOsc133, type PromptMarker } from './commandDecorations'
+import { terminalMenuItems } from './terminalMenu'
 
 interface Props {
   paneId: string
@@ -34,6 +36,7 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
   const [term, setTerm] = useState<XTerm | null>(null)
   const [fit, setFit] = useState<FitAddon | null>(null)
   const [findOpen, setFindOpen] = useState(false)
+  const [findResults, setFindResults] = useState<FindResults | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const cfg = useSettings((st) => st.settings)
   // The focused-pane ring only earns its keep when a tab is split into ≥2
@@ -65,6 +68,9 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
     t.loadAddon(new CanvasAddon())
     fitAddon.fit()
     searchRef.current = search
+    // Only fires while decorations are enabled — see the options passed in
+    // find() below. Disposed with the terminal.
+    search.onDidChangeResults((r) => setFindResults(r))
     // Seed the status bar's dimensions segment (dizayn manbasi:
     // MainWindow.dc.html, `40×120`) right away — the resize-observer below
     // only fires on a LATER container resize, so without this the very
@@ -183,9 +189,17 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
 
   function find(query: string, dir: 'next' | 'prev') {
     const s = searchRef.current
-    if (!s || !query) return
-    if (dir === 'next') s.findNext(query)
-    else s.findPrevious(query)
+    if (!s) return
+    if (!query) {
+      s.clearDecorations()
+      setFindResults(null)
+      return
+    }
+    // decorations are what make onDidChangeResults fire at all, so the match
+    // counter and the highlighting are one feature, not two.
+    const opts = { decorations: findDecorations() }
+    if (dir === 'next') s.findNext(query, opts)
+    else s.findPrevious(query, opts)
   }
 
   return (
@@ -208,16 +222,20 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
           x={menu.x}
           y={menu.y}
           onClose={() => setMenu(null)}
-          items={[
-            { label: 'Copy', disabled: !term.hasSelection(), run: () => void navigator.clipboard.writeText(term.getSelection()).catch(() => {}) },
-            { label: 'Paste', run: () => void navigator.clipboard.readText().then((t) => term.paste(t)).catch(() => {}) },
-            'separator',
-            { label: 'Select All', run: () => term.selectAll() },
-            { label: 'Clear', run: () => term.clear() },
-          ] satisfies MenuEntry[]}
+          items={terminalMenuItems(term)}
         />
       )}
-      {findOpen && <FindBar onFind={find} onClose={() => setFindOpen(false)} />}
+      {findOpen && (
+        <FindBar
+          onFind={find}
+          results={findResults}
+          onClose={() => {
+            searchRef.current?.clearDecorations()
+            setFindResults(null)
+            setFindOpen(false)
+          }}
+        />
+      )}
       {(session.status === 'error' || session.status === 'closed') && (
         <PaneNotice
           kind={session.status === 'error' ? 'failed' : 'dropped'}

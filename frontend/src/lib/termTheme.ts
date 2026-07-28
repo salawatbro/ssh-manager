@@ -31,3 +31,16 @@ export function graphiteTheme(): ITheme {
     brightWhite: v('--term-bright-white'),
   }
 }
+
+// findDecorations builds addon-search's decoration options from the same
+// tokens.css variables graphiteTheme() reads, so the highlight colours cannot
+// drift from the palette. The return type is inferred on purpose: the addon
+// declares ISearchDecorationOptions but does not export it.
+export function findDecorations() {
+  return {
+    matchBackground: v('--term-find-match'),
+    matchOverviewRuler: v('--term-find-match-ruler'),
+    activeMatchBackground: v('--term-find-active'),
+    activeMatchColorOverviewRuler: v('--term-find-active-ruler'),
+  }
+}
