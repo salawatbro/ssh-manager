@@ -191,6 +191,21 @@ task package
 Produces a macOS application bundle (`Zish`, bundle id
 `uz.salawat.sshmgr`). The bundle id keeps the original `sshmgr` name to preserve existing installs' Keychain items and data.
 
+### Bump the version
+
+The app version has exactly one home: `build/config.yml`'s `info.version`.
+Everything else derives from it or is rewritten for you:
+
+```bash
+task bump NEW=x.y.z
+```
+
+That rewrites `build/darwin/Info.plist` (both strings) and the README's DMG
+names; the DMG task and the About screen read the source directly, so there is
+nothing to update there. Add the `CHANGELOG.md` section by hand — `bump` does
+not touch it. `task check` fails if any of them drift apart, or if a hardcoded
+copy of the version appears somewhere new.
+
 ### Build a distributable DMG
 
 ```bash
@@ -213,8 +228,9 @@ wails3 task check   # or: task check
 
 It runs `go vet`, `golangci-lint`, the tests with `-race` and coverage,
 `govulncheck`, the banned-pattern greps (host-key checks, cgo/sqlite rules), the
-frontend typecheck and build, a per-file line-length check, and a CGO-free build
-of `internal/...`.
+frontend typecheck and build, a per-file line-length check, the version drift
+guard (see [Bump the version](#bump-the-version)), and a CGO-free build of
+`internal/...`.
 
 ---
 
