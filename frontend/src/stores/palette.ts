@@ -11,7 +11,7 @@ import type { QuickConnectTarget } from '../lib/quickConnect'
 export type PaletteRowData =
   | { kind: 'server'; server: Server; status: Status }
   | { kind: 'command'; id: string; label: string; run: () => void }
-  | { kind: 'quick-connect'; target: QuickConnectTarget }
+  | { kind: 'quick-connect'; target: QuickConnectTarget; existingName?: string }
 
 interface PaletteState {
   open: boolean

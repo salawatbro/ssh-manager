@@ -12,7 +12,7 @@ import { tabStatus } from '../../lib/tabStatus'
 import { searchServers } from '../../lib/fuzzy'
 import { PaletteRow } from './PaletteRow'
 import { ServerService } from '@bindings/github.com/salawat/sshmgr/internal/service'
-import { parseQuickConnect, runQuickConnect } from '../../lib/quickConnect'
+import { findExistingServer, parseQuickConnect, runQuickConnect } from '../../lib/quickConnect'
 import { toastError } from '../../stores/toasts'
 
 // The ⌘K command palette (FR-08). A quick-connect row when the input parses
@@ -82,7 +82,9 @@ export function CommandPalette({
     // Quick connect is always row 0 when the input parses — Enter connects
     // with nothing else to press. Fuzzy results stay visible below it.
     const target = parseQuickConnect(q)
-    const quickRows: PaletteRowData[] = target ? [{ kind: 'quick-connect', target }] : []
+    const quickRows: PaletteRowData[] = target
+      ? [{ kind: 'quick-connect', target, existingName: findExistingServer(servers, target)?.name }]
+      : []
     return [...quickRows, ...serverRows, ...commands]
   }, [servers, q, onNewServer, onOpenTunnels, selectedId, tabs, paneStatus])
 

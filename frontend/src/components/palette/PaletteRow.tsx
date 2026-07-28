@@ -66,7 +66,9 @@ export function PaletteRow({
           <span className="min-w-0 flex-1 truncate text-[13.5px] text-text">
             Connect to {formatQuickTarget(row.target)}
           </span>
-          <span className="shrink-0 text-[11px] text-textDim">saves to Quick connects</span>
+          <span className="shrink-0 text-[11px] text-textDim">
+            {row.existingName ? `opens ${row.existingName}` : 'saves to Quick connects'}
+          </span>
         </>
       )}
     </div>
