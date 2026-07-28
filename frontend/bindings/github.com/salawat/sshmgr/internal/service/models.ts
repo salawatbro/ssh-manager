@@ -131,6 +131,14 @@ export interface OpenResult {
 }
 
 /**
+ * PlatformInfo is what the About screen renders beside the app version.
+ */
+export interface PlatformInfo {
+    "os": string;
+    "arch": string;
+}
+
+/**
  * SftpProgress is the sftp:progress event payload: one update for an in-flight
  * transfer (or its terminal Finished/Error state). Carries no secret (SEC-01).
  */

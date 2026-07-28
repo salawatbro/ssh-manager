@@ -125,6 +125,7 @@ func main() {
 	uninstallDataDir, _ := platform.DataDir()
 	uninstallLogDir, _ := platform.LogDir()
 	uninstallService := service.NewUninstallService(repo, kr, platform.NewLoginAgent(), uninstallDataDir, uninstallLogDir, platform.RunningFromAppBundle())
+	appInfoService := service.NewAppInfoService()
 
 	// Wires forwardRepo + forwardMgr into serverService so Delete tears down a
 	// server's live tunnels first (Task 4's deviation: a package-level func,
@@ -162,6 +163,7 @@ func main() {
 			application.NewService(sftpService),
 			application.NewService(localService),
 			application.NewService(uninstallService),
+			application.NewService(appInfoService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

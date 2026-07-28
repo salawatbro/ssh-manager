@@ -1,4 +1,18 @@
+import { useEffect, useState } from 'react'
+import { AppInfoService } from '@bindings/github.com/salawat/sshmgr/internal/service'
+
 export function AboutSection() {
+  // Reported by the backend rather than hardcoded: Go knows the target the
+  // binary was built for, and a literal here would silently go wrong the day
+  // a universal or Intel build exists. Rendered only once it resolves, so a
+  // wrong architecture can never flash on screen.
+  const [platform, setPlatform] = useState<{ os: string; arch: string } | null>(null)
+  useEffect(() => {
+    AppInfoService.Platform()
+      .then((p) => setPlatform({ os: p.os, arch: p.arch }))
+      .catch(() => {})
+  }, [])
+
   return (
     <div className="flex flex-col items-center pt-[26px] text-center">
       <div className="mb-[16px] flex h-[52px] w-[52px] items-center justify-center rounded-[11px] border border-borderStrong">
@@ -8,7 +22,10 @@ export function AboutSection() {
         </svg>
       </div>
       <div className="text-[17px] font-semibold text-text">Zish</div>
-      <div className="mt-[5px] font-mono text-[12px] text-textDim">{__APP_VERSION__} · darwin/arm64</div>
+      <div className="mt-[5px] font-mono text-[12px] text-textDim">
+        {__APP_VERSION__}
+        {platform ? ` · ${platform.os}/${platform.arch}` : ''}
+      </div>
       <div className="mt-[22px] flex w-[400px] flex-col gap-[7px] rounded-[7px] border border-border bg-bg0 p-[13px_16px]">
         {[
           'Everything stays on this machine',
