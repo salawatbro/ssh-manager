@@ -78,32 +78,36 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
       if (sel) void navigator.clipboard.writeText(sel).catch(() => {})
     })
 
-    // Key policy lives in lib/terminalKeys.ts so it can be tested; this block
-    // only performs the action it returns.
+    // Key policy -- including whether to preventDefault -- lives in
+    // lib/terminalKeys.ts so it's tested; this block only executes it.
     t.attachCustomKeyEventHandler((e) => {
-      const action = terminalKeyAction(e, isMac)
-      if (action === 'pass') return true // plain Ctrl+C etc. -> host
-      // 'paste-native' and 'drop' both fall through WITHOUT preventDefault, and
-      // that is deliberate for both. For paste it is the whole fix: cancelling
-      // the default and reading the clipboard ourselves trips macOS's
-      // pasteboard confirmation (the "Paste" button the user has to click),
-      // whereas the native paste is delivered straight to xterm's own paste
-      // listener and on to the pty -- the guard on term.onData still sees it.
-      // For 'drop' it preserves native Cmd+C copy, which the terminal relies on.
-      if (action === 'find') {
-        e.preventDefault()
-        setFindOpen((o) => !o)
-      } else if (action === 'jump-prev' || action === 'jump-next') {
-        e.preventDefault()
-        const markers = promptMarkersRef.current
-        const top = t.buffer.active.viewportY
-        const lines = markers.map((m) => m.marker.line).filter((l) => l >= 0).sort((a, b) => a - b)
-        const target = action === 'jump-prev'
-          ? [...lines].reverse().find((l) => l < top)
-          : lines.find((l) => l > top)
-        if (target !== undefined) t.scrollToLine(target)
+      const decision = terminalKeyAction(e, isMac)
+      if (decision.preventDefault) e.preventDefault()
+      switch (decision.action) {
+        case 'pass':
+          return true // plain Ctrl+C etc. -> host
+        case 'find':
+          setFindOpen((o) => !o)
+          return false
+        case 'jump-prev':
+        case 'jump-next': {
+          const markers = promptMarkersRef.current
+          const top = t.buffer.active.viewportY
+          const lines = markers.map((m) => m.marker.line).filter((l) => l >= 0).sort((a, b) => a - b)
+          const target = decision.action === 'jump-prev'
+            ? [...lines].reverse().find((l) => l < top)
+            : lines.find((l) => l > top)
+          if (target !== undefined) t.scrollToLine(target)
+          return false
+        }
+        // Neither prevents default: 'paste-native' lets WebKit do the native
+        // paste (the fix); 'drop' preserves native Cmd+C copy.
+        case 'paste-native':
+        case 'drop':
+          return false
+        default:
+          throw new Error(`Unhandled terminal key action: ${String(decision.action satisfies never)}`)
       }
-      return false
     })
 
     // Shell-integration OSC 133 markers → command blocks → gutter decorations.
