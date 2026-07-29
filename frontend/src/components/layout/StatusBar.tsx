@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Key, Lock, Terminal, UserCheck, type LucideIcon } from 'lucide-react'
 import { AuthType } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useServers } from '../../stores/servers'
+import { useView } from '../../stores/view'
 import { useSessions } from '../../stores/sessions'
 import { usePanes } from '../../stores/panes'
 import { useSettings } from '../../stores/settings'
@@ -10,9 +11,7 @@ import { StatusDot } from '../server/StatusDot'
 import { shellSegmentLabel } from '../../lib/shellSegmentLabel'
 import { isLocalTarget, serverTargetId } from '../../lib/paneTarget'
 
-interface Props {
-  onOpenTunnels: (serverId: string) => void
-}
+
 
 // Auth glyph + label per method (dizayn manbasi: MainWindow.dc.html status
 // bar, left segment — the mock shows a key glyph + "SSH key" for the active
@@ -45,7 +44,7 @@ const divider = <span className="text-border">│</span>
 // (dizayn manbasi: EmptyState.dc.html). With no active tab but servers
 // present, it falls back to the server/tunnel counts the bar showed before
 // this rework — MainWindow.dc.html has no mock for that in-between state.
-export function StatusBar({ onOpenTunnels }: Props) {
+export function StatusBar() {
   const servers = useServers((s) => s.servers)
   const selectedId = useServers((s) => s.selectedId)
   const tabs = useSessions((s) => s.tabs)
@@ -105,7 +104,7 @@ export function StatusBar({ onOpenTunnels }: Props) {
     return (
       <button
         type="button"
-        onClick={() => onOpenTunnels(targetId)}
+        onClick={() => useView.getState().showDetail(targetId)}
         className="flex items-center gap-[5px] hover:text-text"
       >
         {dot}

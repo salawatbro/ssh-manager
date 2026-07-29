@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Sidebar } from './components/layout/Sidebar'
 import { MainContent } from './components/layout/MainContent'
 import { ServerForm } from './components/server/ServerForm'
@@ -13,7 +13,6 @@ import { AuthenticatorPanel } from './components/authenticator/AuthenticatorPane
 import { WelcomeTour } from './components/tour/WelcomeTour'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { ImportPreview } from './components/palette/ImportPreview'
-import { TunnelsPanel } from './components/forwards/TunnelsPanel'
 import { StatusBar } from './components/layout/StatusBar'
 import { Toasts } from './components/ui/Toasts'
 import { useAppKeymap } from './hooks/useAppKeymap'
@@ -34,10 +33,6 @@ export default function App() {
   // selection: a single click on a row opens that server's detail page
   // instead (redesign decision, docs/superpowers/redesign-plan.md §2).
   const formFor = useServerForm((s) => s.target)
-  // TunnelsPanel is per-server (dizayn manbasi: MainWindow.dc.html
-  // panel=tunnels) and shares ServerForm's 392px right-hand slot, so only
-  // one of the two is ever open — see the mutual-exclusion effect below.
-  const [tunnelsFor, setTunnelsFor] = useState<string | null>(null)
 
   const hostKeyRequest = useHostKey((s) => s.request)
   const confirmHostKey = useHostKey((s) => s.confirm)
@@ -88,25 +83,12 @@ export default function App() {
 
   const formOpen = formFor !== null
 
-  // Both panels live in the same 392px right-hand slot — whenever the edit
-  // form opens (from any of its several entry points: a row click, the
-  // context menu's Edit, "Add server", …), close the tunnels panel rather
-  // than tracking every one of those call sites individually.
-  useEffect(() => {
-    if (formOpen) setTunnelsFor(null)
-  }, [formOpen])
-
   function closeForm() {
     useServerForm.getState().close()
   }
 
   function openAdd() {
     useServerForm.getState().openNew()
-  }
-
-  function openTunnelsFor(id: string) {
-    closeForm()
-    setTunnelsFor(id)
   }
 
   useAppKeymap(openAdd)
@@ -153,7 +135,7 @@ export default function App() {
             — the design's empty state still shows the sidebar shell (dimmed
             search box, "No servers yet" placeholder, "+ Add server" footer),
             only the content area swaps to the centered hero. */}
-        <Sidebar onAdd={openAdd} onOpenTunnels={openTunnelsFor} />
+        <Sidebar onAdd={openAdd} />
         {/* Empty/SFTP/terminal three-way swap: extracted to MainContent to
             keep this file under its 200-line budget. */}
         <MainContent formOpen={formOpen} onAdd={openAdd} />
@@ -161,20 +143,13 @@ export default function App() {
             internal state (including confirmDelete) always starts fresh —
             see ServerForm's effect comment for why this matters. */}
         {formFor && <ServerForm key={formFor.id ?? 'new'} serverId={formFor.id} onClose={closeForm} />}
-        {/* Mutually exclusive with the form above (the effect near
-            openTunnelsFor enforces it) — both occupy the same 392px slot. key
-            remounts per target server so TunnelsPanel's `editing` state
-            (add/edit-in-place) never carries over from one server to the next. */}
-        {tunnelsFor && !formOpen && (
-          <TunnelsPanel key={tunnelsFor} serverId={tunnelsFor} onClose={() => setTunnelsFor(null)} />
-        )}
       </div>
 
       {/* TZ 12.1 / design-conformance task 4: 26px status bar (dizayn manbasi:
           MainWindow.dc.html). With an active session it shows the live
           auth/target/dims/tunnels/uptime; with none, the server/tunnel
           counts the bar showed before this rework. */}
-      <StatusBar onOpenTunnels={openTunnelsFor} />
+      <StatusBar />
 
       {/* key={hostKeyRequest.requestID} remounts the modal per request, so a
           NEW host-key request always starts fresh — most importantly, so
@@ -196,7 +171,7 @@ export default function App() {
         <CodeModal key={codeRequest.requestID} request={codeRequest} onSubmit={submitCode} onCancel={cancelCode} />
       )}
 
-      <CommandPalette onNewServer={openAdd} onOpenTunnels={openTunnelsFor} />
+      <CommandPalette onNewServer={openAdd} />
       {/* ⌘E overlay (v0.7 FR-16): snippet quick-run for the focused pane's
           server, driven by stores/snippets.ts — same one-instance-in-App.tsx
           pattern as CommandPalette/GuardModal. */}

@@ -9,6 +9,8 @@ import { detailFields, sshCommand, statusLabel, statusTextClass } from '../../li
 import { envClassOf } from '../../lib/env'
 import { StatusDot } from '../server/StatusDot'
 import { ConnectionCard, DetailCard } from './ConnectionCard'
+import { HealthCard, RecentSessionsCard } from './MetricCards'
+import { TunnelCards } from './TunnelCards'
 
 // The server detail page (dizayn manbasi: Zish.dc.html `isDetail`) — the view a
 // single click on a sidebar row now opens. Everything on it is real model data;
@@ -108,8 +110,11 @@ export function ServerDetail() {
         <div className="mt-[16px] grid grid-cols-3 gap-4">
           <div className="col-span-2 flex flex-col gap-4">
             <ConnectionCard fields={detailFields(server, jumpName)} />
+            <TunnelCards serverId={server.id} />
           </div>
           <div className="col-span-1 flex flex-col gap-4">
+            <HealthCard serverId={server.id} />
+            <RecentSessionsCard serverId={server.id} />
             <DetailCard title="Notes">
               <div className="px-[13px] py-[10px] text-[12.5px] leading-[1.5] text-textMuted">
                 {server.notes || 'No notes for this host.'}

@@ -16,12 +16,7 @@ interface MenuState {
   y: number
 }
 
-interface Props {
-  // Opens TunnelsPanel for the given server id (App.tsx's `tunnelsFor`).
-  onOpenTunnels: (id: string) => void
-}
-
-export function ServerList({ onOpenTunnels }: Props) {
+export function ServerList() {
   const servers = useServers((s) => s.servers)
   const selectedId = useServers((s) => s.selectedId)
   const select = useServers((s) => s.select)
@@ -107,7 +102,7 @@ export function ServerList({ onOpenTunnels }: Props) {
           y={menu.y}
           onClose={() => setMenu(null)}
           onEdit={() => useServerForm.getState().openEdit(menu.server.id)}
-          onTunnels={() => onOpenTunnels(menu.server.id)}
+          onTunnels={() => useView.getState().showDetail(menu.server.id)}
           filtering={filtering}
         />
       )}

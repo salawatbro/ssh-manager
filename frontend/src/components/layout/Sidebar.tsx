@@ -8,14 +8,13 @@ import { allTags } from '../../lib/sidebarFilter'
 
 interface Props {
   onAdd: () => void
-  onOpenTunnels: (id: string) => void
 }
 
 // How many tag pills fit before the row starts eating the list's height. Past
 // this the rest hide behind a `+N` expander (Zish.dc.html sidebar).
 const TAG_LIMIT = 6
 
-export function Sidebar({ onAdd, onOpenTunnels }: Props) {
+export function Sidebar({ onAdd }: Props) {
   const query = useSidebar((s) => s.query)
   const tags = useSidebar((s) => s.tags)
   const setQuery = useSidebar((s) => s.setQuery)
@@ -111,7 +110,7 @@ export function Sidebar({ onAdd, onOpenTunnels }: Props) {
           </div>
         )}
       </div>
-      <ServerList onOpenTunnels={onOpenTunnels} />
+      <ServerList />
       <div className="flex h-[32px] shrink-0 items-center gap-[6px] border-t border-border px-[8px]">
         <button
           type="button"

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { usePalette, type PaletteRowData } from '../../stores/palette'
+import { useView } from '../../stores/view'
 import { useServers } from '../../stores/servers'
 import { useSessions } from '../../stores/sessions'
 import { usePanes } from '../../stores/panes'
@@ -21,13 +22,11 @@ import { toastError } from '../../stores/toasts'
 // ↑↓ move; Esc / backdrop close.
 export function CommandPalette({
   onNewServer,
-  onOpenTunnels,
 }: {
   onNewServer: () => void
   // TunnelsPanel is per-server (dizayn manbasi: MainWindow.dc.html
   // panel=tunnels), so the palette can only offer it for the currently
   // selected server — see the `selectedId` filter below.
-  onOpenTunnels: (id: string) => void
 }) {
   const open = usePalette((s) => s.open)
   const hide = usePalette((s) => s.hide)
@@ -62,7 +61,7 @@ export function CommandPalette({
       { kind: 'command' as const, id: 'welcome-tour', label: 'Welcome tour', run: () => useTour.getState().show() },
       ...(selectedId
         ? [
-            { kind: 'command' as const, id: 'tunnels', label: 'Tunnels', run: () => onOpenTunnels(selectedId) },
+            { kind: 'command' as const, id: 'tunnels', label: 'Tunnels', run: () => useView.getState().showDetail(selectedId) },
             {
               kind: 'command' as const,
               id: 'sftp',
@@ -86,7 +85,7 @@ export function CommandPalette({
       ? [{ kind: 'quick-connect', target, existingName: findExistingServer(servers, target)?.name }]
       : []
     return [...quickRows, ...serverRows, ...commands]
-  }, [servers, q, onNewServer, onOpenTunnels, selectedId, tabs, paneStatus])
+  }, [servers, q, onNewServer, selectedId, tabs, paneStatus])
 
   useEffect(() => {
     setI(0)

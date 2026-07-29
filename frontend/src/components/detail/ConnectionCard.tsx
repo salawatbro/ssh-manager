@@ -27,11 +27,24 @@ export function ConnectionCard({ fields }: Props) {
 
 // The card chrome every detail panel reuses: a 30px upper-cased header strip
 // over a bg1 body. Exported so the tunnels/health/notes cards match it exactly
-// rather than each re-spelling the same classes.
-export function DetailCard({ title, children }: { title: string; children: React.ReactNode }) {
+// rather than each re-spelling the same classes. `hint` becomes the header's
+// tooltip — the metric cards use it to admit their numbers are placeholders
+// without a badge cutting into the design's layout.
+export function DetailCard({
+  title,
+  hint,
+  children,
+}: {
+  title: string
+  hint?: string
+  children: React.ReactNode
+}) {
   return (
     <div className="overflow-hidden rounded-[7px] border border-border bg-bg1">
-      <div className="flex h-[30px] items-center border-b border-border px-[13px] text-[10.5px] font-semibold tracking-[.07em] text-textDim">
+      <div
+        title={hint}
+        className="flex h-[30px] items-center border-b border-border px-[13px] text-[10.5px] font-semibold tracking-[.07em] text-textDim"
+      >
         {title.toUpperCase()}
       </div>
       {children}
