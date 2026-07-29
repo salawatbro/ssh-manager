@@ -4,7 +4,7 @@ All notable changes to **Zish**. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
 follow [Semantic Versioning](https://semver.org/).
 
-Only **1.0.0**, **1.1.0**, **1.2.0** and **1.3.0** are packaged, published releases (macOS `.dmg`).
+Only **1.0.0**, **1.1.0**, **1.2.0**, **1.3.0** and **1.3.1** are packaged, published releases (macOS `.dmg`).
 Versions **0.1–0.7** are the development milestones that built up to 1.0; **1.1.1**
 was a version bump that first shipped packaged as part of 1.2.0.
 
