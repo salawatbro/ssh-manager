@@ -8,6 +8,37 @@ Only **1.0.0**, **1.1.0**, **1.2.0** and **1.3.0** are packaged, published relea
 Versions **0.1–0.7** are the development milestones that built up to 1.0; **1.1.1**
 was a version bump that first shipped packaged as part of 1.2.0.
 
+## [1.3.1] — 2026-07-29
+
+A pass over small defects in shipped features.
+
+### Added
+- **Find match count and highlighting** — `⌘F` now reports where you are in the
+  results (`3/12`, or `no matches`) and highlights every match in the terminal,
+  with the active one distinguished. Previously a query that matched nothing
+  looked exactly like one that matched everything.
+- **Move up / Move down** in a server's right-click menu — reordering a server
+  inside its group no longer requires dragging. Both entries are greyed out at
+  the ends of a group, and while the sidebar filter is active (the visible
+  order is not the stored order then).
+
+### Fixed
+- **`⌘V` pastes again.** macOS interposed its own "Paste" confirmation button,
+  so the keystroke appeared to do nothing until you clicked it — the app was
+  reading the clipboard programmatically, which macOS gates. The paste is now
+  handled natively and goes straight through. Right-click → Paste still shows
+  the system prompt; that path needs a native menu and is not fixed here.
+- **The About screen reports the real platform** rather than a fixed
+  `darwin/arm64` string, so it stays truthful on any future build.
+- **A quick-connect row no longer promises the wrong thing.** When you type
+  `user@host` and a server with that host, user and port already exists,
+  nothing is saved — the existing session is opened. The row now names that
+  server instead of claiming it will save a new one, which matters because the
+  match may be stored under a completely different name.
+- Selecting text in the terminal no longer copies to the clipboard while the
+  find bar is open, so a long-running command cannot cause a background
+  re-search to overwrite what you copied.
+
 ## [1.3.0] — 2026-07-28
 
 ### Added
@@ -211,6 +242,7 @@ This release bundles everything from 0.1 through 0.7 below.
   port, user, auth method, jump host), grouped in the sidebar. No connections
   yet — that arrived in 0.2.
 
+[1.3.1]: https://github.com/salawatbro/ssh-manager/releases/tag/v1.3.1
 [1.3.0]: https://github.com/salawatbro/ssh-manager/releases/tag/v1.3.0
 [1.2.0]: https://github.com/salawatbro/ssh-manager/releases/tag/v1.2.0
 [1.1.0]: https://github.com/salawatbro/ssh-manager/releases/tag/v1.1.0
