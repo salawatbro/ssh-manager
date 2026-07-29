@@ -1,5 +1,6 @@
 import type { Terminal } from '@xterm/xterm'
 import type { MenuEntry } from '../ui/ContextMenu'
+import { EditService } from '@bindings/github.com/salawat/sshmgr'
 
 // The terminal's right-click menu entries. Extracted out of Terminal.tsx to
 // keep that file under its line budget, and because the Copy disabled-state
@@ -12,11 +13,16 @@ export function terminalMenuItems(term: Terminal): MenuEntry[] {
       run: () => void navigator.clipboard.writeText(term.getSelection()).catch(() => {}),
     },
     {
-      // No native paste path for a menu item inside WKWebView (unlike the
-      // Cmd+V key handler), so this still goes through the Clipboard API and
-      // shows the macOS permission prompt. That is expected, not a bug.
+      // Asks AppKit to perform its own paste: action rather than reading the
+      // clipboard here — since macOS 15 a programmatic read is gated behind a
+      // confirmation button, while a real paste command is not. The focus call
+      // matters: clicking this menu button moved focus to the button, and the
+      // action is delivered down the responder chain to whatever is focused.
       label: 'Paste',
-      run: () => void navigator.clipboard.readText().then((t) => term.paste(t)).catch(() => {}),
+      run: () => {
+        term.focus()
+        void EditService.Paste()
+      },
     },
     'separator',
     { label: 'Select All', run: () => term.selectAll() },

@@ -2,7 +2,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { terminalMenuItems } from './terminalMenu'
 import type { Terminal } from '@xterm/xterm'
 
-// A hand-rolled fake: terminalMenuItems only calls these five methods, so a
+// The native paste action, stubbed: calling the real binding would need the
+// Wails runtime, and what matters here is that Paste routes through it rather
+// than reading the clipboard itself.
+vi.mock('@bindings/github.com/salawat/sshmgr', () => ({
+  EditService: { Paste: vi.fn() },
+}))
+
+// A hand-rolled fake: terminalMenuItems only calls these six methods, so a
 // full xterm instance (and the DOM it needs) is unnecessary.
 function fakeTerm(hasSelection: boolean): Terminal {
   return {
@@ -11,6 +18,7 @@ function fakeTerm(hasSelection: boolean): Terminal {
     selectAll: vi.fn(),
     clear: vi.fn(),
     paste: vi.fn(),
+    focus: vi.fn(),
   } as unknown as Terminal
 }
 
@@ -46,5 +54,18 @@ describe('terminalMenuItems', () => {
     clear.run()
     expect(term.selectAll).toHaveBeenCalledOnce()
     expect(term.clear).toHaveBeenCalledOnce()
+  })
+
+  it('focuses the terminal before asking AppKit to paste', async () => {
+    // Order is load-bearing: paste: travels the responder chain, and clicking
+    // the menu button had moved focus off the terminal. It must never go back
+    // to reading the clipboard here — macOS gates that behind a prompt.
+    const { EditService } = await import('@bindings/github.com/salawat/sshmgr')
+    const term = fakeTerm(true)
+    const paste = terminalMenuItems(term)[1]
+    if (paste === 'separator') throw new Error('expected Paste entry')
+    paste.run()
+    expect(term.focus).toHaveBeenCalledOnce()
+    expect(EditService.Paste).toHaveBeenCalledOnce()
   })
 })

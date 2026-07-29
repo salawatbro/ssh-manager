@@ -163,6 +163,7 @@ func main() {
 			application.NewService(sftpService),
 			application.NewService(localService),
 			application.NewService(uninstallService),
+			application.NewService(NewEditService()),
 			application.NewService(appInfoService),
 		},
 		Assets: application.AssetOptions{

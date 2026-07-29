@@ -57,7 +57,7 @@
   --term-selection: rgba(53, 201, 214, 0.28);
 
   /* addon-search decorations. The addon requires #RRGGBB with no alpha, so
-     these are pre-blended against --term-bg rather than reusing
+     the match pair below is pre-blended against --term-bg rather than reusing
      --term-selection (which carries alpha). The two ruler colours are
      mandatory options, not optional like the backgrounds. The active-match
      pair reuses the existing cursor/bright-cyan values via var() rather than

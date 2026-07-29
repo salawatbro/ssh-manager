@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { runFind, closeFind } from './terminalFind'
 import type { SearchAddon } from '@xterm/addon-search'
 
@@ -10,6 +10,9 @@ import type { SearchAddon } from '@xterm/addon-search'
 // always passed) depends on it, not the actual colour values.
 vi.stubGlobal('document', { documentElement: {} })
 vi.stubGlobal('getComputedStyle', () => ({ getPropertyValue: () => '' }))
+// Per-file isolation would clean these up anyway, but only while it is on —
+// undo them here so the file stays self-contained if that ever changes.
+afterAll(() => vi.unstubAllGlobals())
 
 // A hand-rolled fake: runFind/closeFind only call these three methods, so a
 // full SearchAddon instance is unnecessary.

@@ -56,6 +56,9 @@ export function terminalKeyAction(e: TerminalKeyEvent, mac: boolean): TerminalKe
     default:
       // NOT preventing default here keeps native Cmd+C copy working for any
       // unmatched app combo — the pre-existing behavior, preserved.
+      // Swallowing the key is safe because 'drop' only stops xterm from
+      // sending it to the pty; it does not stop propagation, so the
+      // document-level keymaps still service Cmd+W, Cmd+1..9 and the rest.
       return { action: 'drop', preventDefault: false }
   }
 }
