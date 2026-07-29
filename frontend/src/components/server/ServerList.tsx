@@ -29,6 +29,7 @@ export function ServerList({ onOpenTunnels }: Props) {
   const tags = useSidebar((s) => s.tags)
   const collapsed = useSidebar((s) => s.collapsed)
   const toggleGroup = useSidebar((s) => s.toggleGroup)
+  const clearFilter = useSidebar((s) => s.clearFilter)
   // One open menu at a time, keyed by the server it targets — a second
   // right-click (on the same or a different row) just replaces it.
   const [menu, setMenu] = useState<MenuState | null>(null)
@@ -53,9 +54,18 @@ export function ServerList({ onOpenTunnels }: Props) {
   }
 
   if (visible.length === 0) {
+    // The redesign turns the dead end into an exit: say which filters are
+    // hiding everything, and offer the one gesture that clears them.
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center p-[20px] text-center">
-        <span className="text-[12px] leading-[1.5] text-textDim">No matches</span>
+      <div className="min-h-0 flex-1 px-[10px] pt-[16px]">
+        <div className="text-[12px] leading-[1.5] text-textDim">Nothing matches these filters.</div>
+        <button
+          type="button"
+          onClick={clearFilter}
+          className="mt-[6px] block text-[11.5px] text-accentFg hover:text-accent"
+        >
+          Clear filters
+        </button>
       </div>
     )
   }
@@ -86,7 +96,6 @@ export function ServerList({ onOpenTunnels }: Props) {
                   useView.getState().showDetail(s.id)
                 }}
                 onContextMenu={(x, y) => setMenu({ server: s, x, y })}
-                onTunnels={() => onOpenTunnels(s.id)}
                 drag={rowProps(s)}
               />
             ))}

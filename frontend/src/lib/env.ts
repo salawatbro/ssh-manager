@@ -28,3 +28,19 @@ const envBorderClass: Record<string, string> = {
 export function envBorderClassOf(env: string): string {
   return envBorderClass[env] ?? envBorderClass.none
 }
+
+// The sidebar group header's env marker (redesign): a square outlined in the
+// environment colour with a filled bar inside it. Spelled out for the same
+// reason as every other class in this file — a class built at runtime
+// (`envClassOf(env).replace('bg-', 'border-')`) is invisible to Tailwind's
+// static scan and its CSS is simply never emitted.
+const envOutlineClass: Record<string, string> = {
+  prod: 'border-envProd',
+  staging: 'border-envStaging',
+  dev: 'border-envDev',
+  none: 'border-stUnknown',
+}
+
+export function envOutlineClassOf(env: string): string {
+  return envOutlineClass[env] ?? envOutlineClass.none
+}
