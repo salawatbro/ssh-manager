@@ -39,6 +39,18 @@ docs/superpowers/
 # Internal version notes — local working docs only
 docs/*-notes.md
 
+# /design-sync working files. The durable inputs (.design-sync/config.json,
+# NOTES.md, conventions.md, previews/, overrides/) ARE committed; everything
+# below is regenerated per run or per machine.
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+# Converter inputs derived from the frontend build (see .design-sync/NOTES.md)
+frontend/.ds-entry.tsx
+frontend/.ds-styles.css
+
 # Leftover temp file from an interrupted `task bump` sed/mv chain
 # (e.g. build/config.yml.tmp) — see Taskfile.yml's `bump` task.
 *.tmp

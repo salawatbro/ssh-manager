@@ -1,0 +1,37 @@
+/* JetBrains Mono 2.304 — the family tokens.css names in --font-mono. The app
+   itself ships no font files and relies on a system install; the design system
+   bundles these four weights so every design renders the terminal/monospace
+   surfaces in the intended face. SIL Open Font License 1.1 (OFL.txt, shipped
+   alongside). Wired via cfg.extraFonts. */
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./JetBrainsMono-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./JetBrainsMono-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./JetBrainsMono-SemiBold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./JetBrainsMono-Bold.woff2") format("woff2");
+}
