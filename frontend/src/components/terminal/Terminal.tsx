@@ -133,7 +133,12 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
     setTerm(t)
     setFit(fitAddon)
     return () => {
-      // Stops the addon's debounced re-search timer from firing post-dispose.
+      // Doesn't cancel a pending debounced re-search timer — no handle for that exists — so one
+      // scheduled just before unmount can still fire ~200ms later, but clearing the cached search
+      // term here makes its callback take an early return, so it's defanged rather than stopped.
+      // Also partly redundant with the addon's own activate(), which already registers
+      // clearDecorations as a disposer — kept because it runs while the terminal is provably
+      // still alive, not mid-teardown.
       search.clearDecorations()
       t.dispose()
     }

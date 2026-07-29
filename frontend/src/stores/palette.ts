@@ -4,14 +4,21 @@ import type { Status } from '../lib/status'
 import type { QuickConnectTarget } from '../lib/quickConnect'
 
 // A palette row is a server (Enter opens its terminal), a command (Enter runs
-// it), or the synthetic quick-connect row (Enter saves + connects — spec
-// 2026-07-20). `status` (UI-11 status circle) is derived once in
+// it), or the synthetic quick-connect row (Enter opens the matching server
+// when one exists, otherwise saves the target as a new server and connects —
+// spec 2026-07-20). `status` (UI-11 status circle) is derived once in
 // CommandPalette from the live sessions store, so PaletteRow only ever
 // renders it — it never reaches into stores/sessions itself.
 export type PaletteRowData =
   | { kind: 'server'; server: Server; status: Status }
   | { kind: 'command'; id: string; label: string; run: () => void }
-  | { kind: 'quick-connect'; target: QuickConnectTarget; existingName?: string }
+  | {
+      kind: 'quick-connect'
+      target: QuickConnectTarget
+      // Absent means no existing server matches the target; present names
+      // the one Enter will open instead of creating a duplicate.
+      existingName?: string
+    }
 
 interface PaletteState {
   open: boolean

@@ -40,11 +40,12 @@ export function ServerContextMenu({ server, x, y, onClose, onEdit, onTunnels, fi
     { label: 'Open terminal', run: () => openSession(server) },
     { label: 'Browse files (SFTP)', run: () => void useSftp.getState().openFor(server) },
     { label: server.pinned ? 'Unpin from tray' : 'Pin to tray', run: () => void setPinned(server.id, !server.pinned) },
-    // Guard inside run as well as via `disabled`: committing `[]` would send
-    // an empty order to the sole sort_order writer, and the null case must
-    // never reach it by any path.
-    { label: 'Move up', disabled: up === null, run: () => { if (up) void setGroupOrder(server.group, up) } },
-    { label: 'Move down', disabled: down === null, run: () => { if (down) void setGroupOrder(server.group, down) } },
+    // moveWithinGroup returns null (already at that edge of the group) or a non-empty reordered
+    // list — never []. This `run` guard is a null guard, redundant with `disabled` only as
+    // defense in depth: written as `!== null` (not truthiness) so it reads identically to
+    // `disabled: up === null` and can't silently diverge if the return type ever changes.
+    { label: 'Move up', disabled: up === null, run: () => { if (up !== null) void setGroupOrder(server.group, up) } },
+    { label: 'Move down', disabled: down === null, run: () => { if (down !== null) void setGroupOrder(server.group, down) } },
     { label: 'Edit', run: onEdit },
     { label: 'Tunnels', run: onTunnels },
     { label: 'Duplicate', run: () => void duplicate(server.id) },
