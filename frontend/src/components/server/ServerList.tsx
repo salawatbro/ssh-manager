@@ -81,7 +81,6 @@ export function ServerList({ onOpenTunnels }: Props) {
           <GroupHeader
             group={g.group || 'Ungrouped'}
             count={g.servers.length}
-            env={g.servers[0].environment}
             collapsed={!filtering && !!collapsed[g.group]}
             onToggle={() => toggleGroup(g.group)}
           />
