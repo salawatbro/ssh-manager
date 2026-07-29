@@ -40,10 +40,14 @@ export function terminalKeyAction(e: TerminalKeyEvent, mac: boolean): TerminalKe
     case 'f':
       return { action: 'find', preventDefault: true }
     case 'v':
-      // NOT preventing default is the fix: letting WebKit perform the native
-      // paste means xterm's own paste listener delivers it to the pty. The
-      // previous code preventDefault()'d and read the clipboard itself,
-      // which macOS 15+ gates behind a "Paste" confirmation button.
+      // NOT preventing default is the fix on macOS: letting WebKit perform the native paste means
+      // xterm's own paste listener delivers it to the pty, avoiding the "Paste" confirmation
+      // button macOS 15+ gates a programmatic clipboard read behind. Off macOS this branch still
+      // returns 'paste-native', but that path is unsupported and unverified — this app ships
+      // macOS-only, and Ctrl+Shift+V is not a paste accelerator in WebKitGTK, so in practice no
+      // native paste event fires and nothing reaches the pty there today. If this is ever ported,
+      // terminalKeyAction needs a platform-aware action: native on macOS, a clipboard read
+      // elsewhere.
       return { action: 'paste-native', preventDefault: false }
     case 'arrowup':
       return { action: 'jump-prev', preventDefault: true }

@@ -81,9 +81,13 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
     // first pane of a session would show no dims until one occurred.
     usePanes.getState().setPaneDims(paneId, { cols: t.cols, rows: t.rows })
 
-    // Auto-copy on selection (user decision). Best-effort — clipboard can
-    // reject when unfocused.
+    // Auto-copy on selection (user decision). Best-effort — clipboard can reject when unfocused.
+    // Skipped while find is open: the addon's debounced re-search loop (closeFind, terminalFind.ts)
+    // reruns findPrevious every 200ms, usually a same-position no-op but sometimes shifting the
+    // match (scrollback trim, resize) and firing a real selection-changed event with no user
+    // action behind it. Only this automatic path is gated — Cmd+C and right-click Copy still work.
     t.onSelectionChange(() => {
+      if (findOpenRef.current) return
       const sel = t.getSelection()
       if (sel) void navigator.clipboard.writeText(sel).catch(() => {})
     })

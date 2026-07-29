@@ -58,7 +58,12 @@ describe('terminalKeyAction on macOS', () => {
 })
 
 describe('terminalKeyAction off macOS', () => {
-  it('treats Ctrl+Shift+V as the paste combo', () => {
+  it('treats Ctrl+Shift+V as the paste combo — asserts current behaviour, not correctness', () => {
+    // Unsupported and unverified: the app ships macOS-only, so this path has never been exercised
+    // for real. WebKitGTK doesn't treat Ctrl+Shift+V as a paste accelerator, so 'paste-native'
+    // here does not actually deliver a paste off macOS — no native paste event fires, so nothing
+    // reaches the pty, unlike the pre-fix code's clipboard read. If this app is ever ported,
+    // terminalKeyAction needs a platform-aware action instead of this fallthrough.
     const decision = terminalKeyAction(ev({ key: 'v', ctrlKey: true, shiftKey: true }), false)
     expect(decision.action).toBe('paste-native')
     expect(decision.preventDefault).toBe(false)
