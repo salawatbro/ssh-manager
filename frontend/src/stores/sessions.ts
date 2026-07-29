@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useSftp } from './sftp'
+import { releaseContentArea } from './view'
 import { replaceLeaf, removeLeaf, firstLeaf } from '../lib/paneTree'
 import { LOCAL_TARGET_ID } from '../lib/paneTarget'
 
@@ -45,6 +46,10 @@ interface SessionsState {
 // chasing the many call sites: tab strip, ⌘K, double-click, tray, ⌘1–9, ⌘⇧]/[.
 function focusTerminals() {
   if (useSftp.getState().active) useSftp.getState().blur()
+  // The detail page and the file editor sit in the same slot and are opened
+  // explicitly, so bringing a tab forward has to drop them too — otherwise the
+  // tab reads active while its terminal stays hidden behind them.
+  releaseContentArea()
 }
 
 // The mirror of focusTerminals, for the closing side: with the last tab gone the

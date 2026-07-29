@@ -20,6 +20,7 @@ import { useAppKeymap } from './hooks/useAppKeymap'
 import { useTrayConnect } from './hooks/useTrayConnect'
 import { useSftpProgress } from './hooks/useSftpProgress'
 import { useServers } from './stores/servers'
+import { useServerForm } from './stores/serverForm'
 import { useHostKey } from './stores/hostkey'
 import { useCodePrompt } from './stores/codeprompt'
 import { useSettings } from './stores/settings'
@@ -28,9 +29,11 @@ import { useForwards } from './stores/forwards'
 
 export default function App() {
   const load = useServers((s) => s.load)
-  const selectedId = useServers((s) => s.selectedId)
-  const select = useServers((s) => s.select)
-  const [adding, setAdding] = useState(false)
+  // The edit form is opened EXPLICITLY now (Add server, the row menu's Edit…,
+  // the detail page's Edit…) rather than being derived from the sidebar
+  // selection: a single click on a row opens that server's detail page
+  // instead (redesign decision, docs/superpowers/redesign-plan.md §2).
+  const formFor = useServerForm((s) => s.target)
   // TunnelsPanel is per-server (dizayn manbasi: MainWindow.dc.html
   // panel=tunnels) and shares ServerForm's 392px right-hand slot, so only
   // one of the two is ever open — see the mutual-exclusion effect below.
@@ -83,9 +86,7 @@ export default function App() {
     if (!settings.tourSeen) useTour.getState().show()
   }, [settings])
 
-  // Adding wins over the selection, so "Add server" always opens a blank form.
-  const formOpen = adding || selectedId !== null
-  const formFor = adding ? null : selectedId
+  const formOpen = formFor !== null
 
   // Both panels live in the same 392px right-hand slot — whenever the edit
   // form opens (from any of its several entry points: a row click, the
@@ -96,13 +97,11 @@ export default function App() {
   }, [formOpen])
 
   function closeForm() {
-    setAdding(false)
-    select(null)
+    useServerForm.getState().close()
   }
 
   function openAdd() {
-    select(null)
-    setAdding(true)
+    useServerForm.getState().openNew()
   }
 
   function openTunnelsFor(id: string) {
@@ -161,7 +160,7 @@ export default function App() {
         {/* key remounts the form whenever the target server changes, so its
             internal state (including confirmDelete) always starts fresh —
             see ServerForm's effect comment for why this matters. */}
-        {formOpen && <ServerForm key={formFor ?? 'new'} serverId={formFor} onClose={closeForm} />}
+        {formFor && <ServerForm key={formFor.id ?? 'new'} serverId={formFor.id} onClose={closeForm} />}
         {/* Mutually exclusive with the form above (the effect near
             openTunnelsFor enforces it) — both occupy the same 392px slot. key
             remounts per target server so TunnelsPanel's `editing` state

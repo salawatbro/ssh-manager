@@ -4,6 +4,7 @@ import type { FileEntry } from '@bindings/github.com/salawat/sshmgr/internal/sft
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { joinRemote, dirnameRemote } from '../lib/remotePath'
 import { toastError } from './toasts'
+import { releaseContentArea } from './view'
 
 // Mirrors the sftp:progress event payload (service/models.ts SftpProgress)
 // minus the terminal-only `finished`/`error` fields (see applyProgress).
@@ -117,7 +118,12 @@ export const useSftp = create<SftpState>((set, get) => ({
   },
 
   // No-ops when no session is open, so a stray click can't focus an empty view.
-  focus: () => set((s) => (s.open ? { active: true } : {})),
+  focus: () => {
+    // Same choke point as sessions.ts's focusTerminals: the explicitly-opened
+    // detail page / editor share this slot and must let go when SFTP is raised.
+    releaseContentArea()
+    set((s) => (s.open ? { active: true } : {}))
+  },
   blur: () => set({ active: false }),
 
   navLocal: async (dir) => {

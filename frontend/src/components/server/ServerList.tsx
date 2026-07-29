@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { groupServers, useServers } from '../../stores/servers'
 import { useSidebar } from '../../stores/sidebar'
+import { useView } from '../../stores/view'
+import { useServerForm } from '../../stores/serverForm'
 import { filterServers } from '../../lib/sidebarFilter'
 import { useServerDrag } from '../../hooks/useServerDrag'
 import { GroupHeader } from './GroupHeader'
@@ -79,7 +81,10 @@ export function ServerList({ onOpenTunnels }: Props) {
                 key={s.id}
                 server={s}
                 selected={s.id === selectedId}
-                onSelect={() => select(s.id)}
+                onSelect={() => {
+                  select(s.id)
+                  useView.getState().showDetail(s.id)
+                }}
                 onContextMenu={(x, y) => setMenu({ server: s, x, y })}
                 onTunnels={() => onOpenTunnels(s.id)}
                 drag={rowProps(s)}
@@ -93,7 +98,7 @@ export function ServerList({ onOpenTunnels }: Props) {
           x={menu.x}
           y={menu.y}
           onClose={() => setMenu(null)}
-          onEdit={() => select(menu.server.id)}
+          onEdit={() => useServerForm.getState().openEdit(menu.server.id)}
           onTunnels={() => onOpenTunnels(menu.server.id)}
           filtering={filtering}
         />
