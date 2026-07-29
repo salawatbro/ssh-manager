@@ -132,65 +132,81 @@ export function ServerForm({ serverId, onClose }: Props) {
   }
 
   return (
-    // TZ 12.1: inline panel is 392px
-    <div className="flex w-[392px] shrink-0 flex-col border-l border-border bg-bg1">
-      <div className="flex h-[42px] shrink-0 items-center gap-[8px] border-b border-border px-[14px]">
-        <span className="flex-1 text-[13px] font-semibold">
-          {serverId ? 'Edit server' : 'Add server'}
-        </span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="no-drag rounded-[3px] border border-border px-[5px] py-[1px] font-mono text-[10.5px] text-textDim"
-        >
-          Esc
-        </button>
-      </div>
-
-      <ServerFormFields
-        form={form}
-        setForm={setForm}
-        error={error}
-        detectedKeys={detectedKeys}
-        serverId={serverId}
-      />
-
-      <TestConnectionStrip result={testResult} testing={testing} />
-
-      <div className="flex shrink-0 items-center gap-[8px] border-t border-border px-[14px] py-[10px]">
-        {serverId && (
+    // The redesign moves the form off the 392px right-hand slot and into a
+    // centered 620px modal (dizayn manbasi: Zish.dc.html `formOpen`), so the
+    // content area keeps the session or the detail page behind it instead of
+    // being squeezed. Same state, same validation, same save path.
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div
+        className="flex w-[620px] flex-col overflow-hidden rounded-[9px] border border-borderStrong bg-bg2 shadow-[0_16px_48px_rgba(0,0,0,.5)]"
+        style={{ maxHeight: 640 }}
+      >
+        <div className="flex h-[46px] shrink-0 items-center border-b border-border px-[18px]">
+          <span className="flex-1 text-[13.5px] font-semibold text-text">
+            {serverId ? 'Edit server' : 'New server'}
+          </span>
           <button
             type="button"
-            onClick={onDelete}
-            className={`no-drag flex h-[30px] items-center rounded-[5px] px-[12px] text-[12.5px] font-medium ${
-              confirmDelete
-                ? 'bg-stFailed text-bg0 font-semibold'
-                : 'border border-borderStrong text-stFailed'
-            }`}
+            onClick={onClose}
+            aria-label="Close"
+            className="no-drag text-[15px] text-textDim hover:text-text"
           >
-            {confirmDelete ? 'Delete server?' : 'Delete'}
+            ×
           </button>
-        )}
-        {/* Tests the SAVED server, not the current form values — only shown
-            for an existing server. */}
-        {serverId && (
+        </div>
+
+        <ServerFormFields
+          form={form}
+          setForm={setForm}
+          error={error}
+          detectedKeys={detectedKeys}
+          serverId={serverId}
+        />
+
+        <TestConnectionStrip result={testResult} testing={testing} />
+
+        <div className="flex h-[52px] shrink-0 items-center gap-[9px] border-t border-border px-[18px]">
+          {serverId && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className={`no-drag h-[28px] rounded-[6px] px-[11px] text-[11.5px] ${
+                confirmDelete
+                  ? 'bg-stFailed font-semibold text-bg0'
+                  : 'border border-stFailed/40 text-stFailed hover:bg-stFailed/10'
+              }`}
+            >
+              {confirmDelete ? 'Delete server?' : 'Delete server'}
+            </button>
+          )}
+          {/* Tests the SAVED server, not the current form values — only shown
+              for an existing server. */}
+          {serverId && (
+            <button
+              type="button"
+              onClick={runTest}
+              disabled={testing}
+              className="no-drag h-[28px] rounded-[6px] border border-borderStrong px-[11px] text-[11.5px] text-textMuted hover:text-text disabled:opacity-50"
+            >
+              Test connection
+            </button>
+          )}
+          <div className="flex-1" />
           <button
             type="button"
-            onClick={runTest}
-            disabled={testing}
-            className="no-drag flex h-[30px] items-center rounded-[5px] border border-borderStrong px-[12px] text-[12.5px] font-medium text-text disabled:opacity-50"
+            onClick={onClose}
+            className="no-drag h-[30px] rounded-[6px] border border-borderStrong px-[14px] text-[12.5px] text-textMuted hover:text-text"
           >
-            Test connection
+            Cancel
           </button>
-        )}
-        <span className="flex-1" />
-        <button
-          type="button"
-          onClick={onSave}
-          className="no-drag flex h-[30px] items-center rounded-[5px] bg-accent px-[16px] text-[12.5px] font-semibold text-onAccent"
-        >
-          Save
-        </button>
+          <button
+            type="button"
+            onClick={onSave}
+            className="no-drag h-[30px] rounded-[6px] bg-accent px-[16px] text-[12.5px] font-medium text-onAccent"
+          >
+            Save
+          </button>
+        </div>
       </div>
     </div>
   )

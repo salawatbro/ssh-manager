@@ -38,26 +38,31 @@ export function ServerFormFields({ form, setForm, error, detectedKeys, serverId 
   const groups = [...new Set(servers.map((s) => s.group).filter((g) => g !== ''))].sort()
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-[13px] overflow-y-auto p-[14px]">
-      <div className="flex flex-col gap-[5px]">
-        <span className={label}>Name</span>
-        <input
-          className={field}
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
+    <div className="min-h-0 flex-1 overflow-y-auto px-[18px] pt-[16px] pb-6">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-[5px]">
+          <span className={label}>Name</span>
+          <input
+            className={field}
+            placeholder="cbs-app-01"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </div>
+        <ServerFormGroup form={form} setForm={setForm} groups={groups} />
       </div>
 
-      <div className="flex gap-[9px]">
-        <div className="flex flex-1 flex-col gap-[5px]">
+      <div className="mt-4 grid grid-cols-4 gap-4">
+        <div className="col-span-2 flex flex-col gap-[5px]">
           <span className={label}>Host</span>
           <input
             className={`${field} font-mono text-[12.5px]`}
+            placeholder="10.20.4.11"
             value={form.host}
             onChange={(e) => setForm({ ...form, host: e.target.value })}
           />
         </div>
-        <div className="flex w-[78px] shrink-0 flex-col gap-[5px]">
+        <div className="flex flex-col gap-[5px]">
           <span className={label}>Port</span>
           <input
             className={`${field} font-mono text-[12.5px]`}
@@ -69,24 +74,27 @@ export function ServerFormFields({ form, setForm, error, detectedKeys, serverId 
             }}
           />
         </div>
+        <div className="flex flex-col gap-[5px]">
+          <span className={label}>User</span>
+          <input
+            className={`${field} font-mono text-[12.5px]`}
+            placeholder="deploy"
+            value={form.user}
+            onChange={(e) => setForm({ ...form, user: e.target.value })}
+          />
+        </div>
       </div>
 
-      <div className="flex flex-col gap-[5px]">
-        <span className={label}>User</span>
-        <input
-          className={`${field} font-mono text-[12.5px]`}
-          value={form.user}
-          onChange={(e) => setForm({ ...form, user: e.target.value })}
-        />
+      <div className="mt-4">
+        <ServerFormAuth form={form} setForm={setForm} detectedKeys={detectedKeys} />
       </div>
 
-      <ServerFormAuth form={form} setForm={setForm} detectedKeys={detectedKeys} />
+      <div className="mt-4">
+        <TwoFactorFields form={form} setForm={setForm} editing={serverId !== null} />
+      </div>
 
-      <TwoFactorFields form={form} setForm={setForm} editing={serverId !== null} />
-
-      <div className="flex gap-[9px]">
-        <ServerFormGroup form={form} setForm={setForm} groups={groups} />
-        <div className="flex flex-1 flex-col gap-[5px]">
+      <div className="mt-4 grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-[5px]">
           <span className={label}>Environment</span>
           {/* UI-11: environment is a square (rounded-env), placed beside the
               select's value the way the design's dropdown embeds it — a
@@ -107,30 +115,45 @@ export function ServerFormFields({ form, setForm, error, detectedKeys, serverId 
             </select>
           </div>
         </div>
+
+        <div className="flex flex-col gap-[5px]">
+          <span className={label}>Jump host</span>
+          <select
+            className={field}
+            value={form.jumpId ?? ''}
+            onChange={(e) => setForm({ ...form, jumpId: e.target.value || null })}
+          >
+            <option value="">None — direct connection</option>
+            {servers
+              .filter((s) => s.id !== serverId)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.user}@{s.host})
+                </option>
+              ))}
+          </select>
+        </div>
       </div>
 
-      <TagsEditor form={form} setForm={setForm} />
+      <div className="mt-4">
+        <TagsEditor form={form} setForm={setForm} />
+      </div>
 
-      <div className="flex flex-col gap-[5px]">
-        <span className={label}>Jump host</span>
-        <select
-          className={field}
-          value={form.jumpId ?? ''}
-          onChange={(e) => setForm({ ...form, jumpId: e.target.value || null })}
-        >
-          <option value="">None</option>
-          {servers
-            .filter((s) => s.id !== serverId)
-            .map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-        </select>
+      {/* Notes are a real Server field the old 392px panel never had room for
+          — the design gives them a box, so they finally reach the UI. */}
+      <div className="mt-4 flex flex-col gap-[5px]">
+        <span className={label}>Notes</span>
+        <textarea
+          value={form.notes}
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          placeholder="Runs the checkout workers. Drain before restart."
+          className="w-full resize-none rounded-[5px] border border-border bg-bg0 px-[9px] py-[7px] text-[12.5px] leading-[1.45] text-text outline-none focus:border-accent placeholder:text-textDim"
+          style={{ height: 66 }}
+        />
       </div>
 
       {error && (
-        <div className="rounded-[5px] border border-stFailed bg-stFailed/10 p-[9px] text-[12px] text-stFailed">
+        <div className="mt-4 rounded-[5px] border border-stFailed bg-stFailed/10 p-[9px] text-[12px] text-stFailed">
           {error}
         </div>
       )}
