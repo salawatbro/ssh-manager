@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Terminal as XTerm } from '@xterm/xterm'
-import { FitAddon } from '@xterm/addon-fit'
-import { CanvasAddon } from '@xterm/addon-canvas'
-import { SearchAddon } from '@xterm/addon-search'
+import type { Terminal as XTerm } from '@xterm/xterm'
+import type { FitAddon } from '@xterm/addon-fit'
+import type { SearchAddon } from '@xterm/addon-search'
 import '@xterm/xterm/css/xterm.css'
-import { graphiteTheme } from '../../lib/termTheme'
 import type { FindResults } from '../../lib/findStatus'
 import { isMac } from '../../lib/platform'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
@@ -17,6 +15,7 @@ import { PaneNotice } from './PaneNotice'
 import { FindBar } from './FindBar'
 import { ContextMenu } from '../ui/ContextMenu'
 import { installOsc133, type PromptMarker } from './commandDecorations'
+import { createTerminal } from './createTerminal'
 import { terminalMenuItems } from './terminalMenu'
 import { runFind, closeFind } from './terminalFind'
 
@@ -54,23 +53,7 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
-    const st = useSettings.getState().settings
-    const t = new XTerm({
-      fontFamily: 'JetBrains Mono, ui-monospace, SFMono-Regular, monospace',
-      fontSize: st?.termFontSize ?? 13,
-      cursorBlink: st?.termBlink ?? true,
-      cursorStyle: (st?.termCursor as 'block' | 'bar' | 'underline') ?? 'block',
-      scrollback: st?.termScrollback ?? 10000,
-      allowProposedApi: true,
-      theme: graphiteTheme(),
-    })
-    const fitAddon = new FitAddon()
-    const search = new SearchAddon()
-    t.loadAddon(fitAddon)
-    t.loadAddon(search)
-    t.open(host)
-    t.loadAddon(new CanvasAddon())
-    fitAddon.fit()
+    const { term: t, fit: fitAddon, search } = createTerminal(host, useSettings.getState().settings)
     searchRef.current = search
     // Only fires while decorations are enabled — see terminalFind.ts's
     // runFind(). Disposed with the terminal.
@@ -207,6 +190,7 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
     if (session.status === 'exited') useSessions.getState().closePane(tabId, paneId)
   }, [session.status, tabId, paneId])
 
+
   return (
     <div
       className={`relative h-full w-full bg-bg0 ${focused && isSplit ? 'shadow-[inset_0_0_0_1px_var(--color-accent)]' : ''}`}
@@ -221,7 +205,15 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
           where they'd sit above any z-auto overlay (the host-key/2FA modals
           hit exactly that). FindBar/PaneNotice/ContextMenu are siblings of
           this host, so they keep painting above the terminal as before. */}
-      <div ref={hostRef} className="isolate h-full w-full py-[6px] pr-[6px] pl-[10px]" />
+      <div className="isolate h-full w-full py-[6px] pr-[6px] pl-[10px]">
+        {/* xterm's parent must carry NO padding. FitAddon sizes the terminal
+            from getComputedStyle(parent).height, which under border-box is the
+            BORDER box, and it only subtracts padding declared on the xterm
+            element itself — never the parent's. With the padding one level up
+            it counted 12px of vertical space that did not exist and fitted one
+            row too many, which then painted over the status bar. */}
+        <div ref={hostRef} className="h-full w-full" />
+      </div>
       {menu && term && (
         <ContextMenu
           x={menu.x}
