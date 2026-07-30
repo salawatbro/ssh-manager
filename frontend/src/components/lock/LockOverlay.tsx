@@ -27,12 +27,17 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
   if (!locked) return null
 
   async function submitPin(pin: string) {
-    const ok = await LockService.VerifyPin(pin)
-    if (ok) {
-      setError('')
-      unlock()
-    } else {
-      setError('Incorrect PIN — try again.')
+    try {
+      const ok = await LockService.VerifyPin(pin)
+      if (ok) {
+        setError('')
+        unlock()
+      } else {
+        setError('Incorrect PIN — try again.')
+        setAttempt((a) => a + 1)
+      }
+    } catch {
+      setError('Could not verify — try again.')
       setAttempt((a) => a + 1)
     }
   }
@@ -40,10 +45,15 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
   async function touchUnlock() {
     setScanning(true)
     setError('')
-    const ok = await BiometricService.Authenticate('Unlock Zish')
-    setScanning(false)
-    if (ok) unlock()
-    else setError('Touch ID did not match — enter your PIN.')
+    try {
+      const ok = await BiometricService.Authenticate('Unlock Zish')
+      if (ok) unlock()
+      else setError('Touch ID did not match — enter your PIN.')
+    } catch {
+      setError('Touch ID was cancelled — enter your PIN.')
+    } finally {
+      setScanning(false)
+    }
   }
 
   return (
