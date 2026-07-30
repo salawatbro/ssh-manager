@@ -15,14 +15,21 @@ interface PendingOverwrite {
   names: string[]
 }
 interface PendingDelete {
+  side: PaneSide
   names: string[]
   hasDir: boolean
 }
+// The three PromptModal cases share one state; only rename carries a name.
+type Prompt =
+  | { kind: 'mkdir'; side: PaneSide }
+  | { kind: 'newfile'; side: PaneSide }
+  | { kind: 'rename'; side: PaneSide; name: string }
 
-// SftpView: the dual-pane SFTP shell (Task 8) — drag upload/download between
-// the two panes (gated on an overwrite check), remote mkdir/rename/delete via
-// inline modals (never window.confirm/prompt/alert). Self-guards on the store's
-// `open` flag so App.tsx can mount it unconditionally.
+// SftpView: the dual-pane SFTP shell — drag upload/download between the two
+// panes (gated on an overwrite check) and per-pane mkdir/new-file/rename/delete
+// via inline modals (never window.confirm/prompt/alert). Both panes are full
+// file managers now: the mutations dispatch to the remote session or the local
+// filesystem in stores/sftpMutations.ts. Self-guards on the store's `open` flag.
 //
 // The two panes are one component (FilePane); this one owns what needs to see
 // both at once: the overwrite check against the destination listing, and the
@@ -44,15 +51,15 @@ export default function SftpView() {
   const upload = useSftp((s) => s.upload)
   const download = useSftp((s) => s.download)
   const mkdir = useSftp((s) => s.mkdir)
+  const createFile = useSftp((s) => s.createFile)
   const remove = useSftp((s) => s.remove)
   const rename = useSftp((s) => s.rename)
 
   const [pendingOverwrite, setPendingOverwrite] = useState<PendingOverwrite | null>(null)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
-  const [pendingRename, setPendingRename] = useState<string | null>(null)
-  const [mkdirOpen, setMkdirOpen] = useState(false)
-  // One of the four modals owns Escape while open, else it'd also close the view.
-  const modalOpen = !!pendingOverwrite || !!pendingDelete || pendingRename !== null || mkdirOpen
+  const [prompt, setPrompt] = useState<Prompt | null>(null)
+  // One of the modals owns Escape while open, else it'd also close the view.
+  const modalOpen = !!pendingOverwrite || !!pendingDelete || prompt !== null
 
   useEffect(() => {
     if (!open || !active) return
@@ -66,6 +73,9 @@ export default function SftpView() {
 
   if (!open) return null
 
+  const cwdFor = (side: PaneSide) => (side === 'remote' ? remoteCwd : localCwd)
+  const entriesFor = (side: PaneSide) => (side === 'remote' ? remoteEntries : localEntries)
+
   // One call per name: the backend transfers a single path at a time (each gets
   // its own progress row in TransferBar), and a folder goes recursively.
   function startTransfer(dest: PaneSide, names: string[]) {
@@ -78,37 +88,44 @@ export default function SftpView() {
   // not collide starts immediately; the collisions wait on one confirm together,
   // so dropping 20 files does not mean 20 dialogs.
   function transferTo(dest: PaneSide, names: string[]) {
-    const taken = new Set((dest === 'remote' ? remoteEntries : localEntries).map((e) => e.name))
-    const colliding = names.filter((n) => taken.has(n))
+    const taken = new Set(entriesFor(dest).map((e) => e.name))
     startTransfer(
       dest,
       names.filter((n) => !taken.has(n)),
     )
+    const colliding = names.filter((n) => taken.has(n))
     if (colliding.length > 0) setPendingOverwrite({ dest, names: colliding })
-  }
-
-  function confirmOverwrite() {
-    if (!pendingOverwrite) return
-    startTransfer(pendingOverwrite.dest, pendingOverwrite.names)
-    setPendingOverwrite(null)
   }
 
   function confirmDelete() {
     if (!pendingDelete) return
-    void remove(pendingDelete.names.map((name) => joinRemote(remoteCwd, name)))
+    const { side, names } = pendingDelete
+    void remove(
+      side,
+      names.map((n) => joinRemote(cwdFor(side), n)),
+    )
     setPendingDelete(null)
   }
 
-  function submitRename(newName: string) {
-    if (pendingRename === null) return
-    void rename(joinRemote(remoteCwd, pendingRename), newName)
-    setPendingRename(null)
+  function submitPrompt(value: string) {
+    if (!prompt) return
+    if (prompt.kind === 'mkdir') void mkdir(prompt.side, value)
+    else if (prompt.kind === 'newfile') void createFile(prompt.side, value)
+    else void rename(prompt.side, joinRemote(cwdFor(prompt.side), prompt.name), value)
+    setPrompt(null)
   }
 
-  function submitMkdir(name: string) {
-    void mkdir(name)
-    setMkdirOpen(false)
-  }
+  // The full handler set for one pane; both panes get the same, differing only
+  // in the side each closes over.
+  const paneProps = (side: PaneSide) => ({
+    side,
+    onTransfer: transferTo,
+    onMkdir: () => setPrompt({ kind: 'mkdir', side }),
+    onNewFile: () => setPrompt({ kind: 'newfile', side }),
+    onRename: (name: string) => setPrompt({ kind: 'rename', side, name }),
+    onDelete: (names: string[]) =>
+      setPendingDelete({ side, names, hasDir: entriesFor(side).some((e) => e.isDir && names.includes(e.name)) }),
+  })
 
   const overwriteDest = pendingOverwrite?.dest === 'remote' ? remoteCwd : localCwd
 
@@ -134,20 +151,9 @@ export default function SftpView() {
       ) : (
         <>
           <div className="flex min-h-0 flex-1">
-            {/* Rename/Delete/New folder reach only the remote pane — every
-                mutating SftpService call takes a session id (see paneMenu.ts). */}
-            <FilePane side="local" onTransfer={transferTo} />
-            <FilePane
-              side="remote"
-              onTransfer={transferTo}
-              onMkdir={() => setMkdirOpen(true)}
-              onRename={setPendingRename}
-              onDelete={(names) =>
-                setPendingDelete({ names, hasDir: remoteEntries.some((e) => e.isDir && names.includes(e.name)) })
-              }
-            />
+            <FilePane {...paneProps('local')} />
+            <FilePane {...paneProps('remote')} />
           </div>
-
           <TransferBar />
         </>
       )}
@@ -164,7 +170,10 @@ export default function SftpView() {
           }. Overwrite?`}
           confirmLabel="Overwrite"
           danger
-          onConfirm={confirmOverwrite}
+          onConfirm={() => {
+            startTransfer(pendingOverwrite.dest, pendingOverwrite.names)
+            setPendingOverwrite(null)
+          }}
           onCancel={() => setPendingOverwrite(null)}
         />
       )}
@@ -188,25 +197,14 @@ export default function SftpView() {
         />
       )}
 
-      {pendingRename !== null && (
+      {prompt && (
         <PromptModal
-          title={`Rename "${pendingRename}"`}
-          label="New name"
-          initialValue={pendingRename}
-          confirmLabel="Rename"
-          onSubmit={submitRename}
-          onCancel={() => setPendingRename(null)}
-        />
-      )}
-
-      {mkdirOpen && (
-        <PromptModal
-          title="New folder"
-          label="Folder name"
-          initialValue=""
-          confirmLabel="Create"
-          onSubmit={submitMkdir}
-          onCancel={() => setMkdirOpen(false)}
+          title={prompt.kind === 'rename' ? `Rename "${prompt.name}"` : prompt.kind === 'newfile' ? 'New file' : 'New folder'}
+          label={prompt.kind === 'rename' ? 'New name' : prompt.kind === 'newfile' ? 'File name' : 'Folder name'}
+          initialValue={prompt.kind === 'rename' ? prompt.name : ''}
+          confirmLabel={prompt.kind === 'rename' ? 'Rename' : 'Create'}
+          onSubmit={submitPrompt}
+          onCancel={() => setPrompt(null)}
         />
       )}
     </div>

@@ -18,6 +18,7 @@ import (
 type fakeSession struct {
 	listed   string
 	removed  string
+	created  string
 	closed   bool
 	uploads  []string
 	progress []sftpx.Progress // scripted progress the transfer will emit
@@ -39,6 +40,7 @@ func (f *fakeSession) Home() (string, error)           { return "/home/x", nil }
 func (f *fakeSession) Mkdir(string) error              { return nil }
 func (f *fakeSession) Remove(p string) error           { f.removed = p; return nil }
 func (f *fakeSession) Rename(string, string) error     { return nil }
+func (f *fakeSession) CreateFile(p string) error       { f.created = p; return nil }
 func (f *fakeSession) ReadFile(string) (string, error) { return f.read, f.readErr }
 func (f *fakeSession) WriteFile(p, content string) error {
 	f.wrote = [2]string{p, content}

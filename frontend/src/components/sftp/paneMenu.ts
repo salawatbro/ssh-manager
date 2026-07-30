@@ -13,6 +13,7 @@ export interface PaneMenuActions {
   transfer: (names: string[]) => void
   copyPath: (names: string[]) => void
   mkdir: () => void
+  newFile: () => void
   rename: (name: string) => void
   remove: (names: string[]) => void
   refresh: () => void
@@ -32,19 +33,18 @@ function counted(verb: string, names: string[]): string {
   return names.length > 1 ? `${verb} ${names.length} items` : verb
 }
 
-// The SFTP pane's right-click menu (Zish.dc.html sftp menu).
-//
-// Items the design draws that are NOT here, because no backend call exists
-// behind them: "New file…" (SftpService can make a directory, not an empty
-// file) and, on the LOCAL side, "New folder…" / "Rename…" / "Delete" — every
-// mutating SftpService method takes a session id and acts on the remote host.
-// Drawing them anyway would give the user a menu item that can only fail.
+// The SFTP pane's right-click menu (Zish.dc.html sftp menu). Both panes are full
+// file managers: the local mutations act on this machine's files, the remote
+// ones on the open session, and SftpView routes each accordingly. Deleting or
+// renaming a local file touches the user's real filesystem, which is why Delete
+// goes through a confirm and Rename refuses to overwrite.
 export function paneMenuItems({ side, target, destPath, actions }: PaneMenuInput): MenuEntry[] {
   const isRemote = side === 'remote'
 
   if (target === null) {
     return [
-      ...(isRemote ? [{ label: 'New folder…', run: actions.mkdir }] : []),
+      { label: 'New folder…', run: actions.mkdir },
+      { label: 'New file…', run: actions.newFile },
       { label: 'Refresh', run: actions.refresh },
     ]
   }
@@ -57,14 +57,11 @@ export function paneMenuItems({ side, target, destPath, actions }: PaneMenuInput
     ...(isDir && single ? [{ label: 'Open', run: () => actions.open(names[0]) }] : []),
     { label: `${transfer} to ${destPath}`, run: () => actions.transfer(names) },
     { label: single ? 'Copy path' : 'Copy paths', run: () => actions.copyPath(names) },
-    ...(isRemote
-      ? ([
-          'separator',
-          { label: 'New folder…', run: actions.mkdir },
-          ...(single ? [{ label: 'Rename…', run: () => actions.rename(names[0]) }] : []),
-          'separator',
-          { label: counted('Delete', names), danger: true, run: () => actions.remove(names) },
-        ] as MenuEntry[])
-      : []),
+    'separator',
+    { label: 'New folder…', run: actions.mkdir },
+    { label: 'New file…', run: actions.newFile },
+    ...(single ? [{ label: 'Rename…', run: () => actions.rename(names[0]) }] : []),
+    'separator',
+    { label: counted('Delete', names), danger: true, run: () => actions.remove(names) },
   ]
 }

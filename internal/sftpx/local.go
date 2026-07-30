@@ -33,3 +33,47 @@ func LocalHome() (string, error) {
 	}
 	return h, nil
 }
+
+// The four below mirror the remote Session's mutations for the local pane, so
+// the left side is a full file manager and not read-only. Every path is one the
+// user chose in the pane on their own machine.
+
+// MkdirLocal creates a single local directory.
+func MkdirLocal(path string) error {
+	if err := os.Mkdir(path, 0o750); err != nil {
+		return fmt.Errorf("cannot create %s: %w", path, err)
+	}
+	return nil
+}
+
+// RenameLocal renames a local path, refusing to overwrite an existing target —
+// the rename prompt is not an overwrite flow, and os.Rename would clobber.
+func RenameLocal(oldPath, newPath string) error {
+	if _, err := os.Lstat(newPath); err == nil {
+		return fmt.Errorf("%s already exists", newPath)
+	}
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return fmt.Errorf("cannot rename %s: %w", oldPath, err)
+	}
+	return nil
+}
+
+// RemoveLocal deletes a local file, or a directory and everything under it.
+// os.RemoveAll removes a symlink itself rather than following it, so a link
+// inside the tree cannot lead the delete outside the confirmed path (the same
+// property the remote Remove takes care to keep).
+func RemoveLocal(path string) error {
+	if err := os.RemoveAll(path); err != nil {
+		return fmt.Errorf("cannot remove %s: %w", path, err)
+	}
+	return nil
+}
+
+// CreateLocalFile creates a new empty local file, failing if one already exists.
+func CreateLocalFile(path string) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) //nolint:gosec // G304: editor/pane creates a user-named local file
+	if err != nil {
+		return fmt.Errorf("cannot create %s: %w", path, err)
+	}
+	return f.Close()
+}

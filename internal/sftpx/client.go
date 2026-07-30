@@ -60,6 +60,16 @@ func (s *Session) Rename(oldPath, newPath string) error {
 	return nil
 }
 
+// CreateFile creates a new empty file, failing if one already exists at path
+// (O_EXCL) so "New file…" never silently clobbers a real one.
+func (s *Session) CreateFile(path string) error {
+	f, err := s.client.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL)
+	if err != nil {
+		return fmt.Errorf("cannot create %s: %w", path, err)
+	}
+	return f.Close()
+}
+
 // Remove deletes a file, or a directory and everything under it. pkg/sftp has
 // no RemoveAll, so directories are walked depth-first: children first, then the
 // now-empty directory. A plain file takes the fast path.

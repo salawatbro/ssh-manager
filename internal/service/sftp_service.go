@@ -22,6 +22,7 @@ type sftpSession interface {
 	Mkdir(path string) error
 	Remove(path string) error
 	Rename(oldPath, newPath string) error
+	CreateFile(path string) error
 	ReadFile(path string) (string, error)
 	WriteFile(path, content string) error
 	Upload(ctx context.Context, localPath, remoteDir string, onProgress func(sftpx.Progress)) error
@@ -162,11 +163,37 @@ func (s *SftpService) Rename(sessionID, oldPath, newPath string) error {
 	return sess.Rename(oldPath, newPath)
 }
 
+// CreateFile creates a new empty file on the remote side ("New file…").
+func (s *SftpService) CreateFile(sessionID, path string) error {
+	sess, err := s.get(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.CreateFile(path)
+}
+
 // ListLocal needs no session — the left pane is the local FS.
 func (s *SftpService) ListLocal(dir string) ([]sftpx.FileEntry, error) { return sftpx.ListLocal(dir) }
 
 // LocalHome needs no session — the left pane is the local FS.
 func (s *SftpService) LocalHome() (string, error) { return sftpx.LocalHome() }
+
+// The four below give the local pane the same mutations the remote side has —
+// none need a session, since the left pane is the local filesystem.
+
+// MkdirLocal creates a directory on the local side.
+func (s *SftpService) MkdirLocal(path string) error { return sftpx.MkdirLocal(path) }
+
+// RenameLocal renames a local path (refusing to overwrite an existing target).
+func (s *SftpService) RenameLocal(oldPath, newPath string) error {
+	return sftpx.RenameLocal(oldPath, newPath)
+}
+
+// RemoveLocal deletes a local file, or a directory and everything under it.
+func (s *SftpService) RemoveLocal(path string) error { return sftpx.RemoveLocal(path) }
+
+// CreateLocalFile creates a new empty local file ("New file…").
+func (s *SftpService) CreateLocalFile(path string) error { return sftpx.CreateLocalFile(path) }
 
 // ReadFile returns a remote text file's contents for the editor.
 func (s *SftpService) ReadFile(sessionID, path string) (string, error) {

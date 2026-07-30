@@ -2,11 +2,11 @@ import { create } from 'zustand'
 import { SftpService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import type { FileEntry } from '@bindings/github.com/salawat/sshmgr/internal/sftpx'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { joinRemote, dirnameRemote } from '../lib/remotePath'
 import { applyTransferProgress, type ProgressEvent, type TransferProgress } from '../lib/transferProgress'
 import { toastError } from './toasts'
 import { releaseContentArea } from './view'
 import { clearPaneSelection } from './sftpSelection'
+import { fileMutations } from './sftpMutations'
 
 interface SftpState {
   open: boolean
@@ -40,17 +40,21 @@ interface SftpState {
   upload: (localPath: string) => Promise<void>
   download: (remotePath: string) => Promise<void>
   cancel: (transferID: string) => void
-  mkdir: (name: string) => Promise<void>
+  // The four mutations are side-aware: both panes are full file managers now,
+  // so each dispatches to the remote SFTP session or the local filesystem. name
+  // is joined onto that side's cwd; oldPath/paths are already full paths.
+  mkdir: (side: 'local' | 'remote', name: string) => Promise<void>
+  createFile: (side: 'local' | 'remote', name: string) => Promise<void>
+  rename: (side: 'local' | 'remote', oldPath: string, newName: string) => Promise<void>
+  // Takes a list: the panes support a multi-selection, and the backend has no
+  // batch delete.
+  remove: (side: 'local' | 'remote', paths: string[]) => Promise<void>
   // Editor IO. Remote read/write need the open session's id; local goes
   // straight to the filesystem. Both throw on failure so the editor can show
   // the reason rather than the store swallowing it into a toast — a failed save
   // must stop the "saved" state, not look like it worked.
   readFile: (side: 'local' | 'remote', path: string) => Promise<string>
   writeFile: (side: 'local' | 'remote', path: string, content: string) => Promise<void>
-  // Takes a list: the panes support a multi-selection, and the backend has no
-  // batch delete.
-  remove: (paths: string[]) => Promise<void>
-  rename: (oldPath: string, newName: string) => Promise<void>
   // internal, used by useSftpProgress:
   applyProgress: (p: ProgressEvent) => void
 }
@@ -201,43 +205,8 @@ export const useSftp = create<SftpState>((set, get) => ({
     void SftpService.CancelTransfer(transferID).catch(() => {})
   },
 
-  mkdir: async (name) => {
-    const { sessionId, remoteCwd } = get()
-    if (!sessionId) return
-    try {
-      await SftpService.Mkdir(sessionId, joinRemote(remoteCwd, name))
-      await get().navRemote(remoteCwd)
-    } catch (e) {
-      toastError(e instanceof Error ? e.message : String(e))
-    }
-  },
-
-  // One Remove per path, then a single refresh at the end instead of one per
-  // file. A failure stops the run (the rest of the selection is left alone) and
-  // still refreshes, so the pane shows exactly what survived.
-  remove: async (paths) => {
-    const { sessionId, remoteCwd } = get()
-    if (!sessionId) return
-    try {
-      for (const path of paths) {
-        await SftpService.Remove(sessionId, path)
-      }
-    } catch (e) {
-      toastError(e instanceof Error ? e.message : String(e))
-    }
-    await get().navRemote(remoteCwd)
-  },
-
-  rename: async (oldPath, newName) => {
-    const { sessionId, remoteCwd } = get()
-    if (!sessionId) return
-    try {
-      await SftpService.Rename(sessionId, oldPath, joinRemote(dirnameRemote(oldPath), newName))
-      await get().navRemote(remoteCwd)
-    } catch (e) {
-      toastError(e instanceof Error ? e.message : String(e))
-    }
-  },
+  // mkdir / createFile / rename / remove — side-aware, in stores/sftpMutations.ts.
+  ...fileMutations(get),
 
   applyProgress: (p) => {
     // A transfer that dies mid-flight reports through its progress event; the

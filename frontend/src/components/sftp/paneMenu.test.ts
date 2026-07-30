@@ -8,6 +8,7 @@ function actions(): PaneMenuActions {
     transfer: vi.fn(),
     copyPath: vi.fn(),
     mkdir: vi.fn(),
+    newFile: vi.fn(),
     rename: vi.fn(),
     remove: vi.fn(),
     refresh: vi.fn(),
@@ -50,14 +51,13 @@ describe('paneMenuItems', () => {
     expect(items).not.toContain('Rename…')
   })
 
-  // The local pane has no mutating backend at all (every SftpService write takes
-  // a session id and lands on the remote host). If someone adds a local Delete
-  // to the menu, they have to add the backend that makes it work first.
-  it('never offers a local mutation', () => {
+  // Both panes are full file managers now — the local pane offers the same
+  // mutations as the remote one, dispatched to the local filesystem.
+  it('offers the same mutations on the local pane', () => {
     const items = labels(
       paneMenuItems({ side: 'local', target: { names: ['a.txt'], isDir: false }, destPath: '/srv', actions: actions() }),
     )
-    expect(items).toEqual(['Upload to /srv', 'Copy path'])
+    expect(items).toEqual(['Upload to /srv', 'Copy path', 'New folder…', 'New file…', 'Rename…', 'Delete'])
   })
 
   it('offers Open for a single folder only', () => {
@@ -71,22 +71,24 @@ describe('paneMenuItems', () => {
     expect(dirs).not.toContain('Open')
   })
 
-  it('falls back to the folder actions on empty space', () => {
-    expect(labels(paneMenuItems({ side: 'local', target: null, destPath: '/srv', actions: actions() }))).toEqual(['Refresh'])
+  it('offers New folder / New file on empty space, both panes', () => {
+    expect(labels(paneMenuItems({ side: 'local', target: null, destPath: '/srv', actions: actions() }))).toEqual([
+      'New folder…',
+      'New file…',
+      'Refresh',
+    ])
     expect(labels(paneMenuItems({ side: 'remote', target: null, destPath: '~', actions: actions() }))).toEqual([
       'New folder…',
+      'New file…',
       'Refresh',
     ])
   })
 
-  // SftpService can create a directory but not an empty file, so the design's
-  // "New file…" is deliberately absent everywhere.
-  it('offers no New file… until a backend exists for it', () => {
-    const everywhere = [
-      paneMenuItems({ side: 'local', target: null, destPath: '/srv', actions: actions() }),
-      paneMenuItems({ side: 'remote', target: null, destPath: '~', actions: actions() }),
+  it('offers New file… wherever New folder… appears', () => {
+    const onRow = labels(
       paneMenuItems({ side: 'remote', target: { names: ['a.txt'], isDir: false }, destPath: '~', actions: actions() }),
-    ].flatMap(labels)
-    expect(everywhere).not.toContain('New file…')
+    )
+    expect(onRow).toContain('New file…')
+    expect(onRow).toContain('New folder…')
   })
 })

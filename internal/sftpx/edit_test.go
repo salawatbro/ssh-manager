@@ -115,6 +115,81 @@ func TestLocalReadWriteRoundTrip(t *testing.T) {
 	}
 }
 
+func TestCreateFileIsExclusive(t *testing.T) {
+	s, root := newTestSession(t)
+	p := filepath.Join(root, "notes.md")
+	if err := s.CreateFile(p); err != nil {
+		t.Fatalf("CreateFile error = %v", err)
+	}
+	if fi, err := os.Stat(p); err != nil || fi.Size() != 0 {
+		t.Fatalf("CreateFile did not make an empty file: %v", err)
+	}
+	// A second create over the same name must fail, not clobber.
+	if err := s.CreateFile(p); err == nil {
+		t.Fatal("CreateFile over an existing file returned nil error")
+	}
+}
+
+func TestLocalMutations(t *testing.T) {
+	root := t.TempDir()
+
+	dir := filepath.Join(root, "releases")
+	if err := MkdirLocal(dir); err != nil {
+		t.Fatalf("MkdirLocal error = %v", err)
+	}
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		t.Fatalf("MkdirLocal did not create a dir: %v", err)
+	}
+
+	f := filepath.Join(root, "a.txt")
+	if err := CreateLocalFile(f); err != nil {
+		t.Fatalf("CreateLocalFile error = %v", err)
+	}
+	if err := CreateLocalFile(f); err == nil {
+		t.Fatal("CreateLocalFile over an existing file returned nil error")
+	}
+
+	renamed := filepath.Join(root, "b.txt")
+	if err := RenameLocal(f, renamed); err != nil {
+		t.Fatalf("RenameLocal error = %v", err)
+	}
+	// Renaming onto an existing name must refuse rather than overwrite.
+	other := filepath.Join(root, "c.txt")
+	_ = os.WriteFile(other, []byte("keep"), 0o644)
+	if err := RenameLocal(renamed, other); err == nil {
+		t.Fatal("RenameLocal over an existing target returned nil error")
+	}
+
+	if err := RemoveLocal(dir); err != nil {
+		t.Fatalf("RemoveLocal error = %v", err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("RemoveLocal left the dir behind: %v", err)
+	}
+}
+
+// RemoveLocal must delete a symlink itself, never descend into and wipe its
+// target — the local mirror of the remote Remove's symlink guard.
+func TestRemoveLocalDoesNotFollowSymlinks(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(root, "outside")
+	_ = os.MkdirAll(outside, 0o755)
+	keep := filepath.Join(outside, "keepme.txt")
+	_ = os.WriteFile(keep, []byte("do not delete"), 0o644)
+
+	tree := filepath.Join(root, "tree")
+	_ = os.MkdirAll(tree, 0o755)
+	if err := os.Symlink(outside, filepath.Join(tree, "link")); err != nil {
+		t.Fatalf("Symlink error = %v", err)
+	}
+	if err := RemoveLocal(tree); err != nil {
+		t.Fatalf("RemoveLocal error = %v", err)
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Fatalf("outside file was deleted (symlink followed): %v", err)
+	}
+}
+
 func TestReadLocalFileRejectsBinary(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "a.out")

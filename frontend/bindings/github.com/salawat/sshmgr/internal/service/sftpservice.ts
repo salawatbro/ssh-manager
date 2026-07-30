@@ -31,6 +31,20 @@ export function Close(sessionID: string): $CancellablePromise<void> {
 }
 
 /**
+ * CreateFile creates a new empty file on the remote side ("New file…").
+ */
+export function CreateFile(sessionID: string, path: string): $CancellablePromise<void> {
+    return $Call.ByID(389766934, sessionID, path);
+}
+
+/**
+ * CreateLocalFile creates a new empty local file ("New file…").
+ */
+export function CreateLocalFile(path: string): $CancellablePromise<void> {
+    return $Call.ByID(1992894325, path);
+}
+
+/**
  * Download is Upload's mirror: remotePath -> localDir.
  */
 export function Download(sessionID: string, remotePath: string, localDir: string): $CancellablePromise<string> {
@@ -63,6 +77,13 @@ export function LocalHome(): $CancellablePromise<string> {
  */
 export function Mkdir(sessionID: string, path: string): $CancellablePromise<void> {
     return $Call.ByID(3410111815, sessionID, path);
+}
+
+/**
+ * MkdirLocal creates a directory on the local side.
+ */
+export function MkdirLocal(path: string): $CancellablePromise<void> {
+    return $Call.ByID(594946854, path);
 }
 
 /**
@@ -102,10 +123,24 @@ export function Remove(sessionID: string, path: string): $CancellablePromise<voi
 }
 
 /**
+ * RemoveLocal deletes a local file, or a directory and everything under it.
+ */
+export function RemoveLocal(path: string): $CancellablePromise<void> {
+    return $Call.ByID(1639093039, path);
+}
+
+/**
  * Rename moves/renames a remote path.
  */
 export function Rename(sessionID: string, oldPath: string, newPath: string): $CancellablePromise<void> {
     return $Call.ByID(2826446262, sessionID, oldPath, newPath);
+}
+
+/**
+ * RenameLocal renames a local path (refusing to overwrite an existing target).
+ */
+export function RenameLocal(oldPath: string, newPath: string): $CancellablePromise<void> {
+    return $Call.ByID(3081926909, oldPath, newPath);
 }
 
 /**

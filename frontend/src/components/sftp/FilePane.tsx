@@ -20,12 +20,12 @@ interface Props {
   // owns this: it is the only place that sees both listings, so it is the only
   // place that can check for an overwrite before starting anything.
   onTransfer: (dest: PaneSide, names: string[]) => void
-  // Remote-only, and left off for the local pane: every mutating SftpService
-  // call takes a session id. paneMenuItems draws no local mutation either way,
-  // so these are unreachable there rather than merely inert.
-  onMkdir?: () => void
-  onRename?: (name: string) => void
-  onDelete?: (names: string[]) => void
+  // Both panes are full file managers now — SftpView owns the prompts/confirm
+  // and dispatches each to the remote session or the local filesystem.
+  onMkdir: () => void
+  onNewFile: () => void
+  onRename: (name: string) => void
+  onDelete: (names: string[]) => void
 }
 
 interface MenuState {
@@ -40,7 +40,7 @@ interface MenuState {
 // "Drop to upload/download" while a drag hovers). Navigating up is the ".." row
 // rather than a header button, which is where the old 34px header and the
 // refresh-only toolbar went.
-export function FilePane({ side, onTransfer, onMkdir, onRename, onDelete }: Props) {
+export function FilePane({ side, onTransfer, onMkdir, onNewFile, onRename, onDelete }: Props) {
   const isLocal = side === 'local'
   const cwd = useSftp((s) => (isLocal ? s.localCwd : s.remoteCwd))
   const entries = useSftp((s) => (isLocal ? s.localEntries : s.remoteEntries))
@@ -114,9 +114,10 @@ export function FilePane({ side, onTransfer, onMkdir, onRename, onDelete }: Prop
           copyPath: (names) => {
             void navigator.clipboard.writeText(names.map((n) => joinRemote(cwd, n)).join('\n')).catch(() => {})
           },
-          mkdir: () => onMkdir?.(),
-          rename: (name) => onRename?.(name),
-          remove: (names) => onDelete?.(names),
+          mkdir: onMkdir,
+          newFile: onNewFile,
+          rename: onRename,
+          remove: onDelete,
           refresh: () => void useSftp.getState().refresh(),
         },
       })
