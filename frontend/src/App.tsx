@@ -16,6 +16,7 @@ import { SettingsModal } from './components/settings/SettingsModal'
 import { ImportPreview } from './components/palette/ImportPreview'
 import { StatusBar } from './components/layout/StatusBar'
 import { Toasts } from './components/ui/Toasts'
+import { LockOverlay } from './components/lock/LockOverlay'
 import { useAppKeymap } from './hooks/useAppKeymap'
 import { useTrayConnect } from './hooks/useTrayConnect'
 import { useSftpProgress } from './hooks/useSftpProgress'
@@ -225,6 +226,9 @@ export default function App() {
           for actions with no inline surface: the tray pin cap, SFTP ops after
           connect, a failed settings save, Data-section export/import/backup. */}
       <Toasts />
+      {/* App lock — full-window overlay over the UI; renders null when unlocked.
+          Sessions/tunnels keep running underneath. Forgot flow wired in Task 13. */}
+      <LockOverlay onForgot={() => {}} />
     </div>
   )
 }
