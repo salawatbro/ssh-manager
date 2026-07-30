@@ -196,6 +196,7 @@ func main() {
 			application.NewService(healthService),
 			application.NewService(sessionStateService),
 			application.NewService(lockService),
+			application.NewService(NewBiometricService()),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
