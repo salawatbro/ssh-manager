@@ -55,18 +55,26 @@ type State struct {
 
 // Manager owns all live sessions.
 type Manager struct {
-	emitter   Emitter
-	flush     time.Duration
-	keepAlive time.Duration
-	mu        sync.Mutex
-	runners   map[string]*runner
+	emitter     Emitter
+	flush       time.Duration
+	keepAlive   time.Duration
+	keepEnabled func() bool
+	mu          sync.Mutex
+	runners     map[string]*runner
 }
 
 // NewManager builds a manager. flush is the coalescing interval (~16ms);
-// keepAlive is the dead-peer probe interval (~30s).
+// keepAlive is the keep-alive / dead-peer probe interval (~30s).
 func NewManager(e Emitter, flush, keepAlive time.Duration) *Manager {
 	return &Manager{emitter: e, flush: flush, keepAlive: keepAlive, runners: map[string]*runner{}}
 }
+
+// SetKeepAliveEnabled installs a live predicate for the "Keep the terminal
+// awake" setting, read on each probe tick so a toggle takes effect without
+// reconnecting (mirrors Dialer.SetDialTimeoutProvider). A nil predicate — the
+// default — means always enabled, preserving the original always-probe
+// behaviour.
+func (m *Manager) SetKeepAliveEnabled(fn func() bool) { m.keepEnabled = fn }
 
 // runner holds one session's goroutine coordination.
 type runner struct {
@@ -175,6 +183,12 @@ func (m *Manager) keepAliveLoop(sessionID string, r *runner) {
 	for {
 		select {
 		case <-tick.C:
+			// "Keep the terminal awake" off → skip the probe but keep ticking,
+			// so turning it back on resumes probing on the next tick. While off,
+			// a dead peer is only noticed on the next read/write.
+			if m.keepEnabled != nil && !m.keepEnabled() {
+				continue
+			}
 			if err := r.pty.KeepAlive(); err != nil {
 				m.shutdown(sessionID, r, true, domain.CodeSessionClosed, "Connection lost.")
 				return

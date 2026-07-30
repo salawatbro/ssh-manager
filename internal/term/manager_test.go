@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -16,6 +17,7 @@ type fakePTY struct {
 	chunks     chan []byte
 	written    []byte
 	kaErr      error
+	kaCalls    int
 	rsErr      error
 	resizeCols int
 	resizeRows int
@@ -46,7 +48,17 @@ func (f *fakePTY) Resize(cols, rows int) error {
 	f.resizeCols, f.resizeRows = cols, rows
 	return f.rsErr
 }
-func (f *fakePTY) KeepAlive() error { return f.kaErr }
+func (f *fakePTY) KeepAlive() error {
+	f.mu.Lock()
+	f.kaCalls++
+	f.mu.Unlock()
+	return f.kaErr
+}
+func (f *fakePTY) keepAliveCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.kaCalls
+}
 func (f *fakePTY) Close() error {
 	f.closeOnce.Do(func() { f.closed = true; close(f.chunks) })
 	return nil
@@ -154,6 +166,43 @@ func TestKeepAliveFailureClosesSession(t *testing.T) {
 	}
 	if !pty.closed {
 		t.Fatal("pty not closed on dead peer")
+	}
+}
+
+// With "Keep the terminal awake" off the loop keeps ticking but sends no probe,
+// so a dead peer is NOT torn down by the keep-alive path — and flipping the
+// predicate back on resumes probing.
+func TestKeepAliveDisabledSkipsProbe(t *testing.T) {
+	e := &capEmitter{}
+	m := NewManager(e, time.Hour, 10*time.Millisecond) // flush parked, keep-alive fast
+	// atomic: the predicate is read on the keep-alive goroutine while the test
+	// flips it here.
+	var awake atomic.Bool
+	m.SetKeepAliveEnabled(awake.Load)
+	pty := newFakePTY()
+	pty.kaErr = errors.New("broken pipe") // would close the session if probed
+
+	m.Add("s1", pty)
+
+	// Several ticks pass with the probe disabled: no KeepAlive call, session stays.
+	time.Sleep(60 * time.Millisecond)
+	if pty.keepAliveCalls() != 0 {
+		t.Fatalf("probe fired while disabled: %d calls", pty.keepAliveCalls())
+	}
+	if _, ok := e.lastState(); ok {
+		if s, _ := e.lastState(); s.State == StateClosed {
+			t.Fatal("session closed while keep-alive disabled")
+		}
+	}
+
+	// Re-enable: the next tick probes, hits kaErr, and closes the session.
+	awake.Store(true)
+	waitFor(t, 2*time.Second, func() bool {
+		s, ok := e.lastState()
+		return ok && s.State == StateClosed
+	})
+	if pty.keepAliveCalls() == 0 {
+		t.Fatal("probe never fired after re-enabling")
 	}
 }
 

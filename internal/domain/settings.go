@@ -12,6 +12,13 @@ type Settings struct {
 	ConfirmOnQuit      bool `gorm:"not null;default:true" json:"confirmOnQuit"`
 	ConnectTimeoutSecs int  `gorm:"not null;default:10" json:"connectTimeoutSecs"`
 
+	// KeepAwake sends an OpenSSH keepalive on every open session's ~30s tick
+	// (term.Manager). On (default) it holds an idle connection open through a
+	// server idle-timeout or a NAT drop, and detects a dead peer promptly. Off,
+	// no probe is sent: an idle session may be closed by the far side and a dead
+	// peer is only noticed on the next read or write.
+	KeepAwake bool `gorm:"not null;default:true" json:"keepAwake"`
+
 	// Terminal (read live by the frontend; v0.3 hard-coded these)
 	TermFont       string `gorm:"not null;default:'JetBrains Mono'" json:"termFont"`
 	TermFontSize   int    `gorm:"not null;default:13" json:"termFontSize"`
@@ -58,6 +65,7 @@ func DefaultSettings() Settings {
 		KeepRunningInTray:  true,
 		ConfirmOnQuit:      true,
 		ConnectTimeoutSecs: 10,
+		KeepAwake:          true,
 		TermFont:           "JetBrains Mono",
 		TermFontSize:       13,
 		TermTheme:          "graphite",

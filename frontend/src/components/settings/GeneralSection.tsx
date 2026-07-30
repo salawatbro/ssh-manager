@@ -37,6 +37,13 @@ export function GeneralSection() {
       <Row label="Confirm before quitting" hint="Ask when terminal sessions are still open.">
         <Toggle on={s.confirmOnQuit} onChange={(v) => void update({ confirmOnQuit: v })} />
       </Row>
+      {/* Design: "Keep the terminal awake" · "Sends a keepalive every 30s".
+          On, a keepalive holds an idle session open and spots a dead peer
+          promptly; off, an idle connection may drop and a dead peer is only
+          noticed on the next keystroke. */}
+      <Row label="Keep the terminal awake" hint="Send a keepalive every 30s so idle sessions don’t drop.">
+        <Toggle on={s.keepAwake} onChange={(v) => void update({ keepAwake: v })} />
+      </Row>
       <Row
         label="Production command guard"
         badge={<ProdBadge />}

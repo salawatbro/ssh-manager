@@ -136,6 +136,15 @@ export interface Settings {
     "connectTimeoutSecs": number;
 
     /**
+     * KeepAwake sends an OpenSSH keepalive on every open session's ~30s tick
+     * (term.Manager). On (default) it holds an idle connection open through a
+     * server idle-timeout or a NAT drop, and detects a dead peer promptly. Off,
+     * no probe is sent: an idle session may be closed by the far side and a dead
+     * peer is only noticed on the next read or write.
+     */
+    "keepAwake": boolean;
+
+    /**
      * Terminal (read live by the frontend; v0.3 hard-coded these)
      */
     "termFont": string;

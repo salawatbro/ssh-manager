@@ -146,6 +146,16 @@ func main() {
 		return 10 * time.Second
 	})
 
+	// "Keep the terminal awake" drives the keep-alive probe live, same as the
+	// dial timeout above. Falls back to enabled if the store read fails, matching
+	// the KeepAwake default and the pre-setting always-probe behaviour.
+	termMgr.SetKeepAliveEnabled(func() bool {
+		if s, err := settingsService.Get(); err == nil {
+			return s.KeepAwake
+		}
+		return true
+	})
+
 	app := application.New(application.Options{
 		Name:        "Zish",
 		Description: "Local SSH connection manager",
