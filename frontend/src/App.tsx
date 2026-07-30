@@ -19,6 +19,7 @@ import { Toasts } from './components/ui/Toasts'
 import { LockOverlay } from './components/lock/LockOverlay'
 import { ForgotResetModal } from './components/lock/ForgotResetModal'
 import { useAppKeymap } from './hooks/useAppKeymap'
+import { useLockBoot } from './hooks/useLockBoot'
 import { useTrayConnect } from './hooks/useTrayConnect'
 import { useSftpProgress } from './hooks/useSftpProgress'
 import { useConnectStageEvents } from './hooks/useConnectStages'
@@ -119,6 +120,9 @@ export default function App() {
   }
 
   useAppKeymap(openAdd)
+  // Boots the App Lock: locks on launch once settings load (async), then
+  // runs the idle timer while enabled. Manual ⌘L is in useAppKeymap above.
+  useLockBoot()
   useTrayConnect()
   // Subscribes to sftp:progress for the whole app's lifetime, same as the
   // other mount-once hooks above — SftpView itself never mounts/unmounts
