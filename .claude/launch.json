@@ -6,6 +6,12 @@
       "runtimeExecutable": "wails3",
       "runtimeArgs": ["dev"],
       "port": 9245
+    },
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "port": 9245
     }
   ]
 }

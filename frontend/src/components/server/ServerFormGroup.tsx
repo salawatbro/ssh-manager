@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Select } from '../ui/Select'
 import type { ServerFormValues } from './ServerForm'
 
 interface Props {
@@ -49,22 +50,19 @@ export function ServerFormGroup({ form, setForm, groups }: Props) {
   return (
     <div className="flex flex-1 flex-col gap-[5px]">
       <span className={label}>Group</span>
-      <select
-        className={field}
+      <Select
+        ariaLabel="Group"
         value={form.group}
-        onChange={(e) => {
-          if (e.target.value === NEW_GROUP) setManual(true)
-          else setForm({ ...form, group: e.target.value })
+        onChange={(v) => {
+          if (v === NEW_GROUP) setManual(true)
+          else setForm({ ...form, group: v })
         }}
-      >
-        <option value="">(none)</option>
-        {groups.map((g) => (
-          <option key={g} value={g}>
-            {g}
-          </option>
-        ))}
-        <option value={NEW_GROUP}>+ New group…</option>
-      </select>
+        options={[
+          { value: '', label: '(none)' },
+          ...groups.map((g) => ({ value: g, label: g })),
+          { value: NEW_GROUP, label: '+ New group…' },
+        ]}
+      />
     </div>
   )
 }

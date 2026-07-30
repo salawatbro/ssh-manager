@@ -1,8 +1,8 @@
-import type { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { KeyInfo } from '@bindings/github.com/salawat/sshmgr/internal/sshx'
-import { envClassOf } from '../../lib/env'
 import { useServers } from '../../stores/servers'
+import { Select } from '../ui/Select'
 import type { ServerFormValues } from './ServerForm'
+import { EnvironmentSelect } from './EnvironmentSelect'
 import { ServerFormAuth } from './ServerFormAuth'
 import { ServerFormGroup } from './ServerFormGroup'
 import { TagsEditor } from './TagsEditor'
@@ -96,42 +96,28 @@ export function ServerFormFields({ form, setForm, error, detectedKeys, serverId 
       <div className="mt-4 grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-[5px]">
           <span className={label}>Environment</span>
-          {/* UI-11: environment is a square (rounded-env), placed beside the
-              select's value the way the design's dropdown embeds it — a
-              native <select> can't render a swatch inside its own box. */}
-          <div className="relative">
-            <span
-              className={`pointer-events-none absolute left-[9px] top-1/2 h-[8px] w-[8px] -translate-y-1/2 rounded-env ${envClassOf(form.environment)}`}
-            />
-            <select
-              className={`${field} pl-[23px]`}
-              value={form.environment}
-              onChange={(e) => setForm({ ...form, environment: e.target.value as Environment })}
-            >
-              <option value="prod">Prod</option>
-              <option value="staging">Staging</option>
-              <option value="dev">Dev</option>
-              <option value="none">None</option>
-            </select>
-          </div>
+          {/* UI-11: environment is a square (rounded-env). A custom picker so the
+              colour shows in the trigger AND in every option while choosing — a
+              native <select> can render neither inside its own box. */}
+          <EnvironmentSelect
+            value={form.environment}
+            onChange={(v) => setForm({ ...form, environment: v })}
+          />
         </div>
 
         <div className="flex flex-col gap-[5px]">
           <span className={label}>Jump host</span>
-          <select
-            className={field}
+          <Select
+            ariaLabel="Jump host"
             value={form.jumpId ?? ''}
-            onChange={(e) => setForm({ ...form, jumpId: e.target.value || null })}
-          >
-            <option value="">None — direct connection</option>
-            {servers
-              .filter((s) => s.id !== serverId)
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.user}@{s.host})
-                </option>
-              ))}
-          </select>
+            onChange={(v) => setForm({ ...form, jumpId: v || null })}
+            options={[
+              { value: '', label: 'None — direct connection' },
+              ...servers
+                .filter((s) => s.id !== serverId)
+                .map((s) => ({ value: s.id, label: `${s.name} (${s.user}@${s.host})` })),
+            ]}
+          />
         </div>
       </div>
 

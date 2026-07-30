@@ -5,6 +5,7 @@ import type { SnippetInput } from '@bindings/github.com/salawat/sshmgr/internal/
 import { useServers } from '../../stores/servers'
 import { useSnippets } from '../../stores/snippets'
 import { Segmented } from '../settings/controls'
+import { Select } from '../ui/Select'
 
 interface Props {
   // null = adding a new snippet; a Snippet = editing that row in place.
@@ -112,44 +113,38 @@ export function SnippetForm({ initial, onDone }: Props) {
       {scope === SnippetScope.ScopeGroup && (
         <div className="flex flex-col gap-[4px]">
           <span className={label}>Group</span>
-          <select className={field} value={scopeRef} onChange={(e) => setScopeRef(e.target.value)}>
-            <option value="">Select a group…</option>
-            {groups.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
+          <Select
+            ariaLabel="Group"
+            value={scopeRef}
+            onChange={setScopeRef}
+            options={[{ value: '', label: 'Select a group…' }, ...groups.map((g) => ({ value: g, label: g }))]}
+          />
         </div>
       )}
 
       {scope === SnippetScope.ScopeServer && (
         <div className="flex flex-col gap-[4px]">
           <span className={label}>Server</span>
-          <select className={field} value={scopeRef} onChange={(e) => setScopeRef(e.target.value)}>
-            <option value="">Select a server…</option>
-            {servers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name || s.host}
-              </option>
-            ))}
-          </select>
+          <Select
+            ariaLabel="Server"
+            value={scopeRef}
+            onChange={setScopeRef}
+            options={[
+              { value: '', label: 'Select a server…' },
+              ...servers.map((s) => ({ value: s.id, label: s.name || s.host })),
+            ]}
+          />
         </div>
       )}
 
       <div className="flex flex-col gap-[4px]">
         <span className={label}>Quick-run slot (⌘⇧1-9, 0 = none)</span>
-        <select
-          className={field}
+        <Select
+          ariaLabel="Quick-run slot"
           value={slot}
-          onChange={(e) => setSlot(Number(e.target.value))}
-        >
-          {Array.from({ length: 10 }, (_, n) => n).map((n) => (
-            <option key={n} value={n}>
-              {n === 0 ? 'None' : n}
-            </option>
-          ))}
-        </select>
+          onChange={setSlot}
+          options={Array.from({ length: 10 }, (_, n) => ({ value: n, label: n === 0 ? 'None' : String(n) }))}
+        />
       </div>
 
       {error && <span className="text-[11px] text-stFailed">{error}</span>}
