@@ -1,4 +1,5 @@
 import { useSftp } from '../../stores/sftp'
+import { formatEta, formatRate } from '../../lib/transferProgress'
 
 // The SFTP footer (Zish.dc.html SFTP view). The design keeps this strip present
 // at all times: with a transfer running it shows the progress, and idle it says
@@ -6,11 +7,15 @@ import { useSftp } from '../../stores/sftp'
 // otherwise invisible. That is why this no longer returns null when idle; the
 // layout reserves the row either way, so nothing shifts when one starts.
 //
-// Two things the design shows are NOT here, because nothing reports them:
-// a batch counter ("2 of 5") — sftp:progress carries one file at a time, with no
-// notion of the batch it belongs to — and a transfer rate / ETA. Both need the
-// backend to send more than it does today; inventing either from the numbers on
-// hand would just be a plausible-looking guess about the user's network.
+// The rate and ETA are real now — the backend measures throughput and sends it
+// on the sftp:progress event (SftpProgress.Rate). Both read blank until the
+// first sample window elapses, so a transfer too short to measure shows neither
+// rather than a made-up "0 B/s".
+//
+// The design's batch counter ("2 of 5") is deliberately still absent: each file
+// is its own concurrent transfer with its own row, so a serial "2 of 5" would
+// misrepresent what is actually happening. That was a scope decision, not an
+// oversight.
 export function TransferBar() {
   const transfers = useSftp((s) => s.transfers)
   const cancel = useSftp((s) => s.cancel)
@@ -32,6 +37,8 @@ export function TransferBar() {
       {transfers.map((t) => {
         const pct = t.total > 0 ? Math.min(100, Math.round((t.done / t.total) * 100)) : 0
         const up = t.direction === 'upload'
+        const rate = formatRate(t.rate)
+        const eta = formatEta(t.total - t.done, t.rate)
         return (
           <div key={t.transferID} className="flex items-center gap-[10px]">
             {/* The design writes the direction as a bare arrow rather than an
@@ -47,6 +54,10 @@ export function TransferBar() {
               <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
             </div>
             <span className="shrink-0 font-mono text-[11px] text-textMuted">{pct}%</span>
+            {/* Fixed-width so the bar to its left does not jitter as the rate
+                text changes length; blank until the backend has a sample. */}
+            <span className="w-[64px] shrink-0 text-right font-mono text-[11px] text-textDim">{rate}</span>
+            <span className="w-[58px] shrink-0 text-right font-mono text-[11px] text-textDim">{eta}</span>
             <button
               type="button"
               onClick={() => cancel(t.transferID)}

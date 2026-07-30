@@ -152,6 +152,11 @@ export interface SftpProgress {
     "currentFile": string;
     "done": number;
     "total": number;
+
+    /**
+     * bytes/sec, smoothed; 0 until the first sample window elapses
+     */
+    "rate": number;
     "finished": boolean;
 
     /**

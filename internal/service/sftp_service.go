@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -298,14 +299,38 @@ func (s *SftpService) run(direction string, fn func(ctx context.Context, id stri
 	return id
 }
 
-// progressFn adapts sftpx.Progress into throttled sftp:progress events. It emits
-// on every callback; sftpx already batches per copy chunk (~32KB), so this stays
-// cheap without extra time-based throttling.
+// progressFn adapts sftpx.Progress into sftp:progress events and computes the
+// transfer rate. It emits on every callback; sftpx already batches per copy
+// chunk (~32KB), so this stays cheap without extra throttling.
+//
+// The rate is sampled over a ~300ms window (Done is cumulative across the whole
+// transfer, directories included) and smoothed with a light EWMA, so the number
+// the footer shows does not jitter every chunk. State lives in this closure,
+// which the copy goroutine calls single-threaded, so no lock is needed.
 func (s *SftpService) progressFn(id, direction string) func(sftpx.Progress) {
+	const window = 300 * time.Millisecond
+	var (
+		lastAt   time.Time
+		lastDone int64
+		rate     int64
+	)
 	return func(p sftpx.Progress) {
+		now := time.Now()
+		switch {
+		case lastAt.IsZero():
+			lastAt, lastDone = now, p.Done
+		case now.Sub(lastAt) >= window:
+			inst := int64(float64(p.Done-lastDone) / now.Sub(lastAt).Seconds())
+			if rate == 0 {
+				rate = inst
+			} else {
+				rate = (rate*2 + inst) / 3 // EWMA, weighted toward the running value
+			}
+			lastAt, lastDone = now, p.Done
+		}
 		s.emitter.Emit("sftp:progress", SftpProgress{
 			TransferID: id, Direction: direction,
-			CurrentFile: p.CurrentFile, Done: p.Done, Total: p.Total,
+			CurrentFile: p.CurrentFile, Done: p.Done, Total: p.Total, Rate: rate,
 		})
 	}
 }

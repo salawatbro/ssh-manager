@@ -45,6 +45,7 @@ type SftpProgress struct {
 	CurrentFile string `json:"currentFile"`
 	Done        int64  `json:"done"`
 	Total       int64  `json:"total"`
+	Rate        int64  `json:"rate"` // bytes/sec, smoothed; 0 until the first sample window elapses
 	Finished    bool   `json:"finished"`
 	Error       string `json:"error"` // non-empty on failure
 }
