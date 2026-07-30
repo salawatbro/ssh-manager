@@ -1,10 +1,21 @@
 import { create } from 'zustand'
+import { SessionStateService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useSftp } from './sftp'
 import { useSettings } from './settings'
 import { releaseContentArea } from './view'
 import { replaceLeaf, removeLeaf, firstLeaf } from '../lib/paneTree'
 import { LOCAL_TARGET_ID } from '../lib/paneTarget'
+
+// Persist the open SSH tabs' server ids for "Restore sessions on launch". One
+// entry per SSH tab (local tabs excluded); a split tab persists as its single
+// server id, so it comes back as one pane. Fire-and-forget — a failed save just
+// means that change is not restored. Called after every tab add/remove; never
+// on mount, so the saved list survives untouched until the restore reads it.
+function persistOpenTabs(tabs: Tab[]) {
+  const ids = tabs.filter((t) => t.serverId !== LOCAL_TARGET_ID).map((t) => t.serverId)
+  void SessionStateService.SaveOpenTabs(ids).catch(() => {})
+}
 
 // A tab's panes form a binary split tree; a leaf is one terminal session for a
 // server. Task 6 fills in splitFocused/closePane; v0.3-Task-5 only ever builds
@@ -106,6 +117,7 @@ export const useSessions = create<SessionsState>((set, get) => ({
     }
     focusTerminals()
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
+    persistOpenTabs(get().tabs)
   },
 
   // A tab on the local machine: no server, nothing persisted, not in the
@@ -145,6 +157,7 @@ export const useSessions = create<SessionsState>((set, get) => ({
   closeTab: (tabId) => {
     set((s) => closeTabState(s.tabs, tabId, s.activeTabId))
     focusSftpIfNoTabsLeft(get().tabs)
+    persistOpenTabs(get().tabs)
   },
 
   requestCloseTab: (tabId) => {
@@ -213,5 +226,8 @@ export const useSessions = create<SessionsState>((set, get) => ({
     // Only fires on the branch that removed the tab's last pane (and with it
     // the last tab) — otherwise tabs is non-empty and this is a no-op.
     focusSftpIfNoTabsLeft(get().tabs)
+    // Persist in case this closed a whole tab; if it only dropped a pane of a
+    // split, the tab's server id is unchanged and the saved list still matches.
+    persistOpenTabs(get().tabs)
   },
 }))

@@ -108,6 +108,9 @@ func main() {
 	// The Health card dials its own short-lived connection per probe (never the
 	// terminal's), so it needs the same repo/keychain/dialer SftpService does.
 	healthService := service.NewHealthService(repo, kr, dialer)
+	// "Restore sessions on launch": the frontend saves the open-tab list as tabs
+	// change and reopens it at startup.
+	sessionStateService := service.NewSessionStateService(store.NewSessionStateRepo(db))
 	settingsService := service.NewSettingsService(settingsRepo, platform.NewLoginAgent())
 	importService, err := service.NewImportService(repo)
 	if err != nil {
@@ -184,6 +187,7 @@ func main() {
 			application.NewService(appInfoService),
 			application.NewService(historyService),
 			application.NewService(healthService),
+			application.NewService(sessionStateService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

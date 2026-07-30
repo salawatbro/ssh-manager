@@ -169,6 +169,14 @@ export interface Settings {
     "confirmSessionClose": boolean;
 
     /**
+     * RestoreTabs reopens the terminal tabs that were open at quit, on the next
+     * launch — reconnecting each server (single-pane; a split comes back as one
+     * pane). Off by default. The open-tab list itself lives in SessionState, not
+     * here; this is only the toggle.
+     */
+    "restoreTabs": boolean;
+
+    /**
      * KeepAwake sends an OpenSSH keepalive on every open session's ~30s tick
      * (term.Manager). On (default) it holds an idle connection open through a
      * server idle-timeout or a NAT drop, and detects a dead peer promptly. Off,

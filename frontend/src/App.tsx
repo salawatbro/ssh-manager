@@ -19,7 +19,9 @@ import { Toasts } from './components/ui/Toasts'
 import { useAppKeymap } from './hooks/useAppKeymap'
 import { useTrayConnect } from './hooks/useTrayConnect'
 import { useSftpProgress } from './hooks/useSftpProgress'
+import { SessionStateService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { useServers } from './stores/servers'
+import { useSessions } from './stores/sessions'
 import { useServerForm } from './stores/serverForm'
 import { useHostKey } from './stores/hostkey'
 import { useCodePrompt } from './stores/codeprompt'
@@ -73,6 +75,26 @@ export default function App() {
   }, [])
 
   const settings = useSettings((s) => s.settings)
+
+  // Restore sessions on launch (Settings → General). Runs once, after both
+  // settings and servers have loaded — servers must be present to map a saved id
+  // back to a Server. A saved id whose server was deleted is skipped. Reopening
+  // a tab reconnects it, so any host-key/2FA prompt appears as normal (queued
+  // one at a time); the user opted into this by turning the setting on.
+  const servers = useServers((s) => s.servers)
+  const restored = useRef(false)
+  useEffect(() => {
+    if (restored.current || !settings || servers.length === 0) return
+    restored.current = true
+    if (!settings.restoreTabs) return
+    void SessionStateService.LoadOpenTabs().then((ids) => {
+      for (const id of ids ?? []) {
+        const server = servers.find((s) => s.id === id)
+        if (server) useSessions.getState().open(server)
+      }
+    })
+  }, [settings, servers])
+
   const tourChecked = useRef(false)
   useEffect(() => {
     // Open the welcome tour once, the first time settings load with tourSeen

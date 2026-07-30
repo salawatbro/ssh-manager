@@ -42,6 +42,11 @@ export function GeneralSection() {
       <Row label="Confirm before closing a session" hint="Ask before the × or ⌘W closes a terminal tab.">
         <Toggle on={s.confirmSessionClose} onChange={(v) => void update({ confirmSessionClose: v })} />
       </Row>
+      {/* Design: "Restore sessions on launch". Reopens the terminal tabs that
+          were open at quit; a split comes back as a single pane. */}
+      <Row label="Restore sessions on launch" hint="Reopen the terminal tabs that were open when you quit.">
+        <Toggle on={s.restoreTabs} onChange={(v) => void update({ restoreTabs: v })} />
+      </Row>
       {/* Design: "Keep the terminal awake" · "Sends a keepalive every 30s".
           On, a keepalive holds an idle session open and spots a dead peer
           promptly; off, an idle connection may drop and a dead peer is only

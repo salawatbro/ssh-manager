@@ -9,6 +9,7 @@ import * as ImportService from "./importservice.js";
 import * as LocalService from "./localservice.js";
 import * as SSHService from "./sshservice.js";
 import * as ServerService from "./serverservice.js";
+import * as SessionStateService from "./sessionstateservice.js";
 import * as SettingsService from "./settingsservice.js";
 import * as SftpService from "./sftpservice.js";
 import * as SnippetService from "./snippetservice.js";
@@ -22,6 +23,7 @@ export {
     LocalService,
     SSHService,
     ServerService,
+    SessionStateService,
     SettingsService,
     SftpService,
     SnippetService,
