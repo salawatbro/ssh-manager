@@ -28,7 +28,10 @@ export function GeneralSection() {
       <Row label="Start at login" hint="Launch Zish when you log in.">
         <Toggle on={s.startAtLogin} onChange={(v) => void update({ startAtLogin: v })} />
       </Row>
-      <Row label="Keep running in tray" hint="Closing the window keeps sessions alive; ⌘⇧S brings it back.">
+      {/* The design calls this "Menu bar agent" (Zish.dc.html General), which
+          names the thing the user sees in the menu bar rather than the
+          mechanism. Same setting, same behaviour. */}
+      <Row label="Menu bar agent" hint="Keeps Zish reachable when the window is closed; ⌘⇧S brings it back.">
         <Toggle on={s.keepRunningInTray} onChange={(v) => void update({ keepRunningInTray: v })} />
       </Row>
       <Row label="Confirm before quitting" hint="Ask when terminal sessions are still open.">

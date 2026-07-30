@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { SnippetScope } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { Snippet } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import { isMac } from '../../lib/platform'
 import { useServers } from '../../stores/servers'
 import { useSnippets } from '../../stores/snippets'
 import { SnippetForm } from './SnippetForm'
@@ -35,6 +36,13 @@ export function SnippetManager() {
 
   return (
     <div className="flex flex-col gap-[6px]">
+      {/* The design leads the section with what a snippet does and how to run
+          one (Zish.dc.html Snippets) — the list alone never said either. The
+          binding comes from lib/shortcuts.ts so it stays right off macOS. */}
+      <div className="mb-[4px] text-[12px] leading-[1.5] text-textMuted">
+        Snippets paste into the focused session. Run one with {isMac ? '⌘⇧1…9' : 'Ctrl+Shift+1…9'}, or pick one from the
+        palette ({isMac ? '⌘E' : 'Ctrl+Shift+S'}).
+      </div>
       {all.length === 0 && editing === null && (
         <span className="px-[2px] py-[4px] text-[11.5px] text-textDim">No snippets yet.</span>
       )}
