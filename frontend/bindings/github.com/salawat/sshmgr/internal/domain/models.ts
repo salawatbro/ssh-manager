@@ -234,6 +234,17 @@ export interface Settings {
      * Not a secret — a plain onboarding flag.
      */
     "tourSeen": boolean;
+
+    /**
+     * App lock (see docs/superpowers/specs/2026-07-30-app-lock-design.md). The
+     * PIN itself is NOT here — it is a bcrypt hash in the Keychain. These are
+     * the non-secret preferences. LockEnabled ("Require unlock") is independent
+     * of whether a PIN is set, so a user can keep a PIN but switch locking off.
+     */
+    "lockEnabled": boolean;
+    "lockUseBiometrics": boolean;
+    "lockIdleEnabled": boolean;
+    "lockIdleMinutes": number;
 }
 
 /**

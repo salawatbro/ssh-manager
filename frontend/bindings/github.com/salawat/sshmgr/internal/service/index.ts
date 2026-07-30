@@ -7,6 +7,7 @@ import * as HealthService from "./healthservice.js";
 import * as HistoryService from "./historyservice.js";
 import * as ImportService from "./importservice.js";
 import * as LocalService from "./localservice.js";
+import * as LockService from "./lockservice.js";
 import * as SSHService from "./sshservice.js";
 import * as ServerService from "./serverservice.js";
 import * as SessionStateService from "./sessionstateservice.js";
@@ -21,6 +22,7 @@ export {
     HistoryService,
     ImportService,
     LocalService,
+    LockService,
     SSHService,
     ServerService,
     SessionStateService,

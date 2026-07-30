@@ -140,6 +140,10 @@ func main() {
 	uninstallService := service.NewUninstallService(repo, kr, platform.NewLoginAgent(), uninstallDataDir, uninstallLogDir, platform.RunningFromAppBundle())
 	appInfoService := service.NewAppInfoService()
 
+	// App lock (PIN). ResetAll needs the repos the app already wired; the
+	// session-state repo has no stored var, so construct one here.
+	lockService := service.NewLockService(kr, repo, snippetRepo, store.NewSessionStateRepo(db), sessionLogRepo, settingsRepo)
+
 	// Wires forwardRepo + forwardMgr into serverService so Delete tears down a
 	// server's live tunnels first (Task 4's deviation: a package-level func,
 	// not a method — see SetForwardDeps' doc comment in server_service.go for
@@ -191,6 +195,7 @@ func main() {
 			application.NewService(historyService),
 			application.NewService(healthService),
 			application.NewService(sessionStateService),
+			application.NewService(lockService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
