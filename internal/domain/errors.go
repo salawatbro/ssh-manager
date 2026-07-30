@@ -39,6 +39,9 @@ const (
 	// UI selector arrives v0.6.
 	CodeJumpFailed = "ERR_JUMP_FAILED"
 	CodeJumpCycle  = "ERR_JUMP_CYCLE"
+
+	// CodeInternal is an unexpected internal failure with no more specific code.
+	CodeInternal = "ERR_INTERNAL"
 )
 
 // Error is a domain error carrying a stable code alongside the message.
