@@ -12,6 +12,12 @@ type Settings struct {
 	ConfirmOnQuit      bool `gorm:"not null;default:true" json:"confirmOnQuit"`
 	ConnectTimeoutSecs int  `gorm:"not null;default:10" json:"connectTimeoutSecs"`
 
+	// ConfirmSessionClose asks for confirmation before a terminal tab (a live
+	// session) is closed — the × button, or ⌘W on a single-pane tab. Off by
+	// default: closing a tab is a common, deliberate action, so the prompt is
+	// opt-in. Distinct from ConfirmOnQuit, which guards closing the whole app.
+	ConfirmSessionClose bool `gorm:"not null;default:false" json:"confirmSessionClose"`
+
 	// KeepAwake sends an OpenSSH keepalive on every open session's ~30s tick
 	// (term.Manager). On (default) it holds an idle connection open through a
 	// server idle-timeout or a NAT drop, and detects a dead peer promptly. Off,

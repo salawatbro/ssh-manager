@@ -40,7 +40,11 @@ export function useTerminalKeymap() {
         st.splitFocused('h')
       } else if (action === 'close-pane') {
         e.preventDefault()
-        st.closePane(active.id, active.focusedPaneId)
+        // ⌘W on a single-pane tab closes the whole session, so it goes through
+        // the same confirm the × button does; on a split it just drops one pane
+        // (not the session), so no prompt.
+        if (active.root.kind === 'leaf') st.requestCloseTab(active.id)
+        else st.closePane(active.id, active.focusedPaneId)
       } else if (action === 'next-tab') {
         e.preventDefault()
         st.nextTab()

@@ -37,6 +37,11 @@ export function GeneralSection() {
       <Row label="Confirm before quitting" hint="Ask when terminal sessions are still open.">
         <Toggle on={s.confirmOnQuit} onChange={(v) => void update({ confirmOnQuit: v })} />
       </Row>
+      {/* Design: "Confirm before closing a session". Guards a single tab close
+          (× or ⌘W on a one-pane tab), distinct from quitting the whole app. */}
+      <Row label="Confirm before closing a session" hint="Ask before the × or ⌘W closes a terminal tab.">
+        <Toggle on={s.confirmSessionClose} onChange={(v) => void update({ confirmSessionClose: v })} />
+      </Row>
       {/* Design: "Keep the terminal awake" · "Sends a keepalive every 30s".
           On, a keepalive holds an idle session open and spots a dead peer
           promptly; off, an idle connection may drop and a dead peer is only

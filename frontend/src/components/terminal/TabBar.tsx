@@ -23,7 +23,7 @@ export function TabBar() {
   const tabs = useSessions((s) => s.tabs)
   const activeTabId = useSessions((s) => s.activeTabId)
   const selectTab = useSessions((s) => s.selectTab)
-  const closeTab = useSessions((s) => s.closeTab)
+  const requestCloseTab = useSessions((s) => s.requestCloseTab)
   const paneStatus = usePanes((s) => s.paneStatus)
   const servers = useServers((s) => s.servers)
   // One SFTP session at a time (the store holds a single one), so at most one
@@ -53,7 +53,7 @@ export function TabBar() {
               type="button"
               onMouseDown={(e) => {
                 e.stopPropagation()
-                closeTab(t.id)
+                requestCloseTab(t.id)
               }}
               className={`shrink-0 text-[13px] leading-none text-textDim hover:text-text ${
                 active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'

@@ -6,6 +6,7 @@ import { HostKeyModal } from './components/modals/HostKeyModal'
 import { HostKeyChangedModal } from './components/modals/HostKeyChangedModal'
 import { CodeModal } from './components/modals/CodeModal'
 import { GuardModal } from './components/modals/GuardModal'
+import { CloseSessionModal } from './components/terminal/CloseSessionModal'
 import { TabBar } from './components/terminal/TabBar'
 import { CommandPalette } from './components/palette/CommandPalette'
 import { SnippetPalette } from './components/snippets/SnippetPalette'
@@ -191,6 +192,9 @@ export default function App() {
           reused by the manual buffer here and by the reliable/broadcast paths
           (Tasks 8/9). GuardModal renders nothing itself when closed. */}
       <GuardModal />
+      {/* "Confirm before closing a session" (Settings → General) — renders null
+          unless a tab close is pending. */}
+      <CloseSessionModal />
       {/* Transient feedback stack (dizayn manbasi: Toast.dc.html) — reports
           for actions with no inline surface: the tray pin cap, SFTP ops after
           connect, a failed settings save, Data-section export/import/backup. */}

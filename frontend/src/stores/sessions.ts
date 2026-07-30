@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useSftp } from './sftp'
+import { useSettings } from './settings'
 import { releaseContentArea } from './view'
 import { replaceLeaf, removeLeaf, firstLeaf } from '../lib/paneTree'
 import { LOCAL_TARGET_ID } from '../lib/paneTarget'
@@ -27,10 +28,18 @@ export interface Tab {
 interface SessionsState {
   tabs: Tab[]
   activeTabId: string | null
+  // The tab a close confirm is pending on (Settings → "Confirm before closing a
+  // session"); null when no confirm is open. The modal lives in App.tsx.
+  pendingCloseId: string | null
   open: (server: Server) => void
   openOrFocus: (server: Server) => void
   openLocal: () => void
   closeTab: (tabId: string) => void
+  // Entry point for a user-initiated tab close (the × button, ⌘W on a
+  // single-pane tab): confirms first when the setting is on, else closes now.
+  requestCloseTab: (tabId: string) => void
+  confirmCloseTab: () => void
+  cancelCloseTab: () => void
   selectTab: (tabId: string) => void
   nextTab: () => void
   prevTab: () => void
@@ -80,6 +89,7 @@ function closeTabState(tabs: Tab[], closedId: string, activeId: string | null): 
 export const useSessions = create<SessionsState>((set, get) => ({
   tabs: [],
   activeTabId: null,
+  pendingCloseId: null,
 
   // A new tab, one leaf, one session. Multiple tabs to the same server are
   // allowed (each leaf id is unique, so each drives its own PTY).
@@ -136,6 +146,22 @@ export const useSessions = create<SessionsState>((set, get) => ({
     set((s) => closeTabState(s.tabs, tabId, s.activeTabId))
     focusSftpIfNoTabsLeft(get().tabs)
   },
+
+  requestCloseTab: (tabId) => {
+    // Reads the setting live; a null settings row (not yet loaded) reads as off,
+    // so a close never blocks on an unavailable preference.
+    if (useSettings.getState().settings?.confirmSessionClose) {
+      set({ pendingCloseId: tabId })
+    } else {
+      get().closeTab(tabId)
+    }
+  },
+  confirmCloseTab: () => {
+    const id = get().pendingCloseId
+    set({ pendingCloseId: null })
+    if (id) get().closeTab(id)
+  },
+  cancelCloseTab: () => set({ pendingCloseId: null }),
 
   selectTab: (tabId) => {
     focusTerminals()
