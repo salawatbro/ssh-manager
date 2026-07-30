@@ -33,19 +33,23 @@ export function ConnectionCard({ fields }: Props) {
 export function DetailCard({
   title,
   hint,
+  action,
   children,
 }: {
   title: string
   hint?: string
+  // Right-aligned control in the header (e.g. the Health card's Refresh).
+  action?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
     <div className="overflow-hidden rounded-[7px] border border-border bg-bg1">
       <div
         title={hint}
-        className="flex h-[30px] items-center border-b border-border px-[13px] text-[10.5px] font-semibold tracking-[.07em] text-textDim"
+        className="flex h-[30px] items-center gap-[8px] border-b border-border px-[13px] text-[10.5px] font-semibold tracking-[.07em] text-textDim"
       >
-        {title.toUpperCase()}
+        <span className="flex-1">{title.toUpperCase()}</span>
+        {action}
       </div>
       {children}
     </div>

@@ -78,6 +78,16 @@ export function Resize(sessionID: string, cols: number, rows: number): $Cancella
 }
 
 /**
+ * SetConnRegistry wires the live-connection registry the Health card reads.
+ * Package-level wiring (like SetForwardDeps) rather than a constructor arg, so
+ * the many existing SSHService call sites keep their signature; a nil registry
+ * (tests) simply means sessions are not tracked for reuse.
+ */
+export function SetConnRegistry(r: $models.ConnRegistry | null): $CancellablePromise<void> {
+    return $Call.ByID(1045466036, r);
+}
+
+/**
  * SubmitCode delivers the user's typed 2FA code for a pending code:request
  * (TOTP or an unrecognised keyboard-interactive question). The blocking
  * Open dial — inside the keyboard-interactive challenge — is waiting on

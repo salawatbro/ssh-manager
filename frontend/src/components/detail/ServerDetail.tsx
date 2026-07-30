@@ -9,7 +9,7 @@ import { detailFields, sshCommand, statusLabel, statusTextClass } from '../../li
 import { envClassOf } from '../../lib/env'
 import { StatusDot } from '../server/StatusDot'
 import { ConnectionCard, DetailCard } from './ConnectionCard'
-import { HealthCard } from './MetricCards'
+import { HealthCard } from './HealthCard'
 import { RecentSessionsCard } from './RecentSessionsCard'
 import { TunnelCards } from './TunnelCards'
 

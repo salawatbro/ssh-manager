@@ -105,6 +105,12 @@ func main() {
 	sessionLogRepo := store.NewSessionLogRepo(db)
 	sshService := service.NewSSHService(prompter, repo, settingsRepo, kr, dialer, termMgr, codePrompter, sessionLogRepo)
 	historyService := service.NewHistoryService(sessionLogRepo)
+	// The Health card probes over a connection a terminal already holds, never
+	// dialing on its own. SSHService populates the registry as sessions open and
+	// close; HealthService reads it.
+	connRegistry := service.NewConnRegistry()
+	sshService.SetConnRegistry(connRegistry)
+	healthService := service.NewHealthService(connRegistry)
 	settingsService := service.NewSettingsService(settingsRepo, platform.NewLoginAgent())
 	importService, err := service.NewImportService(repo)
 	if err != nil {
@@ -180,6 +186,7 @@ func main() {
 			application.NewService(NewEditService()),
 			application.NewService(appInfoService),
 			application.NewService(historyService),
+			application.NewService(healthService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
