@@ -50,6 +50,8 @@ export default function SftpView() {
   const remoteEntries = useSftp((s) => s.remoteEntries)
   const upload = useSftp((s) => s.upload)
   const download = useSftp((s) => s.download)
+  const requestClose = useSftp((s) => s.requestClose)
+  const pendingClose = useSftp((s) => s.pendingClose)
   const mkdir = useSftp((s) => s.mkdir)
   const createFile = useSftp((s) => s.createFile)
   const remove = useSftp((s) => s.remove)
@@ -58,18 +60,20 @@ export default function SftpView() {
   const [pendingOverwrite, setPendingOverwrite] = useState<PendingOverwrite | null>(null)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [prompt, setPrompt] = useState<Prompt | null>(null)
-  // One of the modals owns Escape while open, else it'd also close the view.
-  const modalOpen = !!pendingOverwrite || !!pendingDelete || prompt !== null
+  // One of the modals — or the close confirm (App-level CloseSessionModal) —
+  // owns Escape while open, else it'd also close the view.
+  const modalOpen = !!pendingOverwrite || !!pendingDelete || prompt !== null || pendingClose
 
   useEffect(() => {
     if (!open || !active) return
     function onKeyDown(e: KeyboardEvent) {
       // isComposing guards against an IME commit keystroke closing the view.
-      if (e.key === 'Escape' && !e.isComposing && !modalOpen) close()
+      // requestClose confirms first when the setting is on, else closes now.
+      if (e.key === 'Escape' && !e.isComposing && !modalOpen) requestClose()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, active, close, modalOpen])
+  }, [open, active, requestClose, modalOpen])
 
   if (!open) return null
 

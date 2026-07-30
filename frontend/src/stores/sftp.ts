@@ -4,6 +4,7 @@ import type { FileEntry } from '@bindings/github.com/salawat/sshmgr/internal/sft
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { applyTransferProgress, type ProgressEvent, type TransferProgress } from '../lib/transferProgress'
 import { toastError } from './toasts'
+import { useSettings } from './settings'
 import { releaseContentArea } from './view'
 import { clearPaneSelection } from './sftpSelection'
 import { fileMutations } from './sftpMutations'
@@ -27,9 +28,18 @@ interface SftpState {
   // screen. Errors after connect (nav, transfer, mkdir/remove/rename) have no
   // inline surface there and go through toasts instead.
   error: string | null
+  // A close confirm is pending on the SFTP tab ("Confirm before closing a
+  // session"); the App-level CloseSessionModal renders on it. Mirrors the
+  // terminal tabs' pendingCloseId in stores/sessions.ts.
+  pendingClose: boolean
 
   openFor: (server: Server) => Promise<void>
   close: () => void
+  // The SFTP tab's × / Escape go through this: confirm first when the setting
+  // is on, else close now.
+  requestClose: () => void
+  confirmClose: () => void
+  cancelClose: () => void
   // Show / hide the SFTP tab without ending its session. blur() is called by
   // every sessions-store action that brings a terminal tab forward.
   focus: () => void
@@ -71,6 +81,7 @@ export const useSftp = create<SftpState>((set, get) => ({
   remoteEntries: [],
   transfers: [],
   error: null,
+  pendingClose: false,
 
   openFor: async (server) => {
     // Close any prior session (fire-and-forget) so re-opening doesn't leak it.
@@ -121,8 +132,21 @@ export const useSftp = create<SftpState>((set, get) => ({
       remoteEntries: [],
       transfers: [],
       error: null,
+      pendingClose: false,
     })
   },
+
+  requestClose: () => {
+    // Same setting the terminal tabs read (stores/sessions.ts). A null settings
+    // row reads as off, so a close never blocks on an unavailable preference.
+    if (get().open && useSettings.getState().settings?.confirmSessionClose) {
+      set({ pendingClose: true })
+    } else {
+      get().close()
+    }
+  },
+  confirmClose: () => get().close(), // close() resets pendingClose with the rest
+  cancelClose: () => set({ pendingClose: false }),
 
   // No-ops when no session is open, so a stray click can't focus an empty view.
   focus: () => {

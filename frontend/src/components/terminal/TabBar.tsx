@@ -84,7 +84,7 @@ export function TabBar() {
             title="Close SFTP"
             onMouseDown={(e) => {
               e.stopPropagation()
-              useSftp.getState().close()
+              useSftp.getState().requestClose()
             }}
             className={`shrink-0 text-[13px] leading-none text-textDim hover:text-text ${
               sftpActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
