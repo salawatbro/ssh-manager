@@ -233,7 +233,7 @@ export default function App() {
           connect, a failed settings save, Data-section export/import/backup. */}
       <Toasts />
       {/* App lock — full-window overlay over the UI; renders null when unlocked.
-          Sessions/tunnels keep running underneath. Forgot flow wired in Task 13. */}
+          Sessions/tunnels keep running underneath. Wires in the forgot-PIN reset flow. */}
       <LockOverlay onForgot={() => setForgotOpen(true)} />
       {forgotOpen && <ForgotResetModal onClose={() => setForgotOpen(false)} />}
     </div>

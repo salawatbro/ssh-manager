@@ -4,20 +4,23 @@ import { BiometricService } from '@bindings/github.com/salawat/sshmgr'
 import { useLock } from '../../stores/lock'
 import { useSessions } from '../../stores/sessions'
 import { useForwards } from '../../stores/forwards'
+import { useSettings } from '../../stores/settings'
 import { PinPad } from './PinPad'
 
 // Full-window lock. Rendered over a blurred UI; live sessions/tunnels keep
 // running underneath (the footer says so). Touch ID is offered when available
 // and enabled; the PIN is always the fallback. "Forgot passcode?" opens the
-// reset flow (Task 14, wired via onForgot).
+// reset flow, wired via onForgot.
 export function LockOverlay({ onForgot }: { onForgot: () => void }) {
   const locked = useLock((s) => s.locked)
   const biometricsAvailable = useLock((s) => s.biometricsAvailable)
   const unlock = useLock((s) => s.unlock)
+  const useBiometricsPref = useSettings((s) => s.settings?.lockUseBiometrics ?? false)
+  const biometricsOn = biometricsAvailable && useBiometricsPref
   const [error, setError] = useState('')
   const [scanning, setScanning] = useState(false)
   const [attempt, setAttempt] = useState(0)
-  const [useTouch, setUseTouch] = useState(biometricsAvailable)
+  const [useTouch, setUseTouch] = useState(biometricsOn)
 
   const sessionCount = useSessions((s) => s.tabs.length)
   const tunnelCount = useForwards(
@@ -64,7 +67,7 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
           Unlock to reach your hosts, keys and tunnels.
         </div>
 
-        {useTouch && biometricsAvailable ? (
+        {useTouch && biometricsOn ? (
           <div className="mt-5 flex w-full flex-col items-center gap-3">
             <button
               type="button"
@@ -81,7 +84,7 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
           <div className="mt-5 flex w-full flex-col items-center gap-3">
             <PinPad resetKey={attempt} onComplete={(pin) => void submitPin(pin)} />
             <span className="text-[11px] text-textDim">Six digits</span>
-            {biometricsAvailable && (
+            {biometricsOn && (
               <button type="button" onClick={() => setUseTouch(true)} className="text-[12px] text-accentFg hover:text-accent">
                 Use Touch ID instead
               </button>

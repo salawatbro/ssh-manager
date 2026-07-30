@@ -17,7 +17,7 @@ export function useLockBoot() {
     bootedRef.current = true
     void useLock.getState().refresh().then(() => {
       if (settings.lockEnabled && useLock.getState().hasPin) useLock.getState().lock()
-    })
+    }).catch(() => {})
   }, [settings])
 
   // Idle lock — re-created whenever the relevant settings change.

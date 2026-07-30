@@ -12,6 +12,7 @@ import { useLock } from '../stores/lock'
 export function useAppKeymap(onNewServer: () => void) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (useLock.getState().locked) return
       const action = resolveAction(e)
       // Never stack a palette over an open guard confirmation.
       if (action === 'palette' && !useGuard.getState().open) {
