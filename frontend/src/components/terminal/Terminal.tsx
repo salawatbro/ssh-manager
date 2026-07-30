@@ -18,6 +18,7 @@ import { installOsc133, type PromptMarker } from './commandDecorations'
 import { createTerminal } from './createTerminal'
 import { terminalMenuItems } from './terminalMenu'
 import { runFind, closeFind } from './terminalFind'
+import { ConnectingOverlay } from './ConnectingOverlay'
 
 interface Props {
   paneId: string
@@ -190,7 +191,6 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
     if (session.status === 'exited') useSessions.getState().closePane(tabId, paneId)
   }, [session.status, tabId, paneId])
 
-
   return (
     <div
       className={`relative h-full w-full bg-bg0 ${focused && isSplit ? 'shadow-[inset_0_0_0_1px_var(--color-accent)]' : ''}`}
@@ -235,6 +235,12 @@ export function Terminal({ paneId, tabId, serverId, focused, onFocus }: Props) {
           message={session.message}
           onAction={session.retry}
         />
+      )}
+      {/* Covers the empty xterm while an SSH session connects (real per-step
+          timing from connect:stage). Renders null for a local pane — it has no
+          server row to look up — so no guard is needed here. */}
+      {session.status === 'connecting' && (
+        <ConnectingOverlay paneId={paneId} serverId={serverId} onCancel={() => useSessions.getState().closePane(tabId, paneId)} />
       )}
     </div>
   )

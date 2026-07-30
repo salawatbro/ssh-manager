@@ -104,6 +104,9 @@ func main() {
 	// for the detail page's "Recent sessions" card. One repo, two ends.
 	sessionLogRepo := store.NewSessionLogRepo(db)
 	sshService := service.NewSSHService(prompter, repo, settingsRepo, kr, dialer, termMgr, codePrompter, sessionLogRepo)
+	// connect:stage events for the "Connecting…" overlay, through the same
+	// emitter the host-key prompter and term manager use.
+	sshService.SetEmitter(appEmitter{})
 	historyService := service.NewHistoryService(sessionLogRepo)
 	// The Health card dials its own short-lived connection per probe (never the
 	// terminal's), so it needs the same repo/keychain/dialer SftpService does.

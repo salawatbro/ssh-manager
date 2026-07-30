@@ -19,6 +19,7 @@ import { Toasts } from './components/ui/Toasts'
 import { useAppKeymap } from './hooks/useAppKeymap'
 import { useTrayConnect } from './hooks/useTrayConnect'
 import { useSftpProgress } from './hooks/useSftpProgress'
+import { useConnectStageEvents } from './hooks/useConnectStages'
 import { SessionStateService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { useServers } from './stores/servers'
 import { useSessions } from './stores/sessions'
@@ -120,6 +121,9 @@ export default function App() {
   // other mount-once hooks above — SftpView itself never mounts/unmounts
   // fast enough to be a reliable place to own this listener.
   useSftpProgress()
+  // connect:stage events feed the connecting overlay; mounted once so the
+  // resolve stage (emitted the instant a connect starts) is never missed.
+  useConnectStageEvents()
 
   return (
     // pb lifts the bottom status bar clear of macOS Tahoe's large rounded

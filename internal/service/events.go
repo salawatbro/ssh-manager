@@ -37,6 +37,16 @@ type TrayConnect struct {
 	ServerID string `json:"serverID"`
 }
 
+// ConnectStage is the connect:stage event payload — one per real phase of a
+// terminal connect (resolve/tcp/hostkey/auth), for the "Connecting…" overlay.
+// ConnectID correlates it with the pane that is connecting; the frontend times
+// the gaps between stages. Carries no secret.
+type ConnectStage struct {
+	ConnectID string `json:"connectID"`
+	Host      string `json:"host"`
+	Stage     string `json:"stage"` // sshx.Stage* — "resolve" | "tcp" | "hostkey" | "auth"
+}
+
 // SftpProgress is the sftp:progress event payload: one update for an in-flight
 // transfer (or its terminal Finished/Error state). Carries no secret (SEC-01).
 type SftpProgress struct {

@@ -65,8 +65,8 @@ export function ConfirmHostKey(requestID: string, accept: boolean): $Cancellable
  * independent ~3s timeout on top of the already-established connection, so a
  * hung host can delay a successful Open by up to that long beyond the dial.
  */
-export function Open(serverID: string, cols: number, rows: number): $CancellablePromise<$models.OpenResult> {
-    return $Call.ByID(4190982559, serverID, cols, rows);
+export function Open(serverID: string, cols: number, rows: number, connectID: string): $CancellablePromise<$models.OpenResult> {
+    return $Call.ByID(4190982559, serverID, cols, rows, connectID);
 }
 
 /**
@@ -75,6 +75,15 @@ export function Open(serverID: string, cols: number, rows: number): $Cancellable
  */
 export function Resize(sessionID: string, cols: number, rows: number): $CancellablePromise<void> {
     return $Call.ByID(3429379467, sessionID, cols, rows);
+}
+
+/**
+ * SetEmitter wires the event emitter used for connect:stage. Package-level
+ * wiring (like the other setters) so the many NewSSHService call sites keep
+ * their signature; a nil emitter (tests) simply skips stage events.
+ */
+export function SetEmitter(e: $models.Emitter): $CancellablePromise<void> {
+    return $Call.ByID(1758284969, e);
 }
 
 /**

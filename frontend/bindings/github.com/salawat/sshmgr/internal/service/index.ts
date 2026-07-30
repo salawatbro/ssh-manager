@@ -33,6 +33,7 @@ export {
 export type {
     CodeRequest,
     CreateServerInput,
+    Emitter,
     ForwardInput,
     HealthReport,
     HostKeyRequest,

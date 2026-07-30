@@ -41,6 +41,7 @@ type SSHService struct {
 	mgr          *term.Manager
 	codePrompter *CodePrompter
 	history      *store.SessionLogRepo
+	emitter      Emitter // nil in tests → connect:stage events are skipped
 
 	// logIDs maps a live SSH session to the history row Open started for it, so
 	// the term.Manager end hook can stamp the right row. Only SSH sessions are
@@ -66,6 +67,11 @@ func NewSSHService(p *HostKeyPrompter, repo *store.ServerRepo, settings *store.S
 	mgr.SetOnSessionEnd(s.recordEnd)
 	return s
 }
+
+// SetEmitter wires the event emitter used for connect:stage. Package-level
+// wiring (like the other setters) so the many NewSSHService call sites keep
+// their signature; a nil emitter (tests) simply skips stage events.
+func (s *SSHService) SetEmitter(e Emitter) { s.emitter = e }
 
 // recordEnd stamps the history row a session opened. code "" is a clean close
 // (user close or clean shell exit); any code is an abnormal drop. A session not
@@ -116,7 +122,7 @@ func (s *SSHService) SubmitCode(requestID, code string) error {
 // though: when the probe below runs, sshx.DetectShell adds its own
 // independent ~3s timeout on top of the already-established connection, so a
 // hung host can delay a successful Open by up to that long beyond the dial.
-func (s *SSHService) Open(serverID string, cols, rows int) (OpenResult, error) {
+func (s *SSHService) Open(serverID string, cols, rows int, connectID string) (OpenResult, error) {
 	srv, err := s.repo.Get(serverID)
 	if err != nil {
 		return OpenResult{}, err
@@ -126,7 +132,16 @@ func (s *SSHService) Open(serverID string, cols, rows int) (OpenResult, error) {
 		return OpenResult{}, err // coded (auth / keychain / jump cycle / jump depth)
 	}
 
-	conn, err := s.dialer.DialChain(context.Background(), chain)
+	// Report the target's connect phases to the "Connecting…" overlay, keyed by
+	// the pane's connectID. No-op when there is no emitter (tests) or no id.
+	ctx := context.Background()
+	if s.emitter != nil && connectID != "" {
+		ctx = sshx.WithStages(ctx, func(host, stage string) {
+			s.emitter.Emit("connect:stage", ConnectStage{ConnectID: connectID, Host: host, Stage: stage})
+		})
+	}
+
+	conn, err := s.dialer.DialChain(ctx, chain)
 	// SEC-10: drop every hop's plaintext secrets the instant dialing is done.
 	zeroChainCreds(chain)
 	if err != nil {

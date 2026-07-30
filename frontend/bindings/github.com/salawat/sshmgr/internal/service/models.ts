@@ -62,6 +62,12 @@ export interface CreateServerInput {
 }
 
 /**
+ * Emitter is the slice of the Wails app the prompter needs. Narrowing it to
+ * this interface keeps the prompter unit-testable with a fake.
+ */
+export type Emitter = any;
+
+/**
  * ForwardInput is what the frontend sends to create or update a saved port
  * forward. It mirrors CreateServerInput's shape: a plain JSON-tagged struct
  * the service turns into a domain.PortForward and validates again (SEC-08).

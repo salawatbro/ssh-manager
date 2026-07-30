@@ -12,6 +12,7 @@ import { useServers } from '../stores/servers'
 import { useSettings } from '../stores/settings'
 import { useGuard } from '../stores/guard'
 import { usePanes } from '../stores/panes'
+import { useConnectStages } from '../stores/connectStages'
 
 // 'exited' is a clean shell exit (`exit`/Ctrl-D/`exit N`) — the pane closes
 // itself, no notice. 'closed' is an abnormal drop (dead peer, connection
@@ -162,13 +163,16 @@ export function useTerminalSession(
     // Local panes take the same path as SSH ones from here on: LocalService
     // registers into the SAME term.Manager, so Write/Resize/Close below stay
     // on SSHService regardless of the target.
+    // paneId doubles as the connectID: the backend echoes it on each
+    // connect:stage event so the ConnectingOverlay for this pane can time them.
     const opening = isLocalTarget(serverId)
       ? LocalService.Open(term.cols, term.rows)
-      : SSHService.Open(serverId, term.cols, term.rows)
+      : SSHService.Open(serverId, term.cols, term.rows, paneId)
 
     void opening
       .then((res) => {
         const id = res.sessionID
+        useConnectStages.getState().clear(paneId) // done connecting — drop the steps
         if (disposed) {
           void SSHService.Close(id).catch(() => {})
           return
@@ -200,6 +204,7 @@ export function useTerminalSession(
         fit?.fit() // fires onResize → sizes the remote pty to the real layout
       })
       .catch((e: unknown) => {
+        useConnectStages.getState().clear(paneId)
         if (disposed) return
         setStatus('error')
         setMessage(e instanceof Error ? e.message : String(e))
@@ -214,6 +219,7 @@ export function useTerminalSession(
       const id = sessionId.current
       sessionId.current = null
       usePanes.getState().clearPaneConnection(paneId)
+      useConnectStages.getState().clear(paneId) // Cancel/close during connect drops the steps
       if (id) void SSHService.Close(id).catch(() => {})
     }
   }, [serverId, paneId, term, fit, attempt])

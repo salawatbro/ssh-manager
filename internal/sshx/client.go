@@ -168,6 +168,12 @@ func (d *Dialer) dial(ctx context.Context, addr string, cfg *ssh.ClientConfig) (
 
 // tcpDial is the root-hop TCP dial, bounded by the live dial timeout (or its
 // override from SetDialTimeoutProvider).
+//
+// When a connect overlay is listening (stagesActive), it splits the dial into
+// its two real phases for the overlay: a DNS lookup timed as StageResolve, then
+// the TCP connect as StageTCP. The extra lookup runs ONLY when someone is
+// listening, so ordinary dials (SFTP, forwards, health) keep their single
+// resolve-and-connect with no added round trip.
 func (d *Dialer) tcpDial(ctx context.Context, addr string) (net.Conn, error) {
 	to := d.dialTimeout
 	if d.dialTimeoutFn != nil {
@@ -175,14 +181,27 @@ func (d *Dialer) tcpDial(ctx context.Context, addr string) (net.Conn, error) {
 			to = v
 		}
 	}
+	if stagesActive(ctx) {
+		host, _, _ := net.SplitHostPort(addr)
+		emitStage(ctx, host, StageResolve)
+		// The result is unused — DialContext resolves again from its cache; this
+		// call exists only to measure the resolve phase honestly.
+		_, _ = net.DefaultResolver.LookupHost(ctx, host)
+		emitStage(ctx, host, StageTCP)
+	}
 	nd := net.Dialer{Timeout: to}
 	return nd.DialContext(ctx, "tcp", addr)
 }
 
 // dialThrough opens a TCP conn to addr THROUGH an existing ssh client (the
 // jump host), racing ctx so a hung jump-dial is abandoned when the overall
-// deadline fires.
+// deadline fires. A jumped target has no local DNS resolve, so it reports only
+// StageTCP (opening the channel), not StageResolve.
 func dialThrough(ctx context.Context, via *ssh.Client, addr string) (net.Conn, error) {
+	if stagesActive(ctx) {
+		host, _, _ := net.SplitHostPort(addr)
+		emitStage(ctx, host, StageTCP)
+	}
 	type res struct {
 		c   net.Conn
 		err error
@@ -203,6 +222,25 @@ func dialThrough(ctx context.Context, via *ssh.Client, addr string) (net.Conn, e
 // handshake never closes it so a caller with its own retry/cleanup policy
 // (chain dialing) stays in control.
 func (d *Dialer) handshake(ctx context.Context, raw net.Conn, addr string, cfg *ssh.ClientConfig) (*ssh.Client, error) {
+	// Split the handshake into its two reported phases for the overlay: the kex
+	// up to host-key verification (StageHostKey), then authentication
+	// (StageAuth). ssh.NewClientConn does both in one call, so StageAuth is
+	// emitted from inside a wrapper around the host-key callback — which fires
+	// after the key is received and verified, and just before auth begins.
+	if stagesActive(ctx) {
+		host, _, _ := net.SplitHostPort(addr)
+		emitStage(ctx, host, StageHostKey)
+		inner := cfg.HostKeyCallback
+		wrapped := *cfg // shallow copy so the wrapped callback is local to this hop
+		wrapped.HostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			err := inner(hostname, remote, key)
+			if err == nil {
+				emitStage(ctx, host, StageAuth)
+			}
+			return err
+		}
+		cfg = &wrapped
+	}
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -290,11 +328,19 @@ func (d *Dialer) DialChain(ctx context.Context, chain []Hop) (*Conn, error) {
 		}
 		addr := net.JoinHostPort(hop.Server.Host, strconv.Itoa(hop.Server.Port))
 
+		// Only the target (last hop) reports connect stages to the overlay; the
+		// jump hops on the way are silenced so the overlay shows one server's
+		// progress, not each hop's.
+		hopCtx := ctx
+		if i < len(chain)-1 {
+			hopCtx = WithStages(ctx, nil)
+		}
+
 		var raw net.Conn
 		if i == 0 {
-			raw, err = d.tcpDial(ctx, addr)
+			raw, err = d.tcpDial(hopCtx, addr)
 		} else {
-			raw, err = dialThrough(ctx, opened[i-1], addr)
+			raw, err = dialThrough(hopCtx, opened[i-1], addr)
 		}
 		if err != nil {
 			closeAll()
@@ -311,7 +357,7 @@ func (d *Dialer) DialChain(ctx context.Context, chain []Hop) (*Conn, error) {
 			return nil, jumpError(chain, i, err)
 		}
 
-		client, err := d.handshake(ctx, raw, addr, cfg)
+		client, err := d.handshake(hopCtx, raw, addr, cfg)
 		if err != nil {
 			_ = raw.Close()
 			closeAll()

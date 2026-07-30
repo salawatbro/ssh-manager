@@ -144,7 +144,7 @@ func TestOpenMissingPasswordDoesNotDial(t *testing.T) {
 	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
 	svc := NewSSHService(nil, repo, nil, secret.NewFake(), dialer, mgr, nil, nil)
 
-	_, err := svc.Open("s1", 80, 24)
+	_, err := svc.Open("s1", 80, 24, "")
 	var de *domain.Error
 	if err == nil || !errors.As(err, &de) || de.Code != domain.CodeAuthFailed {
 		t.Fatalf("want ERR_AUTH_FAILED, got %v", err)
@@ -163,7 +163,7 @@ func TestOpenDialFailurePropagates(t *testing.T) {
 	dialer := &fakeDialer{dialErr: domain.NewError(domain.CodeConnRefused, "Connection refused.")}
 	svc := NewSSHService(nil, repo, nil, sec, dialer, term.NewManager(nopEmitter{}, time.Hour, time.Hour), nil, nil)
 
-	_, err := svc.Open("s1", 80, 24)
+	_, err := svc.Open("s1", 80, 24, "")
 	var de *domain.Error
 	if err == nil || !errors.As(err, &de) || de.Code != domain.CodeConnRefused {
 		t.Fatalf("want ERR_CONN_REFUSED, got %v", err)
@@ -375,7 +375,7 @@ func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
 	fx := newProbeFixture(t, addr, hostKey)
 	svc := NewSSHService(nil, fx.repo, nil, fx.sec, fx.dialer, fx.mgr, nil, nil)
 
-	res, err := svc.Open("s1", 120, 40)
+	res, err := svc.Open("s1", 120, 40, "")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -417,7 +417,7 @@ func TestOpenWithProbeEnabledSurvivesAnUnprobeableServer(t *testing.T) {
 	settingsRepo := settingsRepoWithShellIntegration(t, true)
 
 	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil, nil)
-	res, err := svc.Open("s1", 80, 24)
+	res, err := svc.Open("s1", 80, 24, "")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -450,7 +450,7 @@ func TestOpenReportsDetectedShellWhenIntegrationEnabled(t *testing.T) {
 	settingsRepo := settingsRepoWithShellIntegration(t, true)
 
 	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil, nil)
-	res, err := svc.Open("s1", 80, 24)
+	res, err := svc.Open("s1", 80, 24, "")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -483,7 +483,7 @@ func TestOpenSkipsProbeWhenShellIntegrationPersistedFalse(t *testing.T) {
 	settingsRepo := settingsRepoWithShellIntegration(t, false)
 
 	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil, nil)
-	res, err := svc.Open("s1", 80, 24)
+	res, err := svc.Open("s1", 80, 24, "")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
