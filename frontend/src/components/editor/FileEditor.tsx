@@ -1,65 +1,122 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSftp } from '../../stores/sftp'
 import { useView } from '../../stores/view'
-import { toastInfo } from '../../stores/toasts'
+import { toastError } from '../../stores/toasts'
 import { editorStats, gutterFor, lineCount } from '../../lib/fileEditor'
-import { placeholderFileText } from '../../lib/placeholderMetrics'
 import { ConfirmModal } from '../sftp/ConfirmModal'
+import { CantEditPanel } from './CantEditPanel'
+
+// How the buffer was loaded: still fetching, ready to edit, or the read failed.
+type LoadState = { phase: 'loading' } | { phase: 'ready' } | { phase: 'error'; message: string }
+
+function clock(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 
 // The file editor (Zish.dc.html editor screen): 34px header, gutter + textarea,
 // 24px status footer, and the "can't edit this file" panel for binaries and
 // anything over the 2 MB ceiling.
 //
-// It cannot read or write yet — SftpService has no ReadFile/WriteFile — so the
-// buffer holds placeholder text that says so (lib/placeholderMetrics.ts), a
-// banner says it again above the gutter, and Save is disabled instead of
-// pretending. The design's "saved 09:41" state and the accent Save button belong
-// to that missing backend and arrive with it; everything else here is final.
+// Contents are read over SFTP (SftpService.ReadFile) on open and written back
+// atomically on save (WriteFile) — remote or local per the target's side. The
+// editability check the pane made from name+size still stands, but the backend
+// enforces the same ceiling and rejects a binary the extension hid, so a read
+// can still fail here; that lands on the error screen rather than an empty
+// textarea.
 export function FileEditor() {
   const target = useView((s) => s.editor)
   const closeEditor = useView((s) => s.closeEditor)
+  const readFile = useSftp((s) => s.readFile)
+  const writeFile = useSftp((s) => s.writeFile)
   const download = useSftp((s) => s.download)
   const [text, setText] = useState('')
   const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<Date | null>(null)
+  const [load, setLoad] = useState<LoadState>({ phase: 'loading' })
   const [discardOpen, setDiscardOpen] = useState(false)
 
   const path = target?.path ?? ''
   const name = target?.name ?? ''
+  const side = target?.side ?? 'remote'
+  const editable = target?.editable ?? false
 
-  // Re-arm the buffer for whichever file is open now. Keyed on the path, so
-  // opening a second file does not inherit the first one's edits.
+  // Load the file whenever the target changes. Guarded so a slow read that
+  // resolves after the user has already opened a different file cannot write
+  // its stale contents over the new one.
   useEffect(() => {
-    setText(name === '' ? '' : placeholderFileText(name))
-    setDirty(false)
-    setDiscardOpen(false)
-  }, [path, name])
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.isComposing || discardOpen) return
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        if (dirty) setDiscardOpen(true)
-        else closeEditor()
-        return
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
-        // preventDefault whether or not saving works: in a dev browser this is
-        // the page-save dialog.
-        e.preventDefault()
-        toastInfo('Saving is not wired up yet — Zish has no remote write call.')
-      }
+    if (!editable || name === '') {
+      setLoad({ phase: 'ready' })
+      return
     }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [closeEditor, dirty, discardOpen])
+    let live = true
+    setLoad({ phase: 'loading' })
+    setText('')
+    setDirty(false)
+    setSavedAt(null)
+    readFile(side, path)
+      .then((contents) => {
+        if (!live) return
+        setText(contents)
+        setLoad({ phase: 'ready' })
+      })
+      .catch((e: unknown) => {
+        if (!live) return
+        setLoad({ phase: 'error', message: e instanceof Error ? e.message : String(e) })
+      })
+    return () => {
+      live = false
+    }
+  }, [path, name, side, editable, readFile])
 
-  if (!target) return null
+  // Latest values for the key handler, so the listener does not re-bind on
+  // every keystroke (which would drop an in-progress IME composition).
+  const stateRef = useRef({ dirty, saving, discardOpen, phase: load.phase })
+  stateRef.current = { dirty, saving, discardOpen, phase: load.phase }
+
+  async function save() {
+    if (!target || !dirty || saving || load.phase !== 'ready') return
+    setSaving(true)
+    try {
+      await writeFile(side, path, text)
+      setDirty(false)
+      setSavedAt(new Date())
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : 'Could not save the file.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   function requestClose() {
     if (dirty) setDiscardOpen(true)
     else closeEditor()
   }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const st = stateRef.current
+      if (e.isComposing || st.discardOpen) return
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        if (st.dirty) setDiscardOpen(true)
+        else closeEditor()
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        // preventDefault whether or not a save fires — in a dev browser this is
+        // the page-save dialog.
+        e.preventDefault()
+        void save()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+    // save/closeEditor read live state through the ref, so binding once is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  if (!target) return null
+
+  const canSave = dirty && !saving && load.phase === 'ready'
 
   return (
     // relative: scopes the discard confirm's `absolute inset-0` to this view.
@@ -69,18 +126,24 @@ export function FileEditor() {
         <span className="min-w-0 truncate font-mono text-[10.5px] text-textDim" title={path}>
           {path}
         </span>
-        {dirty && <span className="shrink-0 text-[11px] text-stConnecting">● modified</span>}
+        {dirty ? (
+          <span className="shrink-0 text-[11px] text-stConnecting">● modified</span>
+        ) : (
+          savedAt && <span className="shrink-0 text-[11px] text-stConnected">saved {clock(savedAt)}</span>
+        )}
         <div className="flex-1" />
         <span className="shrink-0 font-mono text-[10.5px] text-textDim">
-          {target.side === 'remote' ? 'remote' : 'local'} · utf-8 · LF
+          {side === 'remote' ? 'remote' : 'local'} · utf-8 · LF
         </span>
         <button
           type="button"
-          disabled
-          title="Zish cannot write files yet — SftpService has no write call."
-          className="h-[24px] shrink-0 rounded-[5px] border border-border px-[10px] text-[11.5px] text-textDim opacity-50"
+          disabled={!canSave}
+          onClick={() => void save()}
+          className={`h-[24px] shrink-0 rounded-[5px] px-[10px] text-[11.5px] ${
+            canSave ? 'bg-accent font-medium text-onAccent' : 'border border-border text-textDim'
+          }`}
         >
-          Save
+          {saving ? 'Saving…' : 'Save'}
         </button>
         <button
           type="button"
@@ -91,70 +154,56 @@ export function FileEditor() {
         </button>
       </div>
 
-      {target.editable ? (
-        <>
-          <div className="flex h-[26px] shrink-0 items-center border-b border-border bg-bg1b px-[12px]">
-            <span className="truncate text-[11px] text-stConnecting">
-              Preview only — this is not the file&rsquo;s contents, and nothing here can be saved.
-            </span>
-          </div>
-          <div className="flex min-h-0 flex-1 overflow-y-auto">
-            <div
-              className="shrink-0 border-r border-border bg-bg1 px-[9px] py-[8px] text-right font-mono text-[12.5px] leading-[1.55] text-textDim"
-              style={{ width: 48, whiteSpace: 'pre' }}
-            >
-              {gutterFor(text)}
-            </div>
-            {/* The textarea grows with the text and the whole pair scrolls
-                together, so the gutter never drifts out of step with the lines. */}
-            <textarea
-              value={text}
-              spellCheck={false}
-              onChange={(e) => {
-                setText(e.target.value)
-                setDirty(true)
-              }}
-              className="min-w-0 flex-1 resize-none bg-bg0 px-[11px] py-[8px] font-mono text-[12.5px] leading-[1.55] text-text outline-none"
-              style={{ height: Math.max(lineCount(text) * 19.4 + 16, 200) }}
-            />
-          </div>
-        </>
+      {!editable ? (
+        <CantEditPanel
+          name={name}
+          size={target.size}
+          canDownload={side === 'remote'}
+          onDownload={() => {
+            void download(path)
+            closeEditor()
+          }}
+        />
+      ) : load.phase === 'loading' ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center text-[13px] text-textMuted">Opening {name}…</div>
+      ) : load.phase === 'error' ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[8px] px-[24px] text-center">
+          <span className="text-[13.5px] font-semibold text-text">Could not open this file</span>
+          <span className="max-w-[360px] text-[12.5px] text-textMuted">{load.message}</span>
+        </div>
       ) : (
-        <div className="flex min-h-0 flex-1 items-center justify-center">
-          <div className="flex max-w-[360px] flex-col items-center text-center">
-            <div className="text-[13.5px] font-semibold text-text">Zish can&rsquo;t edit this file</div>
-            <div className="mt-[7px] text-[12.5px] leading-[1.5] text-textMuted">
-              {name} is {target.size || 'not a text file'} — Zish only edits text files under 2 MB.
-            </div>
-            {/* Downloading is real (SftpService.Download), so this button is the
-                one thing on this panel that fully works — remote side only,
-                since there is nowhere to download a local file to. */}
-            {target.side === 'remote' && (
-              <button
-                type="button"
-                onClick={() => {
-                  void download(path)
-                  closeEditor()
-                }}
-                className="mt-[14px] h-[28px] rounded-[6px] border border-borderStrong px-[12px] text-[12px] text-textMuted hover:text-text"
-              >
-                Download instead
-              </button>
-            )}
+        <div className="flex min-h-0 flex-1 overflow-y-auto">
+          <div
+            className="shrink-0 border-r border-border bg-bg1 px-[9px] py-[8px] text-right font-mono text-[12.5px] leading-[1.55] text-textDim"
+            style={{ width: 48, whiteSpace: 'pre' }}
+          >
+            {gutterFor(text)}
           </div>
+          {/* The textarea grows with the text and the whole pair scrolls
+              together, so the gutter never drifts out of step with the lines. */}
+          <textarea
+            value={text}
+            spellCheck={false}
+            onChange={(e) => {
+              setText(e.target.value)
+              setDirty(true)
+            }}
+            className="min-w-0 flex-1 resize-none bg-bg0 px-[11px] py-[8px] font-mono text-[12.5px] leading-[1.55] text-text outline-none"
+            style={{ height: Math.max(lineCount(text) * 19.4 + 16, 200) }}
+          />
         </div>
       )}
 
       <div className="flex h-[24px] shrink-0 items-center gap-[10px] border-t border-border bg-bg1b px-[12px] text-[11px] text-textDim">
-        <span className="font-mono">{target.editable ? editorStats(text) : target.size}</span>
+        <span className="font-mono">{editable && load.phase === 'ready' ? editorStats(text) : target.size}</span>
         <div className="flex-1" />
-        <span className="font-mono">Esc close</span>
+        <span className="font-mono">⌘S save · Esc close</span>
       </div>
 
       {discardOpen && (
         <ConfirmModal
           title="Discard changes?"
-          message={`Your edits to ${name} have not been saved anywhere — Zish cannot write files yet.`}
+          message={`Your unsaved edits to ${name} will be lost.`}
           confirmLabel="Discard"
           danger
           onConfirm={() => {

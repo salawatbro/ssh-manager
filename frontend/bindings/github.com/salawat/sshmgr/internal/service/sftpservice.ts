@@ -74,6 +74,20 @@ export function Open(serverID: string): $CancellablePromise<string> {
 }
 
 /**
+ * ReadFile returns a remote text file's contents for the editor.
+ */
+export function ReadFile(sessionID: string, path: string): $CancellablePromise<string> {
+    return $Call.ByID(792451486, sessionID, path);
+}
+
+/**
+ * ReadLocalFile / WriteLocalFile edit the left pane's local files — no session.
+ */
+export function ReadLocalFile(path: string): $CancellablePromise<string> {
+    return $Call.ByID(1840372029, path);
+}
+
+/**
  * RemoteHome is the session's initial remote directory.
  */
 export function RemoteHome(sessionID: string): $CancellablePromise<string> {
@@ -101,4 +115,18 @@ export function Rename(sessionID: string, oldPath: string, newPath: string): $Ca
  */
 export function Upload(sessionID: string, localPath: string, remoteDir: string): $CancellablePromise<string> {
     return $Call.ByID(779034325, sessionID, localPath, remoteDir);
+}
+
+/**
+ * WriteFile replaces a remote file's contents from the editor (atomic).
+ */
+export function WriteFile(sessionID: string, path: string, content: string): $CancellablePromise<void> {
+    return $Call.ByID(1980766301, sessionID, path, content);
+}
+
+/**
+ * WriteLocalFile replaces a local file's contents from the editor (atomic).
+ */
+export function WriteLocalFile(path: string, content: string): $CancellablePromise<void> {
+    return $Call.ByID(481025428, path, content);
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/salawat/sshmgr/internal/domain"
 	"github.com/salawat/sshmgr/internal/secret"
 	"github.com/salawat/sshmgr/internal/sftpx"
 	"github.com/salawat/sshmgr/internal/store"
@@ -21,17 +22,29 @@ type fakeSession struct {
 	uploads  []string
 	progress []sftpx.Progress // scripted progress the transfer will emit
 	transErr error
+	// read is what ReadFile returns; wrote records the last WriteFile so the
+	// service delegation is checked without a real SFTP server (edit.go's own
+	// tests cover the atomic write).
+	read     string
+	readErr  error
+	wrote    [2]string
+	writeErr error
 }
 
 func (f *fakeSession) List(dir string) ([]sftpx.FileEntry, error) {
 	f.listed = dir
 	return []sftpx.FileEntry{{Name: "a.txt"}}, nil
 }
-func (f *fakeSession) Home() (string, error)       { return "/home/x", nil }
-func (f *fakeSession) Mkdir(string) error          { return nil }
-func (f *fakeSession) Remove(p string) error       { f.removed = p; return nil }
-func (f *fakeSession) Rename(string, string) error { return nil }
-func (f *fakeSession) Close() error                { f.closed = true; return nil }
+func (f *fakeSession) Home() (string, error)           { return "/home/x", nil }
+func (f *fakeSession) Mkdir(string) error              { return nil }
+func (f *fakeSession) Remove(p string) error           { f.removed = p; return nil }
+func (f *fakeSession) Rename(string, string) error     { return nil }
+func (f *fakeSession) ReadFile(string) (string, error) { return f.read, f.readErr }
+func (f *fakeSession) WriteFile(p, content string) error {
+	f.wrote = [2]string{p, content}
+	return f.writeErr
+}
+func (f *fakeSession) Close() error { f.closed = true; return nil }
 func (f *fakeSession) Upload(ctx context.Context, local string, _ string, on func(sftpx.Progress)) error {
 	f.uploads = append(f.uploads, local)
 	for _, p := range f.progress {
@@ -207,6 +220,48 @@ func TestSftpCancelUnknownTransfer(t *testing.T) {
 	svc, _, _ := newSftpService(t)
 	if err := svc.CancelTransfer("nope"); err == nil {
 		t.Fatal("CancelTransfer on unknown id returned nil error")
+	}
+}
+
+func TestSftpReadWriteFileDelegate(t *testing.T) {
+	svc, _, _ := newSftpService(t)
+	fs := &fakeSession{read: "server { listen 80; }"}
+	inject(svc, "sid", fs)
+
+	got, err := svc.ReadFile("sid", "/etc/nginx.conf")
+	if err != nil || got != "server { listen 80; }" {
+		t.Fatalf("ReadFile = %q, %v", got, err)
+	}
+	if err := svc.WriteFile("sid", "/etc/nginx.conf", "server { listen 443; }"); err != nil {
+		t.Fatalf("WriteFile error = %v", err)
+	}
+	if fs.wrote != [2]string{"/etc/nginx.conf", "server { listen 443; }"} {
+		t.Fatalf("WriteFile did not delegate: %v", fs.wrote)
+	}
+}
+
+// The frontend gates on name and size before opening, so hitting ErrBinary /
+// ErrTooLarge here means the file changed under it — mapEditErr must surface a
+// coded validation error the editor can show, not a bare string.
+func TestSftpEditErrorsAreCodedValidation(t *testing.T) {
+	svc, _, _ := newSftpService(t)
+	inject(svc, "sid", &fakeSession{readErr: sftpx.ErrBinary})
+	_, err := svc.ReadFile("sid", "/x")
+	var de *domain.Error
+	if !errors.As(err, &de) || de.Code != domain.CodeValidation {
+		t.Fatalf("ReadFile(binary) err = %v, want CodeValidation", err)
+	}
+}
+
+func TestSftpLocalReadWriteRoundTrip(t *testing.T) {
+	svc, _, _ := newSftpService(t)
+	p := t.TempDir() + "/notes.md"
+	if err := svc.WriteLocalFile(p, "# hi\n"); err != nil {
+		t.Fatalf("WriteLocalFile error = %v", err)
+	}
+	got, err := svc.ReadLocalFile(p)
+	if err != nil || got != "# hi\n" {
+		t.Fatalf("local round trip = %q, %v", got, err)
 	}
 }
 

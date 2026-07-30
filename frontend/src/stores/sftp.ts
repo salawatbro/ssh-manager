@@ -3,19 +3,10 @@ import { SftpService } from '@bindings/github.com/salawat/sshmgr/internal/servic
 import type { FileEntry } from '@bindings/github.com/salawat/sshmgr/internal/sftpx'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { joinRemote, dirnameRemote } from '../lib/remotePath'
+import { applyTransferProgress, type ProgressEvent, type TransferProgress } from '../lib/transferProgress'
 import { toastError } from './toasts'
 import { releaseContentArea } from './view'
 import { clearPaneSelection } from './sftpSelection'
-
-// Mirrors the sftp:progress event payload (service/models.ts SftpProgress)
-// minus the terminal-only `finished`/`error` fields (see applyProgress).
-export interface TransferProgress {
-  transferID: string
-  direction: string
-  currentFile: string
-  done: number
-  total: number
-}
 
 interface SftpState {
   open: boolean
@@ -50,12 +41,18 @@ interface SftpState {
   download: (remotePath: string) => Promise<void>
   cancel: (transferID: string) => void
   mkdir: (name: string) => Promise<void>
+  // Editor IO. Remote read/write need the open session's id; local goes
+  // straight to the filesystem. Both throw on failure so the editor can show
+  // the reason rather than the store swallowing it into a toast — a failed save
+  // must stop the "saved" state, not look like it worked.
+  readFile: (side: 'local' | 'remote', path: string) => Promise<string>
+  writeFile: (side: 'local' | 'remote', path: string, content: string) => Promise<void>
   // Takes a list: the panes support a multi-selection, and the backend has no
   // batch delete.
   remove: (paths: string[]) => Promise<void>
   rename: (oldPath: string, newName: string) => Promise<void>
   // internal, used by useSftpProgress:
-  applyProgress: (p: TransferProgress & { finished: boolean; error: string }) => void
+  applyProgress: (p: ProgressEvent) => void
 }
 
 export const useSftp = create<SftpState>((set, get) => ({
@@ -162,6 +159,23 @@ export const useSftp = create<SftpState>((set, get) => ({
     await Promise.all([get().navLocal(localCwd), get().navRemote(remoteCwd)])
   },
 
+  // Unlike the nav/transfer actions, these deliberately do NOT catch: the
+  // editor owns the error surface (its own load-failed screen and its save
+  // toast), so the store lets it propagate rather than toasting here.
+  readFile: async (side, path) => {
+    if (side === 'local') return (await SftpService.ReadLocalFile(path)) ?? ''
+    const { sessionId } = get()
+    if (!sessionId) throw new Error('This file session is no longer open.')
+    return (await SftpService.ReadFile(sessionId, path)) ?? ''
+  },
+
+  writeFile: async (side, path, content) => {
+    if (side === 'local') return void (await SftpService.WriteLocalFile(path, content))
+    const { sessionId } = get()
+    if (!sessionId) throw new Error('This file session is no longer open.')
+    await SftpService.WriteFile(sessionId, path, content)
+  },
+
   // Tracked via sftp:progress (applyProgress); the backend copies in a goroutine.
   upload: async (localPath) => {
     const { sessionId, remoteCwd } = get()
@@ -229,14 +243,7 @@ export const useSftp = create<SftpState>((set, get) => ({
     // A transfer that dies mid-flight reports through its progress event; the
     // panel is past the pre-connect screen by then, so toast it.
     if (p.error) toastError(p.error)
-    set((state) => ({
-      transfers: p.finished
-        ? state.transfers.filter((t) => t.transferID !== p.transferID)
-        : [
-            ...state.transfers.filter((t) => t.transferID !== p.transferID),
-            { transferID: p.transferID, direction: p.direction, currentFile: p.currentFile, done: p.done, total: p.total },
-          ],
-    }))
+    set((state) => ({ transfers: applyTransferProgress(state.transfers, p) }))
     // A finished transfer may leave a partial file — refresh both panels.
     if (p.finished) void get().refresh()
   },

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/google/uuid"
@@ -21,6 +22,8 @@ type sftpSession interface {
 	Mkdir(path string) error
 	Remove(path string) error
 	Rename(oldPath, newPath string) error
+	ReadFile(path string) (string, error)
+	WriteFile(path, content string) error
 	Upload(ctx context.Context, localPath, remoteDir string, onProgress func(sftpx.Progress)) error
 	Download(ctx context.Context, remotePath, localDir string, onProgress func(sftpx.Progress)) error
 	Close() error
@@ -164,6 +167,50 @@ func (s *SftpService) ListLocal(dir string) ([]sftpx.FileEntry, error) { return 
 
 // LocalHome needs no session — the left pane is the local FS.
 func (s *SftpService) LocalHome() (string, error) { return sftpx.LocalHome() }
+
+// ReadFile returns a remote text file's contents for the editor.
+func (s *SftpService) ReadFile(sessionID, path string) (string, error) {
+	sess, err := s.get(sessionID)
+	if err != nil {
+		return "", err
+	}
+	content, err := sess.ReadFile(path)
+	return content, mapEditErr(err)
+}
+
+// WriteFile replaces a remote file's contents from the editor (atomic).
+func (s *SftpService) WriteFile(sessionID, path, content string) error {
+	sess, err := s.get(sessionID)
+	if err != nil {
+		return err
+	}
+	return mapEditErr(sess.WriteFile(path, content))
+}
+
+// ReadLocalFile / WriteLocalFile edit the left pane's local files — no session.
+func (s *SftpService) ReadLocalFile(path string) (string, error) {
+	content, err := sftpx.ReadLocalFile(path)
+	return content, mapEditErr(err)
+}
+
+// WriteLocalFile replaces a local file's contents from the editor (atomic).
+func (s *SftpService) WriteLocalFile(path, content string) error {
+	return mapEditErr(sftpx.WriteLocalFile(path, content))
+}
+
+// mapEditErr turns sftpx's two expected rejections into coded validation errors
+// the frontend can show; any real IO error passes through unchanged (and nil
+// stays nil).
+func mapEditErr(err error) error {
+	switch {
+	case errors.Is(err, sftpx.ErrTooLarge):
+		return domain.NewError(domain.CodeValidation, "This file is too large to edit (2 MB limit).")
+	case errors.Is(err, sftpx.ErrBinary):
+		return domain.NewError(domain.CodeValidation, "This is not a text file, so it can’t be edited here.")
+	default:
+		return err
+	}
+}
 
 // Upload streams localPath to remoteDir on the session and returns a transferID
 // immediately; the copy runs in a goroutine, emitting sftp:progress as it goes
