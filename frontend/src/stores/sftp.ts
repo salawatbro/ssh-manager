@@ -5,6 +5,7 @@ import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain
 import { joinRemote, dirnameRemote } from '../lib/remotePath'
 import { toastError } from './toasts'
 import { releaseContentArea } from './view'
+import { clearPaneSelection } from './sftpSelection'
 
 // Mirrors the sftp:progress event payload (service/models.ts SftpProgress)
 // minus the terminal-only `finished`/`error` fields (see applyProgress).
@@ -49,7 +50,9 @@ interface SftpState {
   download: (remotePath: string) => Promise<void>
   cancel: (transferID: string) => void
   mkdir: (name: string) => Promise<void>
-  remove: (path: string) => Promise<void>
+  // Takes a list: the panes support a multi-selection, and the backend has no
+  // batch delete.
+  remove: (paths: string[]) => Promise<void>
   rename: (oldPath: string, newName: string) => Promise<void>
   // internal, used by useSftpProgress:
   applyProgress: (p: TransferProgress & { finished: boolean; error: string }) => void
@@ -102,6 +105,9 @@ export const useSftp = create<SftpState>((set, get) => ({
   close: () => {
     const { sessionId } = get()
     if (sessionId) void SftpService.Close(sessionId).catch(() => {})
+    // Otherwise the next session opens with the last one's selection still in it.
+    clearPaneSelection('local')
+    clearPaneSelection('remote')
     set({
       open: false,
       active: false,
@@ -129,6 +135,10 @@ export const useSftp = create<SftpState>((set, get) => ({
   navLocal: async (dir) => {
     try {
       const entries = (await SftpService.ListLocal(dir)) ?? []
+      // Selected names mean nothing in a different folder — but a refresh of the
+      // SAME folder must keep the selection (every finished transfer refreshes
+      // both panes, and the user may still be picking files).
+      if (dir !== get().localCwd) clearPaneSelection('local')
       set({ localCwd: dir, localEntries: entries })
     } catch (e) {
       toastError(e instanceof Error ? e.message : String(e))
@@ -140,6 +150,7 @@ export const useSftp = create<SftpState>((set, get) => ({
     if (!sessionId) return
     try {
       const entries = (await SftpService.ListRemote(sessionId, dir)) ?? []
+      if (dir !== get().remoteCwd) clearPaneSelection('remote')
       set({ remoteCwd: dir, remoteEntries: entries })
     } catch (e) {
       toastError(e instanceof Error ? e.message : String(e))
@@ -187,15 +198,20 @@ export const useSftp = create<SftpState>((set, get) => ({
     }
   },
 
-  remove: async (path) => {
+  // One Remove per path, then a single refresh at the end instead of one per
+  // file. A failure stops the run (the rest of the selection is left alone) and
+  // still refreshes, so the pane shows exactly what survived.
+  remove: async (paths) => {
     const { sessionId, remoteCwd } = get()
     if (!sessionId) return
     try {
-      await SftpService.Remove(sessionId, path)
-      await get().navRemote(remoteCwd)
+      for (const path of paths) {
+        await SftpService.Remove(sessionId, path)
+      }
     } catch (e) {
       toastError(e instanceof Error ? e.message : String(e))
     }
+    await get().navRemote(remoteCwd)
   },
 
   rename: async (oldPath, newName) => {

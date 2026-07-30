@@ -67,7 +67,11 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
                 item.run()
                 if (!item.keepOpen) onClose()
               }}
-              className={`flex h-[28px] w-full items-center px-[12px] text-left text-[12.5px] disabled:opacity-40 enabled:hover:bg-bgSel ${
+              // truncate + tooltip: a label can carry a path it cannot fit
+              // ("Upload 3 items to /srv/cbs/releases") and must not spill out
+              // of the menu box.
+              title={item.label}
+              className={`flex h-[28px] w-full items-center truncate whitespace-nowrap px-[12px] text-left text-[12.5px] disabled:opacity-40 enabled:hover:bg-bgSel ${
                 item.danger ? 'text-stFailed' : 'text-text'
               }`}
             >
