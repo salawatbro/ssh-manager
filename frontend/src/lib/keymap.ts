@@ -12,6 +12,7 @@ export type Action =
   | 'prev-tab'
   | 'settings'
   | 'snippets'
+  | 'lock'
   | { tab: number }
   | { snippetSlot: number }
 
@@ -41,6 +42,7 @@ export function resolveAction(e: KeyboardEvent): Action | null {
     if (!shift && k === 'k') return 'palette'
     if (!shift && k === 'n') return 'new-server'
     if (!shift && k === 'e') return 'snippets'
+    if (!shift && k === 'l') return 'lock'
     if (k === 'd') return shift ? 'split-h' : 'split-v'
     if (!shift && k === 'w') return 'close-pane'
     if (shift && e.key === '}') return 'next-tab'
@@ -66,6 +68,7 @@ export function resolveAction(e: KeyboardEvent): Action | null {
   if (k === 'e') return 'split-h'
   if (k === 'w') return 'close-pane'
   if (k === 's') return 'snippets'
+  if (k === 'l') return 'lock'
   if (e.key === '}') return 'next-tab'
   if (e.key === '{') return 'prev-tab'
   const m = DIGIT_CODE.exec(e.code)

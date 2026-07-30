@@ -73,6 +73,7 @@ const MAC: Row[] = [
     // Shift+7 delivers key '&' (US layout); the binding is keyed off e.code.
     probes: [{ event: key({ metaKey: true, shiftKey: true, key: '&', code: 'Digit7' }), action: { snippetSlot: 7 } }],
   },
+  { label: 'Lock Zish', keys: '⌘L', probes: [{ event: key({ metaKey: true, key: 'l' }), action: 'lock' }] },
 ]
 
 const WIN: Row[] = [
@@ -107,6 +108,7 @@ const WIN: Row[] = [
     keys: 'Ctrl+Shift+1…9',
     probes: [{ event: key({ ctrlKey: true, shiftKey: true, key: '&', code: 'Digit7' }), action: { snippetSlot: 7 } }],
   },
+  { label: 'Lock Zish', keys: 'Ctrl+Shift+L', probes: [{ event: key({ ctrlKey: true, shiftKey: true, key: 'l' }), action: 'lock' }] },
 ]
 
 for (const [name, isMac, rows] of [

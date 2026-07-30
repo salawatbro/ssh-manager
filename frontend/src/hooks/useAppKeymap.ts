@@ -4,6 +4,7 @@ import { usePalette } from '../stores/palette'
 import { useSettings } from '../stores/settings'
 import { useSnippets } from '../stores/snippets'
 import { useGuard } from '../stores/guard'
+import { useLock } from '../stores/lock'
 
 // App-level hotkeys, always active (not terminal-scoped): open the palette and
 // New server. Uses the shared resolveAction so macOS ⌘K/⌘N and Windows
@@ -25,6 +26,11 @@ export function useAppKeymap(onNewServer: () => void) {
       } else if (action === 'snippets' && !usePalette.getState().open && !useGuard.getState().open) {
         e.preventDefault()
         useSnippets.getState().show()
+      } else if (action === 'lock') {
+        e.preventDefault()
+        // ⌘L locks when a PIN is set; otherwise send the user to set one.
+        if (useLock.getState().hasPin) useLock.getState().lock()
+        else useSettings.getState().show()
       }
     }
     document.addEventListener('keydown', onKey)

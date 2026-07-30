@@ -17,4 +17,5 @@ export const SHORTCUTS: { label: string; keys: string }[] = [
   { label: 'Find in terminal', keys: `${isMac ? '⌘' : 'Ctrl+Shift+'}F` },
   { label: 'Snippet palette', keys: isMac ? '⌘E' : 'Ctrl+Shift+S' },
   { label: 'Run snippet quick-slot 1…9', keys: isMac ? '⌘⇧1…9' : 'Ctrl+Shift+1…9' },
+  { label: 'Lock Zish', keys: isMac ? '⌘L' : 'Ctrl+Shift+L' },
 ]
