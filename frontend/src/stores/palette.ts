@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { LucideIcon } from 'lucide-react'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { Status } from '../lib/status'
 import type { QuickConnectTarget } from '../lib/quickConnect'
@@ -11,7 +12,9 @@ import type { QuickConnectTarget } from '../lib/quickConnect'
 // renders it — it never reaches into stores/sessions itself.
 export type PaletteRowData =
   | { kind: 'server'; server: Server; status: Status }
-  | { kind: 'command'; id: string; label: string; run: () => void }
+  // A command's icon and hint are the design's palette columns; the hint is
+  // only ever a real binding (see components/palette/commands.ts).
+  | { kind: 'command'; id: string; label: string; icon: LucideIcon; hint?: string; run: () => void }
   | {
       kind: 'quick-connect'
       target: QuickConnectTarget

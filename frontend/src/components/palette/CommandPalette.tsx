@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { usePalette, type PaletteRowData } from '../../stores/palette'
-import { useView } from '../../stores/view'
 import { useServers } from '../../stores/servers'
 import { useSessions } from '../../stores/sessions'
 import { usePanes } from '../../stores/panes'
-import { useAuthenticator } from '../../stores/authenticator'
-import { useTour } from '../../stores/tour'
-import { useSftp } from '../../stores/sftp'
 import type { Status } from '../../lib/status'
 import { tabStatus } from '../../lib/tabStatus'
 import { searchServers } from '../../lib/fuzzy'
 import { PaletteRow } from './PaletteRow'
+import { paletteCommands } from './commands'
 import { ServerService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { findExistingServer, parseQuickConnect, runQuickConnect } from '../../lib/quickConnect'
 import { toastError } from '../../stores/toasts'
@@ -50,34 +47,9 @@ export function CommandPalette({
       return { kind: 'server', server, status }
     })
     const ql = q.trim().toLowerCase()
-    const commands: PaletteRowData[] = [
-      { kind: 'command' as const, id: 'new-server', label: 'New server', run: onNewServer },
-      {
-        kind: 'command' as const,
-        id: 'local-terminal',
-        label: 'Local terminal',
-        run: () => useSessions.getState().openLocal(),
-      },
-      { kind: 'command' as const, id: 'welcome-tour', label: 'Welcome tour', run: () => useTour.getState().show() },
-      ...(selectedId
-        ? [
-            { kind: 'command' as const, id: 'tunnels', label: 'Tunnels', run: () => useView.getState().showDetail(selectedId) },
-            {
-              kind: 'command' as const,
-              id: 'sftp',
-              label: 'Browse files (SFTP)',
-              // Mirrors the Tunnels command above: SFTP is per-server, so it
-              // only appears (and only has a target) once a server is
-              // selected in the sidebar.
-              run: () => {
-                const server = servers.find((s) => s.id === selectedId)
-                if (server) void useSftp.getState().openFor(server)
-              },
-            },
-          ]
-        : []),
-      { kind: 'command' as const, id: 'authenticator', label: 'Authenticator', run: () => useAuthenticator.getState().show() },
-    ].filter((c) => !ql || c.label.toLowerCase().includes(ql))
+    const commands: PaletteRowData[] = paletteCommands({ onNewServer, selectedId, servers }).filter(
+      (c) => !ql || c.label.toLowerCase().includes(ql),
+    )
     // Quick connect is always row 0 when the input parses — Enter connects
     // with nothing else to press. Fuzzy results stay visible below it.
     const target = parseQuickConnect(q)
@@ -184,20 +156,13 @@ export function CommandPalette({
             ),
           )}
         </div>
-        {/* Footer hints (dizayn manbasi: overlay=palette footer bar). ↵ connect
-            and ↑↓ navigate are real bindings, wired above. `>` commands and
-            `#` tags are the design's mode affordances — this build has no
-            prefix-mode parser, so they render as decorative labels only, not
-            wired shortcuts. */}
+        {/* Only the bindings this palette actually has. The `>` commands and `#`
+            tags hints that used to sit here were the design's prefix modes,
+            which this build has no parser for — a keyboard hint that does
+            nothing is worse than a shorter footer. */}
         <div className="flex h-[34px] shrink-0 items-center gap-[16px] border-t border-border bg-bg1 px-[14px] text-[11px] text-textDim">
           <span>
             <span className="font-mono text-textMuted">↵</span> connect
-          </span>
-          <span>
-            <span className="font-mono text-textMuted">&gt;</span> commands
-          </span>
-          <span>
-            <span className="font-mono text-textMuted">#</span> tags
           </span>
           <span className="flex-1" />
           <span>

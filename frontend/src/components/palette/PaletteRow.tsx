@@ -55,8 +55,12 @@ export function PaletteRow({
         </>
       ) : row.kind === 'command' ? (
         <>
-          <span className="w-[7px] shrink-0 text-center text-[13px] text-accent">›</span>
-          <span className="flex-1 text-[13.5px] text-text">{row.label}</span>
+          {/* icon · label · hint, the design's three palette columns. The icon
+              is a glyph, never a dot or a square — those two shapes stay
+              reserved for status and environment (UI-11). */}
+          <row.icon size={13} strokeWidth={2} className="shrink-0 text-textDim" />
+          <span className="min-w-0 flex-1 truncate text-[13.5px] text-text">{row.label}</span>
+          {row.hint && <span className="shrink-0 font-mono text-[10.5px] text-textDim">{row.hint}</span>}
         </>
       ) : (
         <>
