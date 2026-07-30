@@ -1,5 +1,6 @@
 import type { KeyInfo } from '@bindings/github.com/salawat/sshmgr/internal/sshx'
 import { useServers } from '../../stores/servers'
+import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import type { ServerFormValues } from './ServerForm'
 import { EnvironmentSelect } from './EnvironmentSelect'
@@ -21,8 +22,6 @@ interface Props {
   serverId: string | null
 }
 
-const field =
-  'h-[30px] rounded-[5px] border border-border bg-bg0 px-[9px] text-text outline-none focus:border-accent'
 const label = 'text-[11px] font-medium text-textMuted'
 
 // The editable fields for a server, split out of ServerForm so the shell
@@ -42,8 +41,7 @@ export function ServerFormFields({ form, setForm, error, detectedKeys, serverId 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-[5px]">
           <span className={label}>Name</span>
-          <input
-            className={field}
+          <Input
             placeholder="cbs-app-01"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -55,8 +53,8 @@ export function ServerFormFields({ form, setForm, error, detectedKeys, serverId 
       <div className="mt-4 grid grid-cols-4 gap-4">
         <div className="col-span-2 flex flex-col gap-[5px]">
           <span className={label}>Host</span>
-          <input
-            className={`${field} font-mono text-[12.5px]`}
+          <Input
+            className="font-mono text-[12.5px]"
             placeholder="10.20.4.11"
             value={form.host}
             onChange={(e) => setForm({ ...form, host: e.target.value })}
@@ -64,8 +62,8 @@ export function ServerFormFields({ form, setForm, error, detectedKeys, serverId 
         </div>
         <div className="flex flex-col gap-[5px]">
           <span className={label}>Port</span>
-          <input
-            className={`${field} font-mono text-[12.5px]`}
+          <Input
+            className="font-mono text-[12.5px]"
             placeholder="22"
             value={form.port}
             onChange={(e) => {
@@ -76,8 +74,8 @@ export function ServerFormFields({ form, setForm, error, detectedKeys, serverId 
         </div>
         <div className="flex flex-col gap-[5px]">
           <span className={label}>User</span>
-          <input
-            className={`${field} font-mono text-[12.5px]`}
+          <Input
+            className="font-mono text-[12.5px]"
             placeholder="deploy"
             value={form.user}
             onChange={(e) => setForm({ ...form, user: e.target.value })}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import type { ServerFormValues } from './ServerForm'
 
@@ -11,8 +12,6 @@ interface Props {
   groups: string[]
 }
 
-const field =
-  'h-[30px] rounded-[5px] border border-border bg-bg0 px-[9px] text-text outline-none focus:border-accent'
 const label = 'text-[11px] font-medium text-textMuted'
 
 // Sentinel <option> value for "start a group that isn't in the list yet" —
@@ -33,9 +32,8 @@ export function ServerFormGroup({ form, setForm, groups }: Props) {
     return (
       <div className="flex flex-1 flex-col gap-[5px]">
         <span className={label}>Group</span>
-        <input
+        <Input
           autoFocus
-          className={field}
           placeholder="New group name"
           value={form.group}
           onChange={(e) => setForm({ ...form, group: e.target.value })}
