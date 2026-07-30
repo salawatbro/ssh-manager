@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Sidebar } from './components/layout/Sidebar'
 import { MainContent } from './components/layout/MainContent'
 import { ServerForm } from './components/server/ServerForm'
@@ -17,6 +17,7 @@ import { ImportPreview } from './components/palette/ImportPreview'
 import { StatusBar } from './components/layout/StatusBar'
 import { Toasts } from './components/ui/Toasts'
 import { LockOverlay } from './components/lock/LockOverlay'
+import { ForgotResetModal } from './components/lock/ForgotResetModal'
 import { useAppKeymap } from './hooks/useAppKeymap'
 import { useTrayConnect } from './hooks/useTrayConnect'
 import { useSftpProgress } from './hooks/useSftpProgress'
@@ -44,6 +45,7 @@ export default function App() {
   const codeRequest = useCodePrompt((s) => s.request)
   const submitCode = useCodePrompt((s) => s.submit)
   const cancelCode = useCodePrompt((s) => s.cancel)
+  const [forgotOpen, setForgotOpen] = useState(false)
 
   useEffect(() => {
     void load()
@@ -228,7 +230,8 @@ export default function App() {
       <Toasts />
       {/* App lock — full-window overlay over the UI; renders null when unlocked.
           Sessions/tunnels keep running underneath. Forgot flow wired in Task 13. */}
-      <LockOverlay onForgot={() => {}} />
+      <LockOverlay onForgot={() => setForgotOpen(true)} />
+      {forgotOpen && <ForgotResetModal onClose={() => setForgotOpen(false)} />}
     </div>
   )
 }
