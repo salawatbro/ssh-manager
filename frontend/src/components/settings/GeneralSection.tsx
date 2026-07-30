@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSettings } from '../../stores/settings'
 import { Row } from './Row'
 import { Toggle, Stepper, ProdBadge } from './controls'
+import { LockSection } from './LockSection'
 
 // FR-14.9/SEC-15: the guard is an ergonomic confirmation step, never a
 // security control — this copy must never say "protected" or "secure".
@@ -90,9 +91,10 @@ export function GeneralSection() {
           onBlur={() => void update({ guardPatternsLocal: localPatterns })}
         />
       </div>
-      <Row label="Connection timeout" hint="Give up if the host does not answer." last>
+      <Row label="Connection timeout" hint="Give up if the host does not answer.">
         <Stepper value={s.connectTimeoutSecs} min={1} max={120} suffix="s" onChange={(v) => void update({ connectTimeoutSecs: v })} />
       </Row>
+      <LockSection />
     </div>
   )
 }
