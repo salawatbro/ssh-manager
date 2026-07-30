@@ -6,6 +6,8 @@ import { ForwardType } from '@bindings/github.com/salawat/sshmgr/internal/domain
 import type { PortForward } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { ForwardInput } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { useForwards } from '../../stores/forwards'
+import { useServers } from '../../stores/servers'
+import { forwardCommand, forwardExplainer, forwardTitle } from '../../lib/forwardCommand'
 import { DestFields } from './DestFields'
 
 interface Props {
@@ -50,6 +52,8 @@ export function ForwardForm({ serverId, initial, onDone }: Props) {
   // Mirrors ServerForm's confirmDelete: first click arms it, second confirms
   // — a saved forward has no undo, so a stray click must not remove it.
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // For the ssh preview below: the same user@host the detail page's command uses.
+  const server = useServers((s) => s.servers.find((x) => x.id === serverId))
 
   async function onDelete() {
     if (!initial) return
@@ -116,6 +120,26 @@ export function ForwardForm({ serverId, initial, onDone }: Props) {
             {t.label}
           </button>
         ))}
+      </div>
+
+      {/* The design's explainer card (Zish.dc.html "Add forward"): what this
+          kind of forward does, and the ssh command that does the same thing,
+          rebuilt as the fields change. It is how a user checks the form says
+          what they meant — and it works in a terminal with no Zish. */}
+      <div className="rounded-[6px] border border-border bg-bg1 px-[9px] py-[8px]">
+        <div className="text-[11.5px] font-medium text-text">{forwardTitle(type)}</div>
+        <div className="mt-[4px] text-[11.5px] leading-[1.5] text-textMuted">{forwardExplainer(type)}</div>
+        <div className="selectable mt-[7px] break-all font-mono text-[11px] text-accentFg">
+          {forwardCommand({
+            type,
+            bindAddr,
+            bindPort,
+            destHost,
+            destPort,
+            user: server?.user ?? '',
+            host: server?.host ?? '',
+          })}
+        </div>
       </div>
 
       <div className="flex gap-[6px]">
