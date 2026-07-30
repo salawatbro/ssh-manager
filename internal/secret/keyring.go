@@ -27,6 +27,11 @@ const passphraseSuffix = ":passphrase"
 // ONLY place a TOTP secret is ever stored — never the DB, never JSON export.
 const totpSuffix = ":totp"
 
+// appLockAccount is the Keychain account holding the app-lock PIN's bcrypt
+// hash (App Lock feature). Server secrets use numeric-ID accounts (optionally
+// with a :passphrase / :totp suffix), so this reserved word cannot collide.
+const appLockAccount = "app-lock"
+
 // maxSecretBytes caps a stored secret. macOS allows ~2982 bytes for our
 // service/account lengths; Windows Credential Manager caps the blob at
 // 2560. Use the smaller so a secret that saves on macOS also saves on
@@ -54,6 +59,9 @@ type Store interface {
 	SetTOTPSecret(serverID, secret string) error
 	GetTOTPSecret(serverID string) (string, error)
 	Delete(serverID string) error
+	SetAppLockHash(hash string) error
+	GetAppLockHash() (string, error)
+	DeleteAppLockHash() error
 }
 
 func checkSize(secret string) error {
@@ -113,6 +121,23 @@ func (keyringStore) Delete(serverID string) error {
 		return err
 	}
 	return deleteIfPresent(serverID + totpSuffix)
+}
+
+// SetAppLockHash stores the app-lock PIN's bcrypt hash. SEC-01: the PIN never
+// reaches the DB — only this hash, only in the Keychain.
+func (keyringStore) SetAppLockHash(hash string) error {
+	return mapSetErr(keyring.Set(Service, appLockAccount, hash))
+}
+
+// GetAppLockHash returns the stored app-lock hash, or ErrNotStored when no PIN
+// has been set.
+func (keyringStore) GetAppLockHash() (string, error) {
+	return getWithTimeout(appLockAccount)
+}
+
+// DeleteAppLockHash removes the app-lock hash (PIN removed / factory reset).
+func (keyringStore) DeleteAppLockHash() error {
+	return deleteIfPresent(appLockAccount)
 }
 
 func deleteIfPresent(account string) error {

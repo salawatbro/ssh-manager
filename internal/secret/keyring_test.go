@@ -146,3 +146,24 @@ func TestTOTPSecretTooBigIsRejected(t *testing.T) {
 		t.Fatal("oversized totp secret should be rejected")
 	}
 }
+
+func TestFakeAppLockHash(t *testing.T) {
+	f := NewFake()
+
+	if _, err := f.GetAppLockHash(); err != ErrNotStored {
+		t.Fatalf("GetAppLockHash on empty = %v, want ErrNotStored", err)
+	}
+	if err := f.SetAppLockHash("hash-abc"); err != nil {
+		t.Fatalf("SetAppLockHash: %v", err)
+	}
+	got, err := f.GetAppLockHash()
+	if err != nil || got != "hash-abc" {
+		t.Fatalf("GetAppLockHash = %q, %v; want \"hash-abc\", nil", got, err)
+	}
+	if err := f.DeleteAppLockHash(); err != nil {
+		t.Fatalf("DeleteAppLockHash: %v", err)
+	}
+	if _, err := f.GetAppLockHash(); err != ErrNotStored {
+		t.Fatalf("GetAppLockHash after delete = %v, want ErrNotStored", err)
+	}
+}

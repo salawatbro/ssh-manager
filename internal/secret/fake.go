@@ -5,10 +5,11 @@ package secret
 // under -race across t.Parallel() tests (verified). A per-instance struct
 // has no shared state, so every test gets its own isolated keychain.
 type Fake struct {
-	pw     map[string]string
-	phrase map[string]string
-	totp   map[string]string
-	fail   error
+	pw      map[string]string
+	phrase  map[string]string
+	totp    map[string]string
+	fail    error
+	appLock *string // nil means unset
 }
 
 // NewFake returns an empty in-memory Store.
@@ -100,5 +101,34 @@ func (f *Fake) Delete(serverID string) error {
 	delete(f.pw, serverID)
 	delete(f.phrase, serverID)
 	delete(f.totp, serverID)
+	return nil
+}
+
+// SetAppLockHash stores the app-lock hash in the fake.
+func (f *Fake) SetAppLockHash(hash string) error {
+	if f.fail != nil {
+		return f.fail
+	}
+	f.appLock = &hash
+	return nil
+}
+
+// GetAppLockHash returns the stored app-lock hash, or ErrNotStored.
+func (f *Fake) GetAppLockHash() (string, error) {
+	if f.fail != nil {
+		return "", f.fail
+	}
+	if f.appLock == nil {
+		return "", ErrNotStored
+	}
+	return *f.appLock, nil
+}
+
+// DeleteAppLockHash clears the fake's app-lock hash.
+func (f *Fake) DeleteAppLockHash() error {
+	if f.fail != nil {
+		return f.fail
+	}
+	f.appLock = nil
 	return nil
 }
