@@ -3,7 +3,8 @@ package service
 import (
 	"testing"
 
-	"github.com/salawat/sshmgr/internal/sshx"
+	"github.com/salawat/sshmgr/internal/domain"
+	"github.com/salawat/sshmgr/internal/secret"
 )
 
 func TestParseUptime(t *testing.T) {
@@ -45,43 +46,23 @@ func TestParseDf(t *testing.T) {
 	}
 }
 
-// Probe with no live connection reports Connected false and does not error —
-// the card shows "connect to see health" rather than a failure.
-func TestHealthProbeNoConnection(t *testing.T) {
-	h := NewHealthService(NewConnRegistry())
-	rep, err := h.Probe("nope")
-	if err != nil {
-		t.Fatalf("Probe error = %v", err)
-	}
-	if rep.Connected {
-		t.Fatal("Connected should be false with no live connection")
+// Probe on an unknown server surfaces the repo error rather than dialing.
+func TestHealthProbeUnknownServer(t *testing.T) {
+	h := NewHealthService(newRepo(t), secret.NewFake(), &fakeDialer{})
+	if _, err := h.Probe("nope"); err == nil {
+		t.Fatal("Probe on an unknown server returned nil error")
 	}
 }
 
-// The registry hands back the most recent connection and forgets a server once
-// its last connection is removed.
-func TestConnRegistryAddGetRemove(t *testing.T) {
-	r := NewConnRegistry()
-	if r.Get("s1") != nil {
-		t.Fatal("empty registry returned a connection")
-	}
-	a, b := &sshx.Conn{}, &sshx.Conn{}
-	r.Add("s1", a)
-	r.Add("s1", b)
-	if r.Get("s1") != b {
-		t.Fatal("Get should return the most recent connection")
-	}
-	r.Remove("s1", b)
-	if r.Get("s1") != a {
-		t.Fatal("Get should fall back to the remaining connection")
-	}
-	r.Remove("s1", a)
-	if r.Get("s1") != nil {
-		t.Fatal("registry should forget a server with no connections")
-	}
-	// A nil conn is ignored, not stored.
-	r.Add("s2", nil)
-	if r.Get("s2") != nil {
-		t.Fatal("nil connection should not be stored")
+// A dial failure comes back as the error for the card to show — the probe never
+// touches a live session, so there is nothing to tear down.
+func TestHealthProbeDialFailure(t *testing.T) {
+	repo := newRepo(t)
+	passwordServer(t, repo)
+	sec := secret.NewFake()
+	_ = sec.SetPassword("s1", "pw")
+	h := NewHealthService(repo, sec, &fakeDialer{dialErr: domain.NewError(domain.CodeConnRefused, "Connection refused.")})
+	if _, err := h.Probe("s1"); err == nil {
+		t.Fatal("Probe should surface the dial failure")
 	}
 }

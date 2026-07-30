@@ -24,19 +24,6 @@ export interface CodeRequest {
 }
 
 /**
- * ConnRegistry tracks the live SSH connections per server so a feature that
- * needs to run a command on a host — the detail page's Health card — can reuse
- * one instead of dialing again (which could prompt for a host key or 2FA just
- * to view a page). SSHService adds a connection when a terminal session opens
- * and removes it when the session ends; HealthService reads.
- * 
- * A server can hold several connections (one per terminal tab); any live one
- * will do for a probe, so Get returns the most recent.
- */
-export interface ConnRegistry {
-}
-
-/**
  * CreateServerInput is what the frontend sends to create or update a server.
  */
 export interface CreateServerInput {
@@ -91,13 +78,11 @@ export interface ForwardInput {
 }
 
 /**
- * HealthReport is the detail page's Health card. Connected is false when the
- * server has no live connection to probe over — the card then says so instead of
- * dialing (the user's choice). Every metric is best-effort: a field a host does
- * not expose (no /proc, an odd df) stays "" and the card shows a dash.
+ * HealthReport is the detail page's Health card. Every metric is best-effort: a
+ * field a host does not expose (no /proc, an odd df) stays "" and the card shows
+ * a dash.
  */
 export interface HealthReport {
-    "connected": boolean;
     "latency": string;
     "uptime": string;
     "load": string;

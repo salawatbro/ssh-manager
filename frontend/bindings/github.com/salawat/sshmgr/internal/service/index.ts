@@ -30,7 +30,6 @@ export {
 
 export type {
     CodeRequest,
-    ConnRegistry,
     CreateServerInput,
     ForwardInput,
     HealthReport,

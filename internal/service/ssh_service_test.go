@@ -110,7 +110,7 @@ func TestRecordEndStampsHistory(t *testing.T) {
 			t.Fatal(serr)
 		}
 		svc.mu.Lock()
-		svc.sessions[sessionID] = &sessionMeta{serverID: "s1", logID: id}
+		svc.logIDs[sessionID] = id
 		svc.mu.Unlock()
 	}
 

@@ -105,12 +105,9 @@ func main() {
 	sessionLogRepo := store.NewSessionLogRepo(db)
 	sshService := service.NewSSHService(prompter, repo, settingsRepo, kr, dialer, termMgr, codePrompter, sessionLogRepo)
 	historyService := service.NewHistoryService(sessionLogRepo)
-	// The Health card probes over a connection a terminal already holds, never
-	// dialing on its own. SSHService populates the registry as sessions open and
-	// close; HealthService reads it.
-	connRegistry := service.NewConnRegistry()
-	sshService.SetConnRegistry(connRegistry)
-	healthService := service.NewHealthService(connRegistry)
+	// The Health card dials its own short-lived connection per probe (never the
+	// terminal's), so it needs the same repo/keychain/dialer SftpService does.
+	healthService := service.NewHealthService(repo, kr, dialer)
 	settingsService := service.NewSettingsService(settingsRepo, platform.NewLoginAgent())
 	importService, err := service.NewImportService(repo)
 	if err != nil {
