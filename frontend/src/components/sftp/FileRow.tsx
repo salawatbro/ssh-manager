@@ -42,9 +42,14 @@ function formatModTime(iso: string): string {
 }
 
 // One directory entry, local or remote (the same row shape serves both
-// panes — only basePath and what onOpen/onSelect do differs). Mirrors
-// ServerRow's row idiom: plain div + inner button-like click targets,
-// truncated name, dim secondary text.
+// panes — only basePath and what onOpen/onSelect do differs).
+//
+// Redesign (Zish.dc.html SFTP panes): 24px inset rows, the name in mono, and
+// directories in accentFg so the tree structure reads at a glance while files
+// stay plain text. The permission string left the row with it — at this density
+// `mode` pushed the date column around for something a user reads rarely, so it
+// moved into the row's tooltip alongside the full path. Nothing is lost, and the
+// date finally has a fixed column of its own.
 export function FileRow({ entry, basePath, selected, onSelect, onOpen, onContextMenu }: Props) {
   const fullPath = joinPath(basePath, entry.name)
 
@@ -67,22 +72,28 @@ export function FileRow({ entry, basePath, selected, onSelect, onOpen, onContext
         onSelect(entry)
         onContextMenu?.(entry, e.clientX, e.clientY)
       }}
-      title={fullPath}
-      className={`flex h-[26px] w-full shrink-0 cursor-default items-center gap-[7px] px-[10px] ${
-        selected ? 'bg-bgSel' : 'hover:bg-bg2'
+      title={`${fullPath}\n${entry.mode}`}
+      className={`ml-[6px] mr-[4px] flex h-[24px] shrink-0 cursor-default items-center gap-[8px] rounded-[4px] px-[7px] ${
+        selected ? 'bg-bgSel' : 'hover:bg-bgSel'
       }`}
     >
-      {entry.isDir ? (
-        <Folder size={13} className="shrink-0 text-textDim" />
-      ) : (
-        <File size={13} className="shrink-0 text-textDim" />
-      )}
-      <span className="min-w-0 flex-1 truncate text-text">{entry.name}</span>
-      <span className="w-[56px] shrink-0 text-right font-mono text-[11px] text-textDim">
+      <span className="flex w-[13px] shrink-0 items-center justify-center">
+        {entry.isDir ? (
+          // Filled, in the accent: a directory is the thing you steer by in a
+          // file pane, so it carries the colour and the solid shape.
+          <Folder size={13} className="text-accentFg" fill="currentColor" strokeWidth={0} />
+        ) : (
+          <File size={12} className="text-textDim" strokeWidth={1.8} />
+        )}
+      </span>
+      <span className={`min-w-0 flex-1 truncate font-mono text-[12px] ${entry.isDir ? 'text-accentFg' : 'text-text'}`}>
+        {entry.name}
+      </span>
+      <span className="w-[78px] shrink-0 text-right font-mono text-[11px] text-textDim">
         {entry.isDir ? '—' : formatSize(entry.size)}
       </span>
-      <span className="w-[150px] shrink-0 truncate font-mono text-[10.5px] text-textDim">
-        {entry.mode} {formatModTime(entry.modTime)}
+      <span className="w-[110px] shrink-0 text-right font-mono text-[11px] text-textDim">
+        {formatModTime(entry.modTime)}
       </span>
     </div>
   )
