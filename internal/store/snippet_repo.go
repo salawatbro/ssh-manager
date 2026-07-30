@@ -91,6 +91,12 @@ func (r *SnippetRepo) Delete(id string) error {
 	return nil
 }
 
+// DeleteAll removes every snippet (factory reset). AllowGlobalUpdate lets GORM
+// run an unconditional delete instead of erroring on a missing WHERE.
+func (r *SnippetRepo) DeleteAll() error {
+	return r.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&domain.Snippet{}).Error
+}
+
 // ApplicableTo returns every snippet that applies to a terminal for
 // serverID in groupName: every global snippet, plus any snippet scoped to
 // groupName or to serverID specifically — ordered slot, name.

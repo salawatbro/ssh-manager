@@ -45,6 +45,11 @@ func (r *SessionLogRepo) End(id uint, at time.Time, outcome string) error {
 	return nil
 }
 
+// DeleteAll removes every session-history row (factory reset).
+func (r *SessionLogRepo) DeleteAll() error {
+	return r.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&domain.SessionLog{}).Error
+}
+
 // Recent returns a server's most recent sessions, newest first, capped at limit.
 func (r *SessionLogRepo) Recent(serverID string, limit int) ([]domain.SessionLog, error) {
 	var logs []domain.SessionLog

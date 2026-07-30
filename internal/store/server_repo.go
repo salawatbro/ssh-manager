@@ -104,6 +104,15 @@ func (r *ServerRepo) Delete(id string) error {
 	return nil
 }
 
+// DeleteAll removes every server (factory reset). Unlike Delete it does not
+// enforce the jump-host guard — a full wipe removes dependents too — and it
+// relies on the port_forwards FK (OnDelete:CASCADE) to clear tunnels. A single
+// bulk delete satisfies the jump_id NO-ACTION constraint at statement end,
+// where a per-id loop would fail on a still-referenced jump host.
+func (r *ServerRepo) DeleteAll() error {
+	return r.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&domain.Server{}).Error
+}
+
 // BumpUsage records one connection: use_count++ and last_used_at=now
 // (FR-04.5). It writes ONLY those two columns, in a single UPDATE, so it
 // never races with a concurrent form Update over any other field. This is
