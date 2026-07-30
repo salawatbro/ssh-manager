@@ -37,3 +37,4 @@ export { FindBar } from './src/components/terminal/FindBar'
 export { PaneNotice } from './src/components/terminal/PaneNotice'
 
 export { ContextMenu } from './src/components/ui/ContextMenu'
+export { Select } from './src/components/ui/Select'

@@ -10,7 +10,8 @@
   "readmeHeader": ".design-sync/conventions.md",
   "overrides": {
     "ContextMenu": { "cardMode": "single", "primaryStory": "ServerRowMenu", "viewport": "460x340" },
-    "DestFields": { "cardMode": "column" }
+    "DestFields": { "cardMode": "column" },
+    "Select": { "cardMode": "single", "primaryStory": "EnvironmentOpen", "viewport": "300x300" }
   },
   "componentSrcMap": {
     "StatusDot": "src/components/server/StatusDot.tsx",
@@ -34,7 +35,8 @@
     "PromptModal": "src/components/sftp/PromptModal.tsx",
     "FindBar": "src/components/terminal/FindBar.tsx",
     "PaneNotice": "src/components/terminal/PaneNotice.tsx",
-    "ContextMenu": "src/components/ui/ContextMenu.tsx"
+    "ContextMenu": "src/components/ui/ContextMenu.tsx",
+    "Select": "src/components/ui/Select.tsx"
   },
   "dtsPropsFor": {
     "StatusDot": "  /** UI-11: the status axis is always a circle — filled for connected/connecting/failed, outline for disc/unknown. `connecting` adds a pulse ring. */\n  status: 'connected' | 'connecting' | 'failed' | 'disc' | 'unknown';\n  /** Diameter in px: 8 = server rows (default), 7 = the tab strip, 6 = tunnel cards. */\n  size?: 6 | 7 | 8;",
@@ -58,6 +60,7 @@
     "PromptModal": "  title: string;\n  /** Field label above the input. */\n  label: string;\n  initialValue: string;\n  confirmLabel: string;\n  /** Fired with the trimmed value; Enter submits only once it is non-blank. */\n  onSubmit: (value: string) => void;\n  /** Also fired by Escape. */\n  onCancel: () => void;",
     "FindBar": "  /** Fired on every keystroke and on Enter / Shift+Enter. */\n  onFind: (query: string, dir: 'next' | 'prev') => void;\n  onClose: () => void;\n  /** addon-search's report. resultIndex is -1 when the active match is unknown (more matches than the highlight limit), which renders as `N+`. */\n  results: { resultIndex: number; resultCount: number } | null;",
     "PaneNotice": "  /** 'failed' = an open that never connected (Retry); 'dropped' = an established session that died (Reconnect). */\n  kind: 'failed' | 'dropped';\n  /** Detail appended after the headline; may be empty. */\n  message: string;\n  onAction: () => void;",
-    "ContextMenu": "  /** Viewport coordinates of the click; clamped so the menu never spills off-screen. */\n  x: number;\n  y: number;\n  items: ({ label: string; run: () => void; danger?: boolean; disabled?: boolean; keepOpen?: boolean } | 'separator')[];\n  /** Fired by Escape, an outside click, and an outside right-click. */\n  onClose: () => void;"
+    "ContextMenu": "  /** Viewport coordinates of the click; clamped so the menu never spills off-screen. */\n  x: number;\n  y: number;\n  items: ({ label: string; run: () => void; danger?: boolean; disabled?: boolean; keepOpen?: boolean } | 'separator')[];\n  /** Fired by Escape, an outside click, and an outside right-click. */\n  onClose: () => void;",
+    "Select": "  /** The selected value (string or number). */\n  value: string | number;\n  /** Each option; `adornment` is an optional leading node, e.g. an environment colour square. */\n  options: { value: string | number; label: string; adornment?: React.ReactNode }[];\n  onChange: (v: string | number) => void;\n  /** Accessible name for the trigger button. */\n  ariaLabel?: string;\n  /** Start opened (uncontrolled) — used to show the option list in previews. */\n  defaultOpen?: boolean;"
   }
 }
