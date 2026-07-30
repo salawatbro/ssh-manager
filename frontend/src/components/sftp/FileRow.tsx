@@ -2,6 +2,7 @@ import type { DragEvent, MouseEvent } from 'react'
 import { File, Folder } from 'lucide-react'
 import type { FileEntry } from '@bindings/github.com/salawat/sshmgr/internal/sftpx'
 import type { ClickModifiers } from '../../lib/sftpSelection'
+import { formatModTime, formatSize } from '../../lib/fileFormat'
 
 // Shared by the parent ("..") row FilePane draws above the listing, so the two
 // line up to the pixel.
@@ -25,27 +26,6 @@ interface Props {
 
 function joinPath(base: string, name: string): string {
   return base.endsWith('/') ? `${base}${name}` : `${base}/${name}`
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let value = bytes / 1024
-  let i = 0
-  while (value >= 1024 && i < units.length - 1) {
-    value /= 1024
-    i++
-  }
-  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[i]}`
-}
-
-// modTime is a Go time.Time marshaled as RFC3339 — an invalid/empty string
-// (should not happen, but the field crosses a Wails binding boundary) falls
-// back to blank rather than rendering "Invalid Date".
-function formatModTime(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 // One directory entry, local or remote (the same row shape serves both panes —

@@ -1,8 +1,12 @@
 import { useState, type DragEvent } from 'react'
 import { ArrowUp } from 'lucide-react'
+import type { FileEntry } from '@bindings/github.com/salawat/sshmgr/internal/sftpx'
 import { useSftp } from '../../stores/sftp'
 import { useSftpSelection } from '../../stores/sftpSelection'
+import { useView } from '../../stores/view'
 import { actionTargets, selectedIn, type PaneSide } from '../../lib/sftpSelection'
+import { isEditableFile } from '../../lib/fileEditor'
+import { formatSize } from '../../lib/fileFormat'
 // Both sides are POSIX here: the remote is always POSIX over SFTP, and the local
 // side is macOS. One pair of helpers serves both panes.
 import { dirnameRemote, joinRemote } from '../../lib/remotePath'
@@ -58,6 +62,18 @@ export function FilePane({ side, onTransfer, onMkdir, onRename, onDelete }: Prop
   function navigate(dir: string) {
     const store = useSftp.getState()
     void (isLocal ? store.navLocal(dir) : store.navRemote(dir))
+  }
+
+  // Double-clicking a file hands it to the editor, which decides from the name
+  // and size whether it shows a textarea or the can't-edit panel.
+  function openInEditor(entry: FileEntry) {
+    useView.getState().openEditor({
+      side,
+      name: entry.name,
+      path: joinRemote(cwd, entry.name),
+      size: formatSize(entry.size),
+      editable: isEditableFile(entry.name, entry.size),
+    })
   }
 
   // The selection is what a right-click or a drag acts on, but only when the row
@@ -162,9 +178,7 @@ export function FilePane({ side, onTransfer, onMkdir, onRename, onDelete }: Prop
               selected={selected.includes(entry.name)}
               dragging={dragging.includes(entry.name)}
               onSelect={(mod) => useSftpSelection.getState().click(side, index, rowNames, mod)}
-              // Only a folder opens on double-click. Opening a FILE is the editor
-              // (stage 7), which has no backend to read its contents yet.
-              onOpen={() => entry.isDir && navigate(joinRemote(cwd, entry.name))}
+              onOpen={() => (entry.isDir ? navigate(joinRemote(cwd, entry.name)) : openInEditor(entry))}
               // Both of these resolve their targets from the CURRENT selection
               // first and then select exactly those — right-clicking or dragging
               // a row inside a multi-selection must not collapse it to one row.

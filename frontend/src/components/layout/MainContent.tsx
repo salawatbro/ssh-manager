@@ -5,6 +5,7 @@ import { useView } from '../../stores/view'
 import { pickMainView } from '../../lib/mainView'
 import { EmptyState } from '../EmptyState'
 import { ServerDetail } from '../detail/ServerDetail'
+import { FileEditor } from '../editor/FileEditor'
 import SftpView from '../sftp/SftpView'
 import { TerminalArea } from '../terminal/TerminalArea'
 
@@ -45,6 +46,9 @@ export function MainContent({ formOpen, onAdd }: Props) {
   })
   if (view === 'empty') return <EmptyState onAdd={onAdd} />
   if (view === 'detail') return <ServerDetail />
+  // Unmounting SftpView costs nothing — the session lives in the store, so
+  // closing the editor brings the panes back exactly as they were.
+  if (view === 'editor') return <FileEditor />
 
   return (
     <>

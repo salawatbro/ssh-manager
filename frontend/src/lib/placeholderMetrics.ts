@@ -53,6 +53,24 @@ export function placeholderHealth(serverId: string): HealthRow[] {
   ]
 }
 
+// The file editor's buffer. Unlike the two cards above, this one does NOT try to
+// look like the real thing: a plausible nginx.conf that a user edits, saves and
+// believes reached the host would be a hazard, not a placeholder. So the buffer
+// says what it is, in the buffer, and the editor disables Save on top of that.
+export function placeholderFileText(name: string): string {
+  return [
+    `# ${name}`,
+    '#',
+    '# PLACEHOLDER — this is NOT the contents of the file.',
+    '#',
+    '# Zish cannot read or write file contents yet: SftpService lists, transfers,',
+    '# renames and deletes, but it has no ReadFile/WriteFile call. The editor',
+    '# around this buffer is the finished layout, waiting for that backend.',
+    '# Nothing typed here can be saved anywhere.',
+    '',
+  ].join('\n')
+}
+
 export function placeholderSessions(serverId: string): SessionRow[] {
   const n = seed(serverId)
   const day = (i: number) => `${String(29 - ((n + i * 3) % 26)).padStart(2, '0')} Jul`
