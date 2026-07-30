@@ -92,13 +92,57 @@ func passwordServer(t *testing.T, repo *store.ServerRepo) *domain.Server {
 	return s
 }
 
+// recordEnd (the term.Manager session-end hook) stamps the history row the
+// matching Open started: a clean close ("" code) as closed, any code as dropped.
+// A session id it never saw (a local terminal) is ignored.
+func TestRecordEndStampsHistory(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hist := store.NewSessionLogRepo(db)
+	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
+	svc := NewSSHService(nil, store.NewServerRepo(db), nil, secret.NewFake(), &fakeDialer{}, mgr, nil, hist)
+
+	seed := func(sessionID string) {
+		id, serr := hist.Start("s1", time.Now())
+		if serr != nil {
+			t.Fatal(serr)
+		}
+		svc.mu.Lock()
+		svc.logIDs[sessionID] = id
+		svc.mu.Unlock()
+	}
+
+	seed("sess1")
+	svc.recordEnd("sess1", "") // clean close
+	seed("sess2")
+	svc.recordEnd("sess2", domain.CodeSessionClosed) // abnormal drop
+	svc.recordEnd("ghost", "")                       // unknown → no-op, no panic
+
+	logs, err := hist.Recent("s1", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(logs) != 2 {
+		t.Fatalf("recorded %d sessions, want 2 (ghost must not add a row)", len(logs))
+	}
+	// Newest first: sess2 (dropped), then sess1 (closed). Both must be ended.
+	if logs[0].Outcome != domain.OutcomeDropped || logs[0].EndedAt == nil {
+		t.Fatalf("drop not recorded: %+v", logs[0])
+	}
+	if logs[1].Outcome != domain.OutcomeClosed || logs[1].EndedAt == nil {
+		t.Fatalf("clean close not recorded: %+v", logs[1])
+	}
+}
+
 // Open with no stored password fails at credsFor — the dialer is never called.
 func TestOpenMissingPasswordDoesNotDial(t *testing.T) {
 	repo := newRepo(t)
 	passwordServer(t, repo)
 	dialer := &fakeDialer{}
 	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
-	svc := NewSSHService(nil, repo, nil, secret.NewFake(), dialer, mgr, nil)
+	svc := NewSSHService(nil, repo, nil, secret.NewFake(), dialer, mgr, nil, nil)
 
 	_, err := svc.Open("s1", 80, 24)
 	var de *domain.Error
@@ -117,7 +161,7 @@ func TestOpenDialFailurePropagates(t *testing.T) {
 	sec := secret.NewFake()
 	_ = sec.SetPassword("s1", "pw")
 	dialer := &fakeDialer{dialErr: domain.NewError(domain.CodeConnRefused, "Connection refused.")}
-	svc := NewSSHService(nil, repo, nil, sec, dialer, term.NewManager(nopEmitter{}, time.Hour, time.Hour), nil)
+	svc := NewSSHService(nil, repo, nil, sec, dialer, term.NewManager(nopEmitter{}, time.Hour, time.Hour), nil, nil)
 
 	_, err := svc.Open("s1", 80, 24)
 	var de *domain.Error
@@ -130,7 +174,7 @@ func TestOpenDialFailurePropagates(t *testing.T) {
 // Prompt blocked on the prompter's channel unblocks with the submitted code.
 func TestSubmitCodeDelegatesToPrompterResolve(t *testing.T) {
 	cp := NewCodePrompter(&fakeCodeEmitter{})
-	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, term.NewManager(nopEmitter{}, time.Hour, time.Hour), cp)
+	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, term.NewManager(nopEmitter{}, time.Hour, time.Hour), cp, nil)
 
 	go func() {
 		// Wait until Prompt has registered its channel, then submit.
@@ -149,7 +193,7 @@ func TestSubmitCodeDelegatesToPrompterResolve(t *testing.T) {
 // timeout, or a code prompter with nothing pending at all).
 func TestSubmitCodeUnknownRequestErrors(t *testing.T) {
 	cp := NewCodePrompter(&fakeCodeEmitter{})
-	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, term.NewManager(nopEmitter{}, time.Hour, time.Hour), cp)
+	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, term.NewManager(nopEmitter{}, time.Hour, time.Hour), cp, nil)
 	if err := svc.SubmitCode("ghost", "123456"); err == nil {
 		t.Fatal("SubmitCode on an unknown request id should error")
 	}
@@ -160,7 +204,7 @@ func TestWriteResizeCloseDelegate(t *testing.T) {
 	mgr := term.NewManager(nopEmitter{}, time.Hour, time.Hour)
 	pty := newFakePTY()
 	mgr.Add("sX", pty)
-	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, mgr, nil)
+	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, mgr, nil, nil)
 
 	if err := svc.Write("sX", base64.StdEncoding.EncodeToString([]byte("hi"))); err != nil {
 		t.Fatal(err)
@@ -191,7 +235,7 @@ func TestBroadcastWritesToEverySession(t *testing.T) {
 	ptyA, ptyB := newFakePTY(), newFakePTY()
 	mgr.Add("a", ptyA)
 	mgr.Add("b", ptyB)
-	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, mgr, nil)
+	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, mgr, nil, nil)
 
 	payload := base64.StdEncoding.EncodeToString([]byte("hi"))
 	if err := svc.Broadcast([]string{"a", "b"}, payload); err != nil {
@@ -216,7 +260,7 @@ func TestBroadcastUnknownSessionDoesNotAbortOthersAndReturnsFirstError(t *testin
 	ptyA, ptyC := newFakePTY(), newFakePTY()
 	mgr.Add("a", ptyA)
 	mgr.Add("c", ptyC)
-	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, mgr, nil)
+	svc := NewSSHService(nil, newRepo(t), nil, secret.NewFake(), &fakeDialer{}, mgr, nil, nil)
 
 	payload := base64.StdEncoding.EncodeToString([]byte("hi"))
 	err := svc.Broadcast([]string{"a", "ghost", "c"}, payload)
@@ -329,7 +373,7 @@ func settingsRepoWithShellIntegration(t *testing.T, enabled bool) *store.Setting
 func TestOpenRequestsPTYAtThePassedSize(t *testing.T) {
 	addr, hostKey, dims, execs := newPTYCapturingServer(t, "")
 	fx := newProbeFixture(t, addr, hostKey)
-	svc := NewSSHService(nil, fx.repo, nil, fx.sec, fx.dialer, fx.mgr, nil)
+	svc := NewSSHService(nil, fx.repo, nil, fx.sec, fx.dialer, fx.mgr, nil, nil)
 
 	res, err := svc.Open("s1", 120, 40)
 	if err != nil {
@@ -372,7 +416,7 @@ func TestOpenWithProbeEnabledSurvivesAnUnprobeableServer(t *testing.T) {
 	fx := newProbeFixture(t, addr, hostKey)
 	settingsRepo := settingsRepoWithShellIntegration(t, true)
 
-	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil)
+	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil, nil)
 	res, err := svc.Open("s1", 80, 24)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
@@ -405,7 +449,7 @@ func TestOpenReportsDetectedShellWhenIntegrationEnabled(t *testing.T) {
 	fx := newProbeFixture(t, addr, hostKey)
 	settingsRepo := settingsRepoWithShellIntegration(t, true)
 
-	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil)
+	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil, nil)
 	res, err := svc.Open("s1", 80, 24)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
@@ -438,7 +482,7 @@ func TestOpenSkipsProbeWhenShellIntegrationPersistedFalse(t *testing.T) {
 	fx := newProbeFixture(t, addr, hostKey)
 	settingsRepo := settingsRepoWithShellIntegration(t, false)
 
-	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil)
+	svc := NewSSHService(nil, fx.repo, settingsRepo, fx.sec, fx.dialer, fx.mgr, nil, nil)
 	res, err := svc.Open("s1", 80, 24)
 	if err != nil {
 		t.Fatalf("Open: %v", err)

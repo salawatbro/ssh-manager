@@ -11,6 +11,7 @@ export {
 export type {
     PortForward,
     Server,
+    SessionLog,
     Settings,
     Snippet
 } from "./models.js";

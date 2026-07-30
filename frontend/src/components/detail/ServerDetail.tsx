@@ -9,7 +9,8 @@ import { detailFields, sshCommand, statusLabel, statusTextClass } from '../../li
 import { envClassOf } from '../../lib/env'
 import { StatusDot } from '../server/StatusDot'
 import { ConnectionCard, DetailCard } from './ConnectionCard'
-import { HealthCard, RecentSessionsCard } from './MetricCards'
+import { HealthCard } from './MetricCards'
+import { RecentSessionsCard } from './RecentSessionsCard'
 import { TunnelCards } from './TunnelCards'
 
 // The server detail page (dizayn manbasi: Zish.dc.html `isDetail`) — the view a

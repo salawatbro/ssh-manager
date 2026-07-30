@@ -1,15 +1,14 @@
 // ⚠ PLACEHOLDER DATA — NOT MEASURED.
 //
-// The design's detail page carries a HEALTH card (latency, uptime, load, disk)
-// and a RECENT SESSIONS card. Neither has a backend yet: nothing in Zish runs
-// remote probes, and session history is not persisted anywhere. The user asked
-// for the cards to look complete now and to be wired when that backend lands
-// (docs/superpowers/redesign-plan.md §3), so the numbers below are invented.
+// The detail page's HEALTH card (latency, uptime, load, disk) has no backend
+// yet — nothing in Zish runs remote probes — so the numbers below are invented.
+// (Recent sessions used to be here too; it now has a real backend, see
+// lib/sessionHistory.ts. Health is the last placeholder left, and the metrics
+// backend lands in redesign-plan.md's remaining work.)
 //
-// Everything fake in this app lives HERE, in one file, on purpose:
-//   * when the backend arrives, replace these two functions and nothing else;
-//   * a reader who lands on the detail page's cards can find out in one hop
-//     that the values are not real.
+// What stays fake lives HERE, in one file, on purpose: when the probe backend
+// arrives, replace placeholderHealth and nothing else, and a reader on the card
+// can find out in one hop that the values are not real.
 //
 // The values are derived from the server id rather than random so a host's
 // numbers stay put between renders — a "latency" that reshuffles every
@@ -22,13 +21,6 @@ export interface HealthRow {
   label: string
   value: string
   tone: MetricTone
-}
-
-export interface SessionRow {
-  when: string
-  duration: string
-  result: string
-  failed: boolean
 }
 
 // A small stable hash of the server id — the seed for every value below.
@@ -53,17 +45,3 @@ export function placeholderHealth(serverId: string): HealthRow[] {
   ]
 }
 
-export function placeholderSessions(serverId: string): SessionRow[] {
-  const n = seed(serverId)
-  const day = (i: number) => `${String(29 - ((n + i * 3) % 26)).padStart(2, '0')} Jul`
-  const clock = (i: number) => `${String(6 + ((n + i * 5) % 16)).padStart(2, '0')}:${String((n + i * 17) % 60).padStart(2, '0')}`
-  return [0, 1, 2, 3].map((i) => {
-    const failed = i === 3 && n % 3 === 0
-    return {
-      when: `${day(i)} ${clock(i)}`,
-      duration: failed ? '—' : `${1 + ((n + i) % 3)}h ${String((n + i * 7) % 60).padStart(2, '0')}m`,
-      result: failed ? 'refused' : i === 0 ? 'open' : 'closed',
-      failed,
-    }
-  })
-}

@@ -122,6 +122,31 @@ export interface Server {
 }
 
 /**
+ * SessionLog is one terminal session against a server, for the detail page's
+ * "Recent sessions" card. It carries no secret and no shell output — just when
+ * the session ran and how it ended. Written by SSHService on open/close, read
+ * by HistoryService.
+ * 
+ * The id is an autoincrement so a log is cheap to append; the app-level id used
+ * elsewhere (uuid strings) would buy nothing for a row nobody references by id.
+ */
+export interface SessionLog {
+    "id": number;
+    "serverId": string;
+    "startedAt": string;
+
+    /**
+     * nil while the session is still open
+     */
+    "endedAt": string | null;
+
+    /**
+     * "" while open, else OutcomeClosed / OutcomeDropped
+     */
+    "outcome": string;
+}
+
+/**
  * Settings is the single-row app configuration table (FR-12.1: settings live
  * in the database, never localStorage). ID is always 1. Defaults come from
  * DefaultSettings() and the gorm column defaults, applied on first run.

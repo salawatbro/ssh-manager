@@ -100,7 +100,11 @@ func main() {
 	kr := secret.NewKeyring()
 	serverService := service.NewServerService(repo, kr, dialer)
 	settingsRepo := store.NewSettingsRepo(db)
-	sshService := service.NewSSHService(prompter, repo, settingsRepo, kr, dialer, termMgr, codePrompter)
+	// Session history: SSHService records start/end, HistoryService reads it back
+	// for the detail page's "Recent sessions" card. One repo, two ends.
+	sessionLogRepo := store.NewSessionLogRepo(db)
+	sshService := service.NewSSHService(prompter, repo, settingsRepo, kr, dialer, termMgr, codePrompter, sessionLogRepo)
+	historyService := service.NewHistoryService(sessionLogRepo)
 	settingsService := service.NewSettingsService(settingsRepo, platform.NewLoginAgent())
 	importService, err := service.NewImportService(repo)
 	if err != nil {
@@ -175,6 +179,7 @@ func main() {
 			application.NewService(uninstallService),
 			application.NewService(NewEditService()),
 			application.NewService(appInfoService),
+			application.NewService(historyService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

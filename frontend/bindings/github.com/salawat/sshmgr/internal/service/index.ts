@@ -3,6 +3,7 @@
 
 import * as AppInfoService from "./appinfoservice.js";
 import * as ForwardService from "./forwardservice.js";
+import * as HistoryService from "./historyservice.js";
 import * as ImportService from "./importservice.js";
 import * as LocalService from "./localservice.js";
 import * as SSHService from "./sshservice.js";
@@ -14,6 +15,7 @@ import * as UninstallService from "./uninstallservice.js";
 export {
     AppInfoService,
     ForwardService,
+    HistoryService,
     ImportService,
     LocalService,
     SSHService,

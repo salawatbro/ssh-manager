@@ -59,6 +59,7 @@ type Manager struct {
 	flush       time.Duration
 	keepAlive   time.Duration
 	keepEnabled func() bool
+	onEnd       func(sessionID, code string)
 	mu          sync.Mutex
 	runners     map[string]*runner
 }
@@ -75,6 +76,13 @@ func NewManager(e Emitter, flush, keepAlive time.Duration) *Manager {
 // default — means always enabled, preserving the original always-probe
 // behaviour.
 func (m *Manager) SetKeepAliveEnabled(fn func() bool) { m.keepEnabled = fn }
+
+// SetOnSessionEnd installs a hook called once as each session ends, with the
+// close code ("" for a clean close — user close or clean shell exit — else the
+// abnormal-close code). SSHService uses it to stamp the session-history row it
+// opened; a session the hook does not recognise (a local terminal) is ignored
+// by the caller. Set once at startup, before any session is added.
+func (m *Manager) SetOnSessionEnd(fn func(sessionID, code string)) { m.onEnd = fn }
 
 // runner holds one session's goroutine coordination.
 type runner struct {
@@ -261,6 +269,11 @@ func (m *Manager) shutdown(sessionID string, r *runner, emit bool, code, msg str
 		m.mu.Lock()
 		delete(m.runners, sessionID)
 		m.mu.Unlock()
+		// Fires for every close path (user, clean exit, dead peer) — the session
+		// history records them all; only the emit below is close-cause specific.
+		if m.onEnd != nil {
+			m.onEnd(sessionID, code)
+		}
 		if emit {
 			m.emitter.Emit(EventState, State{
 				SessionID: sessionID,
