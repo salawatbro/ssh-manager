@@ -18,6 +18,39 @@ func TestDefaultShellIntegrationOn(t *testing.T) {
 	}
 }
 
+func TestSettingsLockDefaults(t *testing.T) {
+	d := DefaultSettings()
+	if d.LockEnabled {
+		t.Errorf("LockEnabled default = true, want false")
+	}
+	if !d.LockUseBiometrics {
+		t.Errorf("LockUseBiometrics default = false, want true")
+	}
+	if !d.LockIdleEnabled {
+		t.Errorf("LockIdleEnabled default = false, want true")
+	}
+	if d.LockIdleMinutes != 10 {
+		t.Errorf("LockIdleMinutes default = %d, want 10", d.LockIdleMinutes)
+	}
+}
+
+func TestSettingsSanitiseLockIdle(t *testing.T) {
+	for _, in := range []int{0, -5, 121, 9999} {
+		s := Settings{LockIdleMinutes: in}
+		s.Sanitise()
+		if s.LockIdleMinutes != 10 {
+			t.Errorf("Sanitise(%d) LockIdleMinutes = %d, want 10", in, s.LockIdleMinutes)
+		}
+	}
+	for _, in := range []int{1, 10, 120} {
+		s := Settings{LockIdleMinutes: in}
+		s.Sanitise()
+		if s.LockIdleMinutes != in {
+			t.Errorf("Sanitise(%d) LockIdleMinutes = %d, want %d", in, s.LockIdleMinutes, in)
+		}
+	}
+}
+
 // TestDefaultLocalGuardPatternsCatchCatastrophicNotEveryday documents the
 // behavioural split the local list exists for: it fires on commands that
 // would wreck the machine — including the macOS-specific disk destroyers

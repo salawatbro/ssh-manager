@@ -66,6 +66,15 @@ type Settings struct {
 	// skipped); false on a fresh install so the tour auto-opens exactly once.
 	// Not a secret — a plain onboarding flag.
 	TourSeen bool `gorm:"not null;default:false" json:"tourSeen"`
+
+	// App lock (see docs/superpowers/specs/2026-07-30-app-lock-design.md). The
+	// PIN itself is NOT here — it is a bcrypt hash in the Keychain. These are
+	// the non-secret preferences. LockEnabled ("Require unlock") is independent
+	// of whether a PIN is set, so a user can keep a PIN but switch locking off.
+	LockEnabled       bool `gorm:"not null;default:false" json:"lockEnabled"`
+	LockUseBiometrics bool `gorm:"not null;default:true" json:"lockUseBiometrics"`
+	LockIdleEnabled   bool `gorm:"not null;default:true" json:"lockIdleEnabled"`
+	LockIdleMinutes   int  `gorm:"not null;default:10" json:"lockIdleMinutes"`
 }
 
 // DefaultSettings returns the first-run defaults. Kept in code (not only in
@@ -88,6 +97,9 @@ func DefaultSettings() Settings {
 		GuardEnabled:       true,
 		GuardPatterns:      defaultGuardPatterns,
 		GuardPatternsLocal: defaultLocalGuardPatterns,
+		LockUseBiometrics:  true,
+		LockIdleEnabled:    true,
+		LockIdleMinutes:    10,
 	}
 }
 
@@ -150,6 +162,9 @@ func (s *Settings) Sanitise() {
 	}
 	if s.TermFont == "" {
 		s.TermFont = "JetBrains Mono"
+	}
+	if s.LockIdleMinutes < 1 || s.LockIdleMinutes > 120 {
+		s.LockIdleMinutes = 10
 	}
 	s.ID = 1
 }
