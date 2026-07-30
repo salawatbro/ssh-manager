@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LockService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { BiometricService } from '@bindings/github.com/salawat/sshmgr'
 import { useLock } from '../../stores/lock'
@@ -26,8 +26,7 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
   const tunnelCount = useForwards(
     (s) => Object.values(s.statusById).filter((st) => st.state === 'running').length,
   )
-
-  if (!locked) return null
+  const autoTriedRef = useRef(false)
 
   async function submitPin(pin: string) {
     try {
@@ -58,6 +57,21 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
       setScanning(false)
     }
   }
+
+  // Auto-present Touch ID once when the overlay locks with biometrics on, so the
+  // user isn't required to click the button first. Resets on unlock for next time.
+  useEffect(() => {
+    if (!locked) {
+      autoTriedRef.current = false
+      return
+    }
+    if (biometricsOn && useTouch && !scanning && !autoTriedRef.current) {
+      autoTriedRef.current = true
+      void touchUnlock()
+    }
+  }, [locked, biometricsOn, useTouch, scanning])
+
+  if (!locked) return null
 
   return (
     <div className="absolute inset-0 z-[100] flex items-center justify-center bg-bg0">
