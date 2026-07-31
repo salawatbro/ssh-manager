@@ -17,10 +17,12 @@ export function Block({
   block,
   onToggle,
   sendRaw,
+  onRerun,
 }: {
   block: TermBlock
   onToggle: () => void
   sendRaw: (d: string) => void
+  onRerun?: () => void
 }) {
   const rail = block.running ? 'bg-stConnecting' : block.exitCode ? 'bg-stFailed' : 'bg-border'
   const duration = !block.running ? fmtDuration(block) : null
@@ -38,6 +40,16 @@ export function Block({
             <span className="text-[10.5px] text-stFailed">exit {block.exitCode}</span>
           )}
           {duration && <span className="text-[10.5px] text-textDim">{duration}</span>}
+          {!block.running && onRerun && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onRerun() }}
+              className="text-textDim hover:text-text"
+              title="Run again"
+            >
+              ↻
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void navigator.clipboard.writeText(copyText(block))}

@@ -40,7 +40,13 @@ export function BlockTerminal({
       }
     >
       {snap.blocks.map((b) => (
-        <Block key={b.id} block={b} onToggle={() => session.toggleFold(b.id)} sendRaw={session.sendRaw} />
+        <Block
+          key={b.id}
+          block={b}
+          onToggle={() => session.toggleFold(b.id)}
+          sendRaw={session.sendRaw}
+          onRerun={snap.running ? undefined : () => session.rerun(b.command)}
+        />
       ))}
       {!snap.running && (
         <PromptLine
