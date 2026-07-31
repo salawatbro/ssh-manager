@@ -17,14 +17,21 @@ export function createBlockSession({ write, newId, guard }: Deps) {
   let snap = build()
   const notify = () => { snap = build(); subs.forEach((f) => f()) }
 
+  // Defined as a local const (not a method on the returned object) so `rerun`
+  // can call it directly without relying on `this` — safe even if a caller
+  // destructures the returned methods.
+  const submit = (line?: string) => {
+    const cmd = line ?? ''
+    history.add(cmd)
+    const send = () => write(cmd + '\r')
+    if (guard) guard(cmd, send)
+    else send()
+  }
+
   return {
     feedText(text: string) { machine.write(text); notify() },
-    submit(line: string) {
-      history.add(line)
-      const send = () => write(line + '\r')
-      if (guard) guard(line, send)
-      else send()
-    },
+    submit,
+    rerun: (command: string) => submit(command),
     sendRaw(data: string) { write(data) },
     historyUp: (cur: string) => history.up(cur),
     historyDown: () => history.down(),
