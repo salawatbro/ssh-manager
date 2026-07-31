@@ -6,6 +6,11 @@ import { ConnectingOverlay } from '../ConnectingOverlay'
 import { BlockTerminal } from './BlockTerminal'
 import { createBlockSession } from '../../../stores/blockSession'
 import { useBlockTerminal } from '../../../hooks/useBlockTerminal'
+import { guardDecisionFor, LOCAL_SCOPE_TARGET } from '../../../lib/guard'
+import { isLocalTarget } from '../../../lib/paneTarget'
+import { useServers } from '../../../stores/servers'
+import { useSettings } from '../../../stores/settings'
+import { useGuard } from '../../../stores/guard'
 
 let seq = 0
 const nextId = () => `blk-${seq++}`
@@ -27,7 +32,32 @@ export function BlockTerminalPane({ paneId, tabId, serverId, focused, onFocus }:
   const hostRef = useRef<HTMLDivElement>(null)
   const writeRef = useRef<((d: string) => void) | null>(null)
   // One session per mounted pane, for the pane's lifetime — not per render.
-  const session = useMemo(() => createBlockSession({ write: (d) => writeRef.current?.(d), newId: nextId }), [])
+  const session = useMemo(() => createBlockSession({
+    write: (d) => writeRef.current?.(d),
+    newId: nextId,
+    // Prod guard (FR-14), mirroring useTerminalSession's onData check but
+    // against submit's already-complete line instead of a fed-up-to-Enter
+    // buffer — block mode has no need for the classic guard buffer.
+    guard: (line, send) => {
+      const settings = useSettings.getState().settings
+      const local = isLocalTarget(serverId)
+      const server = local ? null : useServers.getState().servers.find((s) => s.id === serverId)
+      const target = local
+        ? LOCAL_SCOPE_TARGET
+        : server && { host: server.name || server.host, env: server.environment, local: false }
+      const decision = target ? guardDecisionFor(line, [target], settings) : null
+      if (decision) {
+        useGuard.getState().requestGuard({
+          command: line,
+          title: decision.title,
+          targets: decision.targets,
+          onConfirm: send,
+        })
+      } else {
+        send()
+      }
+    },
+  }), [serverId])
   const { status, message, retry, integrated } = useBlockTerminal(serverId, paneId, hostRef, session, writeRef)
 
   // Mirrors Terminal's status bookkeeping: TabBar/BroadcastBar/StatusBar read
