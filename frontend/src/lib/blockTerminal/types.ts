@@ -22,4 +22,5 @@ export interface TermBlock {
   mode: 'html' | 'xterm' // 'xterm' once a complex sequence is seen
   lines: Segment[][] // html mode only
   folded: boolean
+  raw?: string // retained raw PTY bytes once mode === 'xterm' (RawBlock replays them)
 }

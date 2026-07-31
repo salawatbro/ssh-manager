@@ -32,7 +32,7 @@ export function BlockTerminal({ session, onRawKey }: { session: Session; onRawKe
       }
     >
       {snap.blocks.map((b) => (
-        <Block key={b.id} block={b} onToggle={() => session.toggleFold(b.id)} />
+        <Block key={b.id} block={b} onToggle={() => session.toggleFold(b.id)} sendRaw={session.sendRaw} />
       ))}
       {!snap.running && (
         <PromptLine

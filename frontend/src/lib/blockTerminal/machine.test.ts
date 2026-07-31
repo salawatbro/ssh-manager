@@ -55,6 +55,17 @@ describe('createBlockMachine', () => {
     expect(m.blocks()[0].exitCode).toBe(0)
   })
 
+  it('retains raw bytes on an xterm-mode block', () => {
+    n = 0
+    const m = createBlockMachine(ids)
+    m.write(`${A}${B}vim${C}${ESC}[?1049hSCREEN`)
+    const b = m.blocks()[0]
+    expect(b.mode).toBe('xterm')
+    expect(b.raw).toContain('SCREEN')
+    m.write('MORE')
+    expect(m.blocks()[0].raw).toContain('MORE')
+  })
+
   it('auto-folds a long finished block', () => {
     n = 0
     const m = createBlockMachine(ids)

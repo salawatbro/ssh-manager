@@ -32,9 +32,10 @@ export function createBlockMachine(newId: () => string) {
       if (cur.mode === 'html') {
         ansi.write(text)
         cur.lines = ansi.lines()
-        if (ansi.sawComplex()) cur.mode = 'xterm' // hand off to RawBlock
+        if (ansi.sawComplex()) { cur.mode = 'xterm'; cur.raw = text } // seed with the chunk that flipped it
+      } else {
+        cur.raw = (cur.raw ?? '') + text // subsequent raw bytes for RawBlock to replay
       }
-      // in xterm mode the raw bytes are consumed by RawBlock, not here
     }
     // idle text (banner before the first prompt) is dropped
   }

@@ -1,5 +1,6 @@
 import type { TermBlock } from '../../../lib/blockTerminal/types'
 import { copyText, foldLabel, visibleLines } from '../../../lib/blockTerminal/foldPolicy'
+import { RawBlock } from './RawBlock'
 
 // Formats a block's wall-clock run time for the header (ms under a second,
 // otherwise seconds with one decimal) — same convention as commandDecorations.ts.
@@ -12,7 +13,15 @@ function fmtDuration(block: TermBlock): string | null {
 // One command block: header rail + command line + streaming/exit/duration/copy,
 // with a foldable output body. Not memoized — the machine mutates blocks in
 // place, so this must re-render on every parent snapshot change.
-export function Block({ block, onToggle }: { block: TermBlock; onToggle: () => void }) {
+export function Block({
+  block,
+  onToggle,
+  sendRaw,
+}: {
+  block: TermBlock
+  onToggle: () => void
+  sendRaw: (d: string) => void
+}) {
   const rail = block.running ? 'bg-stConnecting' : block.exitCode ? 'bg-stFailed' : 'bg-border'
   const duration = !block.running ? fmtDuration(block) : null
   return (
@@ -51,6 +60,7 @@ export function Block({ block, onToggle }: { block: TermBlock; onToggle: () => v
             ))}
           </div>
         )}
+        {!block.folded && block.mode === 'xterm' && <RawBlock block={block} sendRaw={sendRaw} />}
         {block.folded && (
           <button
             type="button"
