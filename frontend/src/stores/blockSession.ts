@@ -12,7 +12,9 @@ export function createBlockSession({ write, newId }: Deps) {
   const machine = createBlockMachine(newId)
   const history = createHistory()
   const subs = new Set<() => void>()
-  const notify = () => subs.forEach((f) => f())
+  const build = () => ({ blocks: [...machine.blocks()], running: machine.running(), altScreen: machine.altScreen() })
+  let snap = build()
+  const notify = () => { snap = build(); subs.forEach((f) => f()) }
 
   return {
     feedText(text: string) { machine.write(text); notify() },
@@ -20,7 +22,7 @@ export function createBlockSession({ write, newId }: Deps) {
     sendRaw(data: string) { write(data) },
     historyUp: (cur: string) => history.up(cur),
     historyDown: () => history.down(),
-    snapshot: () => ({ blocks: machine.blocks(), running: machine.running(), altScreen: machine.altScreen() }),
+    snapshot: () => snap,
     subscribe(fn: () => void) { subs.add(fn); return () => subs.delete(fn) },
   }
 }
