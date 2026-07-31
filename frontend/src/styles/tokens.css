@@ -83,6 +83,18 @@
   --term-dim: #6b7480;     /* duration text */
 }
 
+/* Block-terminal segment classes (emitted by lib/blockTerminal/ansi.ts). */
+.tc-fg  { color: var(--term-fg) }
+.tc-dim { color: var(--term-dim) }
+.tc-grn { color: var(--term-green) }
+.tc-yel { color: var(--term-yellow) }
+.tc-blu { color: var(--term-blue) }
+.tc-err { color: var(--term-fail) }
+.tc-mag { color: var(--term-magenta) }
+.tc-cyn { color: var(--term-cyan) }
+.tc-bold { font-weight: 600 }
+.tc-ul  { text-decoration: underline; text-underline-offset: 2px }
+
 /* Everything below participates in the normal cascade via @layer base, so that
    Tailwind utilities (which Tailwind itself emits into @layer utilities) can
    override these defaults instead of silently losing to them (CSS Cascade 5:
