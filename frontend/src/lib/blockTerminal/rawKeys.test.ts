@@ -37,9 +37,25 @@ describe('mapKey', () => {
     expect(mapKey(key({ key: '_', ctrlKey: true, shiftKey: true }))).toBe('\x1f')
   })
 
+  it('regression: Ctrl+Shift+^ and Ctrl+Shift+@ still pass through', async () => {
+    const mapKey = await loadWith(false)
+    expect(mapKey(key({ key: '^', ctrlKey: true, shiftKey: true }))).toBe('\x1e')
+    expect(mapKey(key({ key: '@', ctrlKey: true, shiftKey: true }))).toBe('\x00')
+  })
+
   it('reserves Ctrl+Shift+J on non-mac for the error-jump chord', async () => {
     const mapKey = await loadWith(false)
     expect(mapKey(key({ key: 'J', ctrlKey: true, shiftKey: true }))).toBe('')
+  })
+
+  // Off-mac, Ctrl+Shift is the app's whole chord space (keymap.ts). Letting one
+  // through would both run the app action and inject a control byte —
+  // Ctrl+Shift+D as EOT could close the shell.
+  it('reserves the other off-mac Ctrl+Shift app chords instead of writing to the PTY', async () => {
+    const mapKey = await loadWith(false)
+    for (const k of ['D', 'W', 'L', 'C', 'K', 'N', 'E', 'S']) {
+      expect(mapKey(key({ key: k, ctrlKey: true, shiftKey: true })), k).toBe('')
+    }
   })
 
   it('does not reserve Ctrl+Shift+J on macOS — ordinary Ctrl-letter mapping applies', async () => {

@@ -2,6 +2,7 @@ import { DataService } from '@bindings/github.com/salawat/sshmgr'
 import type { TermBlock } from '../../../lib/blockTerminal/types'
 import { copyText, foldLabel, visibleLines } from '../../../lib/blockTerminal/foldPolicy'
 import { splitLinks } from '../../../lib/blockTerminal/links'
+import { rerunCommand } from '../../../lib/blockTerminal/rerunCommand'
 import { toastError } from '../../../stores/toasts'
 import { RawBlock } from './RawBlock'
 
@@ -47,7 +48,11 @@ export function Block({
           <button type="button" onClick={(e) => { e.stopPropagation(); onToggle() }} className="text-textDim hover:text-text">
             {block.folded ? '▸' : '▾'}
           </button>
-          <span className="truncate tc-fg flex-1 font-mono text-[12.5px]">{block.command}</span>
+          {/* Rendered through the same sanitiser the ↻ button submits, so what
+              the header shows is exactly what a rerun sends. block.command is
+              the raw OSC 133 B→C echo and can carry \r/\b/ESC from a prompt
+              repaint, which HTML would render as stray spaces or nothing. */}
+          <span className="truncate tc-fg flex-1 font-mono text-[12.5px]">{rerunCommand(block.command)}</span>
           {block.running && <span className="text-[10.5px] text-textDim">● streaming</span>}
           {block.exitCode != null && block.exitCode !== 0 && (
             <span className="text-[10.5px] text-stFailed">exit {block.exitCode}</span>

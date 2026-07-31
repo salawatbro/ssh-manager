@@ -11,20 +11,28 @@ export interface RawKeyEvent {
   altKey: boolean
 }
 
+// Control keys that genuinely need Shift to type on a US layout, so they must
+// reach the PTY even though they arrive as Ctrl+Shift: Ctrl+_ (readline undo,
+// 0x1F), Ctrl+^ (0x1E), Ctrl+@ (NUL, 0x00).
+const SHIFTED_CONTROLS = '_^@'
+
 // Minimal control-key mapping for raw passthrough while a command is running
 // (Enter, Tab, Backspace, Ctrl-<letter>). Printable single characters are
-// handled by the caller. `Ctrl+Shift+J` is reserved for the off-mac
-// error-jump chord (BlockTerminal's own chord handler, bound at the
-// document) — narrowed to that exact combination, since a blanket
-// "any Ctrl+Shift" reservation also swallows US-layout chords that need
-// Shift to type, like Ctrl+_ (readline undo, 0x1F) and Ctrl+^ (0x1E). On
-// macOS the app chord is ⌘⇧E (metaKey), which mapKey never special-cases —
-// so no reservation is needed there.
+// handled by the caller.
+//
+// Off-mac, Ctrl+Shift is the app's whole chord space (keymap.ts binds
+// Ctrl+Shift+{K,N,D,E,W,S,L,[,],digit} and BlockTerminal's error jump takes
+// Ctrl+Shift+J), so those combinations are reserved rather than written to the
+// PTY — otherwise one keypress both runs the app action AND injects a control
+// byte (Ctrl+Shift+D would send EOT and could close the shell). The reservation
+// is an allow-list, not a blanket: SHIFTED_CONTROLS still pass through. On
+// macOS the app chords are all ⌘-based, which mapKey never special-cases, so
+// nothing is reserved there.
 export function mapKey(e: RawKeyEvent): string {
   if (e.key === 'Enter') return '\r'
   if (e.key === 'Tab') return '\t'
   if (e.key === 'Backspace') return '\x7f'
-  if (!isMac && e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'j') return ''
+  if (!isMac && e.ctrlKey && e.shiftKey && !SHIFTED_CONTROLS.includes(e.key)) return ''
   if (e.ctrlKey && e.key.length === 1) return String.fromCharCode(e.key.toUpperCase().charCodeAt(0) - 64)
   return ''
 }
