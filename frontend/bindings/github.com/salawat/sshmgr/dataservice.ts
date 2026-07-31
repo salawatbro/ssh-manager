@@ -36,6 +36,15 @@ export function ImportServers(): $CancellablePromise<number> {
 }
 
 /**
+ * OpenExternalURL opens an http/https URL (a link clicked in block-terminal
+ * output) in the user's default browser. Scheme validation lives in
+ * platform.OpenExternalURL — the URL comes from untrusted terminal output.
+ */
+export function OpenExternalURL(url: string): $CancellablePromise<void> {
+    return $Call.ByID(3596933751, url);
+}
+
+/**
  * RevealDataFolder opens the app's data folder in the OS file manager.
  */
 export function RevealDataFolder(): $CancellablePromise<void> {

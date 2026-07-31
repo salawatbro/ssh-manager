@@ -60,3 +60,10 @@ func (d *DataService) RevealDataFolder() error {
 	}
 	return platform.RevealInFileManager(dir)
 }
+
+// OpenExternalURL opens an http/https URL (a link clicked in block-terminal
+// output) in the user's default browser. Scheme validation lives in
+// platform.OpenExternalURL — the URL comes from untrusted terminal output.
+func (d *DataService) OpenExternalURL(url string) error {
+	return platform.OpenExternalURL(url)
+}
