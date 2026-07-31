@@ -4,9 +4,55 @@ All notable changes to **Zish**. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
 follow [Semantic Versioning](https://semver.org/).
 
-Only **1.0.0**, **1.1.0**, **1.2.0**, **1.3.0** and **1.3.1** are packaged, published releases (macOS `.dmg`).
+Only **1.0.0**, **1.1.0**, **1.2.0**, **1.3.0**, **1.3.1** and **1.4.0** are packaged, published releases (macOS `.dmg`).
 Versions **0.1–0.7** are the development milestones that built up to 1.0; **1.1.1**
 was a version bump that first shipped packaged as part of 1.2.0.
+
+## [1.4.0] — 2026-07-31
+
+A full visual redesign, a completed SFTP/session backend, an app lock, and a
+custom form-control set. Existing servers, settings and Keychain secrets are
+preserved — nothing about a saved connection changes.
+
+### Added
+
+- **App Lock** — an optional local lock with a 6-digit PIN (stored only as a
+  bcrypt hash in the macOS Keychain, never on disk) and Touch ID. Zish locks on
+  launch, after an idle timeout, and on `⌘L`; Touch ID is presented
+  automatically when it's enabled. Live SSH sessions and tunnels stay connected
+  behind the lock screen. A "Forgot passcode?" reset wipes servers, Keychain
+  secrets and the PIN back to first-run — `~/.ssh` is left untouched.
+- **Server detail page** — a single click on a server opens a detail view
+  (connection facts, recent sessions, tunnels); the add/edit form is now opened
+  explicitly and lives in a 620px modal.
+- **SFTP as full dual file managers** — both panes browse, transfer, rename,
+  delete and make folders, with multi-selection, drag transfers, a persistent
+  transfer strip showing real rate and ETA, and a built-in file editor opened
+  from either pane.
+- **Session history** — a "Recent sessions" card on the detail page, backed by
+  a recorded session log.
+- **Live host metrics** — the detail page probes host metrics over a dedicated
+  connection (never the terminal's own channel).
+- **Restore sessions on launch** and **confirm before closing a session** (and
+  the SFTP tab) — both opt-in from Settings → General.
+- **"Keep the terminal awake"** setting — sends a keepalive on idle sessions.
+- **Custom form controls** — the environment, group, jump-host and snippet
+  pickers are now custom dropdowns that show their colours (the environment
+  swatch is visible in the trigger and in every option); a shared text input
+  replaces the per-form field styles.
+
+### Changed
+
+- **Full UI redesign** — rebuilt sidebar, tab strip (pills with an SFTP badge),
+  settings sections, overlays, and a connecting overlay with real per-step
+  timing. Tunnels moved onto the server detail page; the old right panel is
+  retired. A tunnel now explains itself with the `ssh` command it stands for.
+
+### Fixed
+
+- Health checks dial a dedicated connection instead of reusing the terminal's
+  channel (which could tear the session down).
+- Dropped a stray environment marker from the sidebar group header.
 
 ## [1.3.1] — 2026-07-29
 
