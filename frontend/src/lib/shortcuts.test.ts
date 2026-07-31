@@ -66,6 +66,7 @@ const MAC: Row[] = [
     ],
   },
   { label: 'Find in terminal', keys: '⌘F', probes: [] },
+  { label: 'Jump to failed command', keys: '⌘⇧E', probes: [] },
   { label: 'Snippet palette', keys: '⌘E', probes: [{ event: key({ metaKey: true, key: 'e' }), action: 'snippets' }] },
   {
     label: 'Run snippet quick-slot 1…9',
@@ -102,6 +103,7 @@ const WIN: Row[] = [
     ],
   },
   { label: 'Find in terminal', keys: 'Ctrl+Shift+F', probes: [] },
+  { label: 'Jump to failed command', keys: 'Ctrl+Shift+J', probes: [] },
   { label: 'Snippet palette', keys: 'Ctrl+Shift+S', probes: [{ event: key({ ctrlKey: true, shiftKey: true, key: 's' }), action: 'snippets' }] },
   {
     label: 'Run snippet quick-slot 1…9',

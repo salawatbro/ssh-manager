@@ -18,20 +18,30 @@ export function Block({
   onToggle,
   sendRaw,
   onRerun,
+  active,
+  onActivate,
+  innerRef,
 }: {
   block: TermBlock
   onToggle: () => void
   sendRaw: (d: string) => void
   onRerun?: () => void
+  active?: boolean
+  onActivate?: () => void
+  innerRef?: (el: HTMLDivElement | null) => void
 }) {
-  const rail = block.running ? 'bg-stConnecting' : block.exitCode ? 'bg-stFailed' : 'bg-border'
+  const rail = block.running ? 'bg-stConnecting' : active ? 'bg-accent' : block.exitCode ? 'bg-stFailed' : 'bg-border'
   const duration = !block.running ? fmtDuration(block) : null
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '3px minmax(0,1fr)' }}>
+    <div
+      ref={innerRef}
+      onClick={() => { if (onActivate && !window.getSelection()?.toString()) onActivate() }}
+      style={{ display: 'grid', gridTemplateColumns: '3px minmax(0,1fr)' }}
+    >
       <div className={rail} />
       <div style={{ minWidth: 0 }}>
         <div className="flex items-center gap-[6px]" style={{ padding: '2px 8px' }}>
-          <button type="button" onClick={onToggle} className="text-textDim hover:text-text">
+          <button type="button" onClick={(e) => { e.stopPropagation(); onToggle() }} className="text-textDim hover:text-text">
             {block.folded ? '▸' : '▾'}
           </button>
           <span className="truncate tc-fg flex-1 font-mono text-[12.5px]">{block.command}</span>
@@ -52,7 +62,7 @@ export function Block({
           )}
           <button
             type="button"
-            onClick={() => void navigator.clipboard.writeText(copyText(block))}
+            onClick={(e) => { e.stopPropagation(); void navigator.clipboard.writeText(copyText(block)) }}
             className="text-textDim hover:text-text"
             title="Copy output"
           >

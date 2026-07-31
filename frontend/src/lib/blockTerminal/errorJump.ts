@@ -2,8 +2,9 @@ import type { TermBlock } from './types'
 
 // Ids of finished blocks that exited non-zero, in document order. Running
 // blocks (exitCode null) never count — a command in flight hasn't failed yet.
+// Matches Block.tsx's own failed-state check (exitCode !== 0), not just > 0.
 export function failedIds(blocks: TermBlock[]): string[] {
-  return blocks.filter((b) => !b.running && b.exitCode != null && b.exitCode > 0).map((b) => b.id)
+  return blocks.filter((b) => !b.running && b.exitCode != null && b.exitCode !== 0).map((b) => b.id)
 }
 
 // The next failed id after `current`, wrapping. Null/absent current (or an

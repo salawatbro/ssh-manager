@@ -11,6 +11,9 @@ describe('failedIds', () => {
     const blocks = [blk('a', 0), blk('b', 1), blk('c', null, true), blk('d', 2), blk('e', null)]
     expect(failedIds(blocks)).toEqual(['b', 'd'])
   })
+  it('returns an empty array for no blocks', () => {
+    expect(failedIds([])).toEqual([])
+  })
 })
 
 describe('nextFailedId', () => {
@@ -29,5 +32,8 @@ describe('nextFailedId', () => {
   })
   it('starts at the first id when current is not in the list', () => {
     expect(nextFailedId(['a', 'b', 'c'], 'zzz')).toBe('a')
+  })
+  it('wraps to itself for a single-element list', () => {
+    expect(nextFailedId(['a'], 'a')).toBe('a')
   })
 })
