@@ -80,7 +80,13 @@ export function Block({
                     <span
                       key={j}
                       className={s.cls}
-                      onClick={(e) => { e.stopPropagation(); void DataService.OpenExternalURL(s.link!.target) }}
+                      // Selection guard mirrors the block root's: double-clicking or
+                      // drag-selecting a URL keeps both mousedown and mouseup inside
+                      // this span, so without it that click would launch the browser.
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (!window.getSelection()?.toString()) void DataService.OpenExternalURL(s.link!.target)
+                      }}
                     >
                       {s.text}
                     </span>
