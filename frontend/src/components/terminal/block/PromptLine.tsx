@@ -19,6 +19,12 @@ export function PromptLine({
   useEffect(() => {
     if (inputRef) inputRef.current = ref.current
     if (focused) ref.current?.focus()
+    // Clear the shared ref on unmount so it doesn't keep pointing at a
+    // detached input while a command runs (harmless today only because
+    // focus() on a detached node is a silent no-op).
+    return () => {
+      if (inputRef) inputRef.current = null
+    }
   }, [focused, inputRef])
   return (
     <div className="flex items-center font-mono text-[12.5px]" style={{ padding: '6px 8px' }}>

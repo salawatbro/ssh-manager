@@ -91,4 +91,25 @@ describe('splitLinks', () => {
     expect(out[0]).toBe(line[0])
     expect(out.some((s) => s.link)).toBe(true)
   })
+
+  it('still links a URL whose scheme colon and slashes are split across a chunk boundary', () => {
+    // The pre-check in splitRun tests for a lone ':' (not '://'), specifically
+    // so this case — the split falling right at the scheme boundary — is not
+    // skipped before the join that coalesces it.
+    const line = [seg('see https:'), seg('//a.co now')]
+    const out = splitLinks(line)
+    expect(joined(out)).toBe('see https://a.co now')
+    const link = out.find((s) => s.link)
+    expect(link?.link).toEqual({ kind: 'url', target: 'https://a.co' })
+  })
+
+  it('excludes a bidi override character from the linked target', () => {
+    // U+202E (right-to-left override) could otherwise make the rendered link
+    // text read as a different host than the one actually opened.
+    const url = 'https://a.co/‮evil'
+    const out = splitLinks([seg(`visit ${url} now`)])
+    const link = out.find((s) => s.link)!
+    expect(link.link!.target).toBe('https://a.co/')
+    expect(link.link!.target).not.toContain('‮')
+  })
 })

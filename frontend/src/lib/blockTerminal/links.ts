@@ -10,7 +10,15 @@ import type { Segment } from './types'
 // deliberate — widening the class risks swallowing trailing markup/punctuation
 // that isn't part of the URL — so a later phase should not "fix" this without
 // revisiting that tradeoff.
-const URL_RE = /https?:\/\/[^\s<>"'`()[\]{}]+/g
+//
+// The class also excludes bidi-control and zero-width characters (U+200B-
+// U+200F, U+202A-U+202E, U+2066-U+2069). Untrusted terminal output could
+// otherwise embed e.g. U+202E (right-to-left override) inside the match,
+// making the rendered link text read as a different host than the one the
+// target actually opens. Excluding them only narrows what the class accepts
+// (a link now truncates a character earlier instead of swallowing it) — it
+// does not change the parenthesis/whitespace/bare-www behaviour above.
+const URL_RE = /https?:\/\/[^\s<>"'`()[\]{}​-‏‪-‮⁦-⁩]+/g
 const TRAILING = /[.,;:!?]+$/
 
 // Split any URL inside a line's text into its own tc-lnk segment. A line with
@@ -63,6 +71,13 @@ export function splitLinks(line: Segment[]): Segment[] {
 // single-element array — do not treat "one part" as "no match".
 function splitRun(run: Segment[]): Segment[] | null {
   const cls = run[0].cls
+  // Cheap pre-check before the join allocation: skip runs where no segment
+  // holds even a lone ':'. This must test for ':', not '://' — a URL split
+  // right at the scheme boundary (e.g. "https:" | "//a.co") has the ':' in
+  // one segment and the "//" in the next, so testing for the full scheme
+  // here would reintroduce the split-chunk bug the run-coalescing exists to
+  // fix.
+  if (!run.some((s) => s.text.includes(':'))) return null
   const text = run.map((s) => s.text).join('')
   if (!text.includes('://')) return null
 

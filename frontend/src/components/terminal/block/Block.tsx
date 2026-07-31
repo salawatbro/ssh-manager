@@ -2,6 +2,7 @@ import { DataService } from '@bindings/github.com/salawat/sshmgr'
 import type { TermBlock } from '../../../lib/blockTerminal/types'
 import { copyText, foldLabel, visibleLines } from '../../../lib/blockTerminal/foldPolicy'
 import { splitLinks } from '../../../lib/blockTerminal/links'
+import { toastError } from '../../../stores/toasts'
 import { RawBlock } from './RawBlock'
 
 // Formats a block's wall-clock run time for the header (ms under a second,
@@ -85,7 +86,12 @@ export function Block({
                       // this span, so without it that click would launch the browser.
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (!window.getSelection()?.toString()) void DataService.OpenExternalURL(s.link!.target)
+                        if (!window.getSelection()?.toString()) {
+                          // A rejected scheme and an opener failure aren't
+                          // distinguishable by message, so this stays generic
+                          // rather than branching on the error text.
+                          DataService.OpenExternalURL(s.link!.target).catch(() => toastError('Could not open link'))
+                        }
                       }}
                     >
                       {s.text}

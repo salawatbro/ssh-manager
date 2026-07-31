@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { createBlockSession } from '../../../stores/blockSession'
 import { isMac } from '../../../lib/platform'
 import { failedIds, nextFailedId } from '../../../lib/blockTerminal/errorJump'
+import { rerunCommand } from '../../../lib/blockTerminal/rerunCommand'
+import { mapKey } from '../../../lib/blockTerminal/rawKeys'
+import { usePalette } from '../../../stores/palette'
+import { useSnippets } from '../../../stores/snippets'
+import { useGuard } from '../../../stores/guard'
 import { Block } from './Block'
 import { PromptLine } from './PromptLine'
 import { ErrorJumpChip } from './ErrorJumpChip'
@@ -11,8 +16,8 @@ type Session = ReturnType<typeof createBlockSession>
 // Scroll container for a block-terminal pane: renders the block list + the
 // compose prompt, routes keyboard input, and owns the error-jump/focus cursor
 // (targetId — view-only). While a command is running the prompt is hidden and
-// keystrokes pass through raw to the PTY (mapKey below); otherwise PromptLine
-// owns compose + history.
+// keystrokes pass through raw to the PTY (mapKey, lib/blockTerminal/rawKeys.ts);
+// otherwise PromptLine owns compose + history.
 export function BlockTerminal({
   session,
   focused,
@@ -38,6 +43,10 @@ export function BlockTerminal({
   // listener isn't re-subscribed on every stream tick.
   const jumpRef = useRef<() => void>(() => {})
   jumpRef.current = () => {
+    // Mirrors useTerminalKeymap.ts's overlay gate: while the palette, the
+    // snippet palette, or the guard confirm modal owns the keyboard, the
+    // chord must not scroll the pane behind it.
+    if (usePalette.getState().open || useSnippets.getState().open || useGuard.getState().open) return
     const ids = failedIds(snap.blocks)
     if (ids.length === 0) return
     const next = nextFailedId(ids, targetId && ids.includes(targetId) ? targetId : null)
@@ -69,8 +78,12 @@ export function BlockTerminal({
   // scroll container that carries raw passthrough while a command runs.
   const activate = (id: string) => {
     setTargetId(id)
-    if (snap.running && !snap.altScreen) ref.current?.focus()
-    else promptRef.current?.focus()
+    // preventScroll: true in both branches — the focus target lives inside
+    // this scroll container, and HTMLElement.focus() defaults to scrolling
+    // it into view (i.e. to the bottom), which would undo an error-jump
+    // scroll-to-center right as the user clicks the block they jumped to.
+    if (snap.running && !snap.altScreen) ref.current?.focus({ preventScroll: true })
+    else promptRef.current?.focus({ preventScroll: true })
   }
 
   return (
@@ -91,18 +104,24 @@ export function BlockTerminal({
             : undefined
         }
       >
-        {snap.blocks.map((b) => (
-          <Block
-            key={b.id}
-            block={b}
-            onToggle={() => session.toggleFold(b.id)}
-            sendRaw={session.sendRaw}
-            onRerun={snap.running || !b.command ? undefined : () => session.rerun(b.command)}
-            active={b.id === targetId}
-            onActivate={() => activate(b.id)}
-            innerRef={(el) => { if (el) rowRefs.current.set(b.id, el); else rowRefs.current.delete(b.id) }}
-          />
-        ))}
+        {snap.blocks.map((b) => {
+          // block.command is the raw terminal echo (see rerunCommand.ts), not
+          // a parsed line — sanitize once and reuse it for both the
+          // emptiness check and the actual rerun call.
+          const clean = rerunCommand(b.command)
+          return (
+            <Block
+              key={b.id}
+              block={b}
+              onToggle={() => session.toggleFold(b.id)}
+              sendRaw={session.sendRaw}
+              onRerun={snap.running || !clean ? undefined : () => session.rerun(clean)}
+              active={b.id === targetId}
+              onActivate={() => activate(b.id)}
+              innerRef={(el) => { if (el) rowRefs.current.set(b.id, el); else rowRefs.current.delete(b.id) }}
+            />
+          )
+        })}
         {!snap.running && (
           <PromptLine
             focused={focused}
@@ -114,15 +133,4 @@ export function BlockTerminal({
       </div>
     </div>
   )
-}
-
-// Minimal control-key mapping for raw passthrough (Enter, Tab, Backspace,
-// Ctrl-<letter>). Printable single characters are handled by the caller.
-function mapKey(e: KeyboardEvent<HTMLDivElement>): string {
-  if (e.key === 'Enter') return '\r'
-  if (e.key === 'Tab') return '\t'
-  if (e.key === 'Backspace') return '\x7f'
-  if (e.ctrlKey && e.shiftKey) return '' // reserved for app chords (error jump)
-  if (e.ctrlKey && e.key.length === 1) return String.fromCharCode(e.key.toUpperCase().charCodeAt(0) - 64)
-  return ''
 }
