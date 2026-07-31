@@ -34,5 +34,5 @@ export function RawBlock({ block, sendRaw }: { block: TermBlock; sendRaw: (d: st
     }
   })
 
-  return <div ref={hostRef} style={{ height: 340 }} />
+  return <div ref={hostRef} className="h-full w-full" style={{ minHeight: 260 }} />
 }

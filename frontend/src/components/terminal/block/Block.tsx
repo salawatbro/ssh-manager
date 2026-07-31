@@ -60,7 +60,15 @@ export function Block({
             ))}
           </div>
         )}
-        {!block.folded && block.mode === 'xterm' && <RawBlock block={block} sendRaw={sendRaw} />}
+        {!block.folded && block.mode === 'xterm' && (
+          block.running
+            ? <RawBlock block={block} sendRaw={sendRaw} />
+            : (
+              <div className="tc-dim" style={{ padding: '4px 12px 8px 8px', fontStyle: 'italic' }}>
+                interactive session ended
+              </div>
+            )
+        )}
         {block.folded && (
           <button
             type="button"

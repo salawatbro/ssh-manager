@@ -1,15 +1,22 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 
 // The compose line shown when no command is running: Enter submits, Up/Down
 // recall the block terminal's own history (see lib/blockTerminal/history.ts).
+// Remounts every time the terminal returns to the prompt, so the focused
+// effect below re-fires on each command completion, not just pane focus.
 export function PromptLine({
   onSubmit,
   onHistory,
+  focused,
 }: {
   onSubmit: (line: string) => void
   onHistory: (dir: 'up' | 'down', current: string) => string | null
+  focused: boolean
 }) {
   const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (focused) ref.current?.focus()
+  }, [focused])
   return (
     <div className="flex items-center font-mono text-[12.5px]" style={{ padding: '6px 8px' }}>
       <span className="tc-dim shrink-0">$&nbsp;</span>

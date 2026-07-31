@@ -9,7 +9,15 @@ type Session = ReturnType<typeof createBlockSession>
 // compose prompt, and routes keyboard input. While a command is running the
 // prompt is hidden and keystrokes pass through raw to the PTY (mapKey below);
 // otherwise PromptLine owns compose + history.
-export function BlockTerminal({ session, onRawKey }: { session: Session; onRawKey: (data: string) => void }) {
+export function BlockTerminal({
+  session,
+  focused,
+  onRawKey,
+}: {
+  session: Session
+  focused: boolean
+  onRawKey: (data: string) => void
+}) {
   const snap = useSyncExternalStore(session.subscribe, session.snapshot)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -36,6 +44,7 @@ export function BlockTerminal({ session, onRawKey }: { session: Session; onRawKe
       ))}
       {!snap.running && (
         <PromptLine
+          focused={focused}
           onSubmit={(line) => session.submit(line)}
           onHistory={(dir, cur) => (dir === 'up' ? session.historyUp(cur) : session.historyDown())}
         />

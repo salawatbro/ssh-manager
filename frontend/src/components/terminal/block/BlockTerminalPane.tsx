@@ -76,7 +76,7 @@ export function BlockTerminalPane({ paneId, tabId, serverId, focused, onFocus }:
 
   return (
     <div ref={hostRef} className="relative h-full w-full bg-bg0" onMouseDown={onFocus}>
-      <BlockTerminal session={session} onRawKey={(d) => session.sendRaw(d)} />
+      <BlockTerminal session={session} focused={focused} onRawKey={(d) => session.sendRaw(d)} />
       {(status === 'error' || status === 'closed') && (
         <PaneNotice kind={status === 'error' ? 'failed' : 'dropped'} message={message} onAction={retry} />
       )}
