@@ -2,6 +2,7 @@
 export interface Segment {
   text: string
   cls: string // e.g. 'tc-grn tc-bold' — maps to --term-* via CSS
+  link?: { kind: 'url'; target: string } // set by splitLinks; renders as a tc-lnk anchor
 }
 
 // A parsed command-boundary marker from the PTY byte stream (OSC 133).
