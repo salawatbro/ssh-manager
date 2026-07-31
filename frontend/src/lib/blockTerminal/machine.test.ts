@@ -76,7 +76,7 @@ describe('createBlockMachine', () => {
 })
 
 describe('createBlockMachine clear', () => {
-  it('drops the earlier blocks when a command erases the display', () => {
+  it('leaves the pane completely empty — the erasing block goes too', () => {
     n = 0
     const m = createBlockMachine(ids)
     m.write(`${A}${B}ls${C}one\ntwo${D(0)}`)
@@ -84,21 +84,47 @@ describe('createBlockMachine clear', () => {
     expect(m.blocks().length).toBe(2)
     // `clear`: ESC[H latches complex, ESC[2J/3J wipe the screen.
     m.write(`${A}${B}clear${C}${ESC}[H${ESC}[2J${ESC}[3J${D(0)}`)
-    const b = m.blocks()
-    expect(b.length).toBe(1)
-    expect(b[0].command).toBe('clear')
-    expect(b[0].mode).toBe('html') // NOT handed to xterm
-    expect(b[0].exitCode).toBe(0)
+    expect(m.blocks()).toEqual([])
   })
 
-  it('keeps output a command prints after erasing the display', () => {
+  it('starts a fresh block for the next command after a clear', () => {
+    n = 0
+    const m = createBlockMachine(ids)
+    m.write(`${A}${B}ls${C}out${D(0)}`)
+    m.write(`${A}${B}clear${C}${ESC}[H${ESC}[2J${D(0)}`)
+    expect(m.blocks()).toEqual([])
+    m.write(`${A}${B}echo hi${C}hi${D(0)}`)
+    const b = m.blocks()
+    expect(b.length).toBe(1)
+    expect(b[0].command).toBe('echo hi')
+    expect(b[0].lines.map((l) => l.map((s) => s.text).join(''))).toEqual(['hi'])
+  })
+
+  // The erasing block is detached, not discarded: a command that erases and
+  // THEN prints (`tput clear; echo hi`) must still show its output.
+  it('re-attaches the erasing block when it prints after the erase', () => {
     n = 0
     const m = createBlockMachine(ids)
     m.write(`${A}${B}old${C}gone${D(0)}`)
     m.write(`${A}${B}redraw${C}${ESC}[2Jfresh${D(0)}`)
     const b = m.blocks()
     expect(b.length).toBe(1)
+    expect(b[0].command).toBe('redraw')
+    expect(b[0].mode).toBe('html') // NOT handed to xterm
+    expect(b[0].exitCode).toBe(0)
     expect(b[0].lines.map((l) => l.map((s) => s.text).join(''))).toEqual(['fresh'])
+  })
+
+  it('re-attaches when the print arrives in a later chunk than the erase', () => {
+    n = 0
+    const m = createBlockMachine(ids)
+    m.write(`${A}${B}old${C}gone${D(0)}`)
+    m.write(`${A}${B}slow${C}${ESC}[2J`)
+    expect(m.blocks()).toEqual([])
+    m.write('later')
+    const b = m.blocks()
+    expect(b.length).toBe(1)
+    expect(b[0].lines.map((l) => l.map((s) => s.text).join(''))).toEqual(['later'])
   })
 
   it('does not clear for an alt-screen program that erases inside its own screen', () => {

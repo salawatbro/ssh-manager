@@ -1,7 +1,9 @@
 import { splitOsc133 } from './osc133'
 import { createAnsiParser } from './ansi'
 import { shouldAutoFold } from './foldPolicy'
-import type { TermBlock } from './types'
+import type { Segment, TermBlock } from './types'
+
+const hasText = (lines: Segment[][]) => lines.some((l) => l.some((s) => s.text.length > 0))
 
 // State machine turning a PTY byte stream into command blocks. States:
 //  idle    — at/after a prompt (A seen, before C). Command text after B.
@@ -16,9 +18,13 @@ export function createBlockMachine(newId: () => string) {
   let cmd = ''
   let cur: TermBlock | null = null
   let ansi = createAnsiParser()
+  // The running block erased the screen and was pulled out of `blocks`. It is
+  // detached rather than discarded: if it prints after erasing, it comes back.
+  let detached = false
 
   const startBlock = () => {
     ansi = createAnsiParser()
+    detached = false
     cur = {
       id: newId(), command: cmd.trim(), startedAt: Date.now(), endedAt: null,
       exitCode: null, running: true, mode: 'html', lines: [], folded: false,
@@ -32,15 +38,18 @@ export function createBlockMachine(newId: () => string) {
       if (cur.mode === 'html') {
         ansi.write(text)
         // Erase-display is `clear`. A block terminal's screen IS the block
-        // list, so wipe it and keep only the command that did the erasing —
-        // the parser has already emptied this block's own grid. Checked before
-        // the complex flip: `clear` leads with ESC[H, and only the parser knows
-        // the erase that followed retracted it.
+        // list, so the whole list goes — including the block of the command
+        // that did the erasing, so the pane ends up genuinely empty. That block
+        // is only detached: a command that erases and THEN prints
+        // (`tput clear; echo hi`) is re-attached below, in this write or a
+        // later one. Checked before the complex flip: `clear` leads with ESC[H,
+        // and only the parser knows the erase that followed retracted it.
         if (ansi.takeCleared()) {
           blocks.length = 0
-          blocks.push(cur)
+          detached = true
         }
         cur.lines = ansi.lines()
+        if (detached && hasText(cur.lines)) { blocks.push(cur); detached = false }
         if (ansi.sawComplex()) { cur.mode = 'xterm'; cur.raw = text } // seed with the chunk that flipped it
       } else {
         cur.raw = (cur.raw ?? '') + text // subsequent raw bytes for RawBlock to replay
