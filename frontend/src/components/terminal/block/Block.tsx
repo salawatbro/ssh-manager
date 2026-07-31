@@ -1,5 +1,7 @@
+import { DataService } from '@bindings/github.com/salawat/sshmgr'
 import type { TermBlock } from '../../../lib/blockTerminal/types'
 import { copyText, foldLabel, visibleLines } from '../../../lib/blockTerminal/foldPolicy'
+import { splitLinks } from '../../../lib/blockTerminal/links'
 import { RawBlock } from './RawBlock'
 
 // Formats a block's wall-clock run time for the header (ms under a second,
@@ -73,11 +75,21 @@ export function Block({
           <div className="font-mono text-[12.5px]" style={{ padding: '2px 12px 8px 8px' }}>
             {visibleLines(block).map((line, i) => (
               <div key={i} style={{ wordBreak: 'break-word' }}>
-                {line.map((s, j) => (
-                  <span key={j} className={s.cls}>
-                    {s.text}
-                  </span>
-                ))}
+                {splitLinks(line).map((s, j) =>
+                  s.link ? (
+                    <span
+                      key={j}
+                      className={s.cls}
+                      onClick={(e) => { e.stopPropagation(); void DataService.OpenExternalURL(s.link!.target) }}
+                    >
+                      {s.text}
+                    </span>
+                  ) : (
+                    <span key={j} className={s.cls}>
+                      {s.text}
+                    </span>
+                  ),
+                )}
               </div>
             ))}
           </div>

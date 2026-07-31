@@ -94,6 +94,8 @@
 .tc-cyn { color: var(--term-cyan) }
 .tc-bold { font-weight: 600 }
 .tc-ul  { text-decoration: underline; text-underline-offset: 2px }
+.tc-lnk { color: var(--term-blue); cursor: pointer; text-decoration: underline dotted }
+.tc-lnk:hover { text-decoration-style: solid }
 
 /* Everything below participates in the normal cascade via @layer base, so that
    Tailwind utilities (which Tailwind itself emits into @layer utilities) can
