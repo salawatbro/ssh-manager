@@ -11,6 +11,17 @@ export function TerminalSection() {
     <div className="flex flex-col">
       <TerminalPreview fontSize={s.termFontSize} cursor={s.termCursor} blink={s.termBlink} />
 
+      <Row label="Terminal mode" hint="Blocks groups each command and its output; needs shell integration. Classic is the standard terminal.">
+        <Segmented
+          value={s.terminalMode}
+          options={[
+            { value: 'classic', label: 'Classic' },
+            { value: 'blocks', label: 'Blocks' },
+          ]}
+          onChange={(v) => void update({ terminalMode: v })}
+        />
+      </Row>
+
       {/* Font-family and Theme are display-only: `s.termFont`/`s.termTheme`
           are real persisted fields (settings.go sanitizes them to
           "JetBrains Mono" / "graphite" no matter what is sent), but this
