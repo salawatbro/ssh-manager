@@ -47,4 +47,48 @@ describe('splitLinks', () => {
     const pre: Segment[] = [{ text: 'https://a.co', cls: 'tc-lnk', link: { kind: 'url', target: 'https://a.co' } }]
     expect(splitLinks(pre)).toBe(pre)
   })
+
+  it('links the whole URL when it is split across two same-cls adjacent segments', () => {
+    const line = [seg('see https://exa'), seg('mple.com now')]
+    const out = splitLinks(line)
+    expect(joined(out)).toBe('see https://example.com now')
+    const link = out.find((s) => s.link)
+    expect(link?.link).toEqual({ kind: 'url', target: 'https://example.com' })
+  })
+
+  it('does not join a URL split across segments with different cls', () => {
+    // Deliberately out of scope: a styling change mid-URL is treated as a
+    // hard boundary, so each half is matched independently.
+    const line = [seg('see https://exa', 'tc-fg'), seg('mple.com now', 'tc-blu')]
+    const out = splitLinks(line)
+    expect(out.filter((s) => s.link).map((s) => s.link!.target)).toEqual(['https://exa'])
+    expect(joined(out)).toBe('see https://example.com now')
+  })
+
+  it('returns the same array reference when two same-cls segments have no URL', () => {
+    const line = [seg('no link '), seg('here at all')]
+    expect(splitLinks(line)).toBe(line)
+  })
+
+  it('does not produce a leading space in the link class when cls is empty', () => {
+    const out = splitLinks([seg('https://a.co', '')])
+    const link = out.find((s) => s.link)!
+    expect(link.cls).toBe('tc-lnk')
+  })
+
+  it('links both URLs and reproduces the original text exactly when a trim is involved', () => {
+    const out = splitLinks([seg('https://a.co, https://b.co.')])
+    expect(out.filter((s) => s.link).map((s) => s.link!.target)).toEqual(['https://a.co', 'https://b.co'])
+    expect(joined(out)).toBe('https://a.co, https://b.co.')
+  })
+
+  it('leaves a non-matching segment untouched by reference on a mixed line', () => {
+    // Different cls on the first segment keeps it in its own run (per the
+    // run-grouping rule), so it is unrelated to the second segment's match
+    // and its identity must survive untouched.
+    const line = [seg('plain', 'tc-dim'), seg('see https://a.co')]
+    const out = splitLinks(line)
+    expect(out[0]).toBe(line[0])
+    expect(out.some((s) => s.link)).toBe(true)
+  })
 })
