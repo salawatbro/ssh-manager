@@ -13,16 +13,16 @@ export function BlockTerminal({ session, onRawKey }: { session: Session; onRawKe
   const snap = useSyncExternalStore(session.subscribe, session.snapshot)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (snap.running) ref.current?.focus()
-  }, [snap.running])
+    if (snap.running && !snap.altScreen) ref.current?.focus()
+  }, [snap.running, snap.altScreen])
   return (
     <div
       ref={ref}
       className="zish-scroll h-full w-full overflow-y-auto font-mono"
       style={{ background: 'var(--term-bg)', color: 'var(--term-fg)' }}
-      tabIndex={snap.running ? 0 : -1}
+      tabIndex={snap.running && !snap.altScreen ? 0 : -1}
       onKeyDown={
-        snap.running
+        snap.running && !snap.altScreen
           ? (e) => {
               const data = e.ctrlKey || e.metaKey || e.altKey || e.key.length > 1 ? mapKey(e) : e.key
               if (data) onRawKey(data)

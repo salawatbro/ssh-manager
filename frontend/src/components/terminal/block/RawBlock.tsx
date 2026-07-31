@@ -18,6 +18,7 @@ export function RawBlock({ block, sendRaw }: { block: TermBlock; sendRaw: (d: st
     const t = createTerminal(hostRef.current, settings)
     termRef.current = t
     const off = t.term.onData((d) => sendRaw(d))
+    t.term.focus()
     return () => { off.dispose(); t.term.dispose(); termRef.current = null; writtenRef.current = 0 }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
