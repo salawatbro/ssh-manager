@@ -54,4 +54,12 @@ describe('createBlockMachine', () => {
     expect(m.blocks()[0].running).toBe(false)
     expect(m.blocks()[0].exitCode).toBe(0)
   })
+
+  it('auto-folds a long finished block', () => {
+    n = 0
+    const m = createBlockMachine(ids)
+    const many = Array.from({ length: 50 }, (_, i) => `line ${i}`).join('\n')
+    m.write(`${A}${B}seq${C}${many}${D(0)}`)
+    expect(m.blocks()[0].folded).toBe(true)
+  })
 })

@@ -1,5 +1,6 @@
 import { splitOsc133 } from './osc133'
 import { createAnsiParser } from './ansi'
+import { shouldAutoFold } from './foldPolicy'
 import type { TermBlock } from './types'
 
 // State machine turning a PTY byte stream into command blocks. States:
@@ -53,7 +54,10 @@ export function createBlockMachine(newId: () => string) {
         case 'B': phase = 'cmd'; break
         case 'C': phase = 'running'; startBlock(); break
         case 'D':
-          if (cur) { cur.running = false; cur.exitCode = part.event.exit; cur.endedAt = Date.now() }
+          if (cur) {
+            cur.running = false; cur.exitCode = part.event.exit; cur.endedAt = Date.now()
+            cur.folded = shouldAutoFold(cur)
+          }
           phase = 'idle'; break
       }
     }

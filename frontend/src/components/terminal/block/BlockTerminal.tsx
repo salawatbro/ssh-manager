@@ -1,4 +1,4 @@
-import { useSyncExternalStore, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useSyncExternalStore, type KeyboardEvent } from 'react'
 import type { createBlockSession } from '../../../stores/blockSession'
 import { Block } from './Block'
 import { PromptLine } from './PromptLine'
@@ -11,15 +11,20 @@ type Session = ReturnType<typeof createBlockSession>
 // otherwise PromptLine owns compose + history.
 export function BlockTerminal({ session, onRawKey }: { session: Session; onRawKey: (data: string) => void }) {
   const snap = useSyncExternalStore(session.subscribe, session.snapshot)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (snap.running) ref.current?.focus()
+  }, [snap.running])
   return (
     <div
+      ref={ref}
       className="zish-scroll h-full w-full overflow-y-auto font-mono"
       style={{ background: 'var(--term-bg)', color: 'var(--term-fg)' }}
       tabIndex={snap.running ? 0 : -1}
       onKeyDown={
         snap.running
           ? (e) => {
-              const data = e.key.length === 1 ? e.key : mapKey(e)
+              const data = e.ctrlKey || e.metaKey || e.altKey || e.key.length > 1 ? mapKey(e) : e.key
               if (data) onRawKey(data)
               e.preventDefault()
             }
