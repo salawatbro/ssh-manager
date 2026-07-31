@@ -22,6 +22,7 @@ export function createBlockSession({ write, newId }: Deps) {
     sendRaw(data: string) { write(data) },
     historyUp: (cur: string) => history.up(cur),
     historyDown: () => history.down(),
+    toggleFold(id: string) { const b = machine.blocks().find((x) => x.id === id); if (b) { b.folded = !b.folded; notify() } },
     snapshot: () => snap,
     subscribe(fn: () => void) { subs.add(fn); return () => subs.delete(fn) },
   }
