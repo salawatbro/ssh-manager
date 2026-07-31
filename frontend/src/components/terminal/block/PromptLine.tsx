@@ -47,6 +47,14 @@ export function PromptLine({
           } else if (e.key === 'ArrowDown') {
             const v = onHistory('down', ref.current!.value)
             if (v != null) ref.current!.value = v
+          } else if (e.key === 'Tab') {
+            // A terminal never hands the keyboard to the next widget, so the
+            // browser's focus-advance default is swallowed here (Shift+Tab
+            // included). Sending a bare \t to the PTY would be wrong too: the
+            // remote shell hasn't seen the composed line yet, so it would run
+            // completion against an empty prompt. Tab becomes client-side
+            // completion in Phase 3.
+            e.preventDefault()
           }
         }}
       />

@@ -73,17 +73,26 @@ export function BlockTerminal({
 
   const failedCount = failedIds(snap.blocks).length
 
+  // Puts the keyboard wherever typing should land: the compose input at the
+  // prompt, or the scroll container that carries raw passthrough while a
+  // command runs. An alt-screen block's embedded xterm owns its own keyboard,
+  // so it is left alone.
+  //
+  // preventScroll: true — the focus target lives inside this scroll container,
+  // and HTMLElement.focus() defaults to scrolling it into view (i.e. to the
+  // bottom), which would undo an error-jump scroll-to-center right as the user
+  // clicks the block they jumped to.
+  const focusKeyboard = () => {
+    if (snap.altScreen) return
+    if (snap.running) ref.current?.focus({ preventScroll: true })
+    else promptRef.current?.focus({ preventScroll: true })
+  }
+
   // Clicking a block moves the focus cursor, but the click also blurs whatever
-  // owned the keyboard. Restore it: the compose input at the prompt, or the
-  // scroll container that carries raw passthrough while a command runs.
+  // owned the keyboard — restore it.
   const activate = (id: string) => {
     setTargetId(id)
-    // preventScroll: true in both branches — the focus target lives inside
-    // this scroll container, and HTMLElement.focus() defaults to scrolling
-    // it into view (i.e. to the bottom), which would undo an error-jump
-    // scroll-to-center right as the user clicks the block they jumped to.
-    if (snap.running && !snap.altScreen) ref.current?.focus({ preventScroll: true })
-    else promptRef.current?.focus({ preventScroll: true })
+    focusKeyboard()
   }
 
   return (
@@ -94,6 +103,13 @@ export function BlockTerminal({
         className="zish-scroll h-full w-full overflow-y-auto font-mono"
         style={{ background: 'var(--term-bg)', color: 'var(--term-fg)' }}
         tabIndex={snap.running && !snap.altScreen ? 0 : -1}
+        // A terminal is one big input surface: clicking anywhere in the pane —
+        // the empty space below the blocks, the prompt's "$" prefix, a block's
+        // output — puts the cursor back in the compose line. Guarded on a live
+        // selection so drag-to-select of output still works, and skipped when
+        // the click was handled by something interactive (the header buttons
+        // and output links all stopPropagation).
+        onClick={() => { if (!window.getSelection()?.toString()) focusKeyboard() }}
         onKeyDown={
           snap.running && !snap.altScreen
             ? (e) => {
