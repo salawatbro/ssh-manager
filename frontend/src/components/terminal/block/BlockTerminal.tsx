@@ -25,6 +25,7 @@ export function BlockTerminal({
   const snap = useSyncExternalStore(session.subscribe, session.snapshot)
   const ref = useRef<HTMLDivElement>(null)
   const rowRefs = useRef(new Map<string, HTMLDivElement>())
+  const promptRef = useRef<HTMLInputElement | null>(null)
   const [targetId, setTargetId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -46,12 +47,15 @@ export function BlockTerminal({
   useEffect(() => {
     if (!focused) return
     function onKey(e: globalThis.KeyboardEvent) {
+      // Bail out for hidden background tabs: TerminalArea keeps every
+      // inactive tab mounted with `display: none`, which makes offsetParent
+      // null. `focused` alone is per-tab and doesn't account for that.
+      if (ref.current?.offsetParent == null) return
       const hit = isMac
-        ? e.metaKey && e.shiftKey && e.key.toLowerCase() === 'e'
-        : e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'j'
+        ? e.metaKey && e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === 'e'
+        : e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'j'
       if (!hit) return
       e.preventDefault()
-      e.stopPropagation()
       jumpRef.current()
     }
     document.addEventListener('keydown', onKey)
@@ -60,42 +64,54 @@ export function BlockTerminal({
 
   const failedCount = failedIds(snap.blocks).length
 
+  // Clicking a block moves the focus cursor, but the click also blurs whatever
+  // owned the keyboard. Restore it: the compose input at the prompt, or the
+  // scroll container that carries raw passthrough while a command runs.
+  const activate = (id: string) => {
+    setTargetId(id)
+    if (snap.running && !snap.altScreen) ref.current?.focus()
+    else promptRef.current?.focus()
+  }
+
   return (
-    <div
-      ref={ref}
-      className="zish-scroll relative h-full w-full overflow-y-auto font-mono"
-      style={{ background: 'var(--term-bg)', color: 'var(--term-fg)' }}
-      tabIndex={snap.running && !snap.altScreen ? 0 : -1}
-      onKeyDown={
-        snap.running && !snap.altScreen
-          ? (e) => {
-              const data = e.ctrlKey || e.metaKey || e.altKey || e.key.length > 1 ? mapKey(e) : e.key
-              if (data) onRawKey(data)
-              e.preventDefault()
-            }
-          : undefined
-      }
-    >
+    <div className="relative h-full w-full">
       {failedCount > 0 && <ErrorJumpChip count={failedCount} onJump={() => jumpRef.current()} />}
-      {snap.blocks.map((b) => (
-        <Block
-          key={b.id}
-          block={b}
-          onToggle={() => session.toggleFold(b.id)}
-          sendRaw={session.sendRaw}
-          onRerun={snap.running || !b.command ? undefined : () => session.rerun(b.command)}
-          active={b.id === targetId}
-          onActivate={() => setTargetId(b.id)}
-          innerRef={(el) => { if (el) rowRefs.current.set(b.id, el); else rowRefs.current.delete(b.id) }}
-        />
-      ))}
-      {!snap.running && (
-        <PromptLine
-          focused={focused}
-          onSubmit={(line) => session.submit(line)}
-          onHistory={(dir, cur) => (dir === 'up' ? session.historyUp(cur) : session.historyDown())}
-        />
-      )}
+      <div
+        ref={ref}
+        className="zish-scroll h-full w-full overflow-y-auto font-mono"
+        style={{ background: 'var(--term-bg)', color: 'var(--term-fg)' }}
+        tabIndex={snap.running && !snap.altScreen ? 0 : -1}
+        onKeyDown={
+          snap.running && !snap.altScreen
+            ? (e) => {
+                const data = e.ctrlKey || e.metaKey || e.altKey || e.key.length > 1 ? mapKey(e) : e.key
+                if (data) onRawKey(data)
+                e.preventDefault()
+              }
+            : undefined
+        }
+      >
+        {snap.blocks.map((b) => (
+          <Block
+            key={b.id}
+            block={b}
+            onToggle={() => session.toggleFold(b.id)}
+            sendRaw={session.sendRaw}
+            onRerun={snap.running || !b.command ? undefined : () => session.rerun(b.command)}
+            active={b.id === targetId}
+            onActivate={() => activate(b.id)}
+            innerRef={(el) => { if (el) rowRefs.current.set(b.id, el); else rowRefs.current.delete(b.id) }}
+          />
+        ))}
+        {!snap.running && (
+          <PromptLine
+            focused={focused}
+            inputRef={promptRef}
+            onSubmit={(line) => session.submit(line)}
+            onHistory={(dir, cur) => (dir === 'up' ? session.historyUp(cur) : session.historyDown())}
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -106,6 +122,7 @@ function mapKey(e: KeyboardEvent<HTMLDivElement>): string {
   if (e.key === 'Enter') return '\r'
   if (e.key === 'Tab') return '\t'
   if (e.key === 'Backspace') return '\x7f'
+  if (e.ctrlKey && e.shiftKey) return '' // reserved for app chords (error jump)
   if (e.ctrlKey && e.key.length === 1) return String.fromCharCode(e.key.toUpperCase().charCodeAt(0) - 64)
   return ''
 }

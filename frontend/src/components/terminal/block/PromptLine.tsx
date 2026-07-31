@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type MutableRefObject } from 'react'
 
 // The compose line shown when no command is running: Enter submits, Up/Down
 // recall the block terminal's own history (see lib/blockTerminal/history.ts).
@@ -8,15 +8,18 @@ export function PromptLine({
   onSubmit,
   onHistory,
   focused,
+  inputRef,
 }: {
   onSubmit: (line: string) => void
   onHistory: (dir: 'up' | 'down', current: string) => string | null
   focused: boolean
+  inputRef?: MutableRefObject<HTMLInputElement | null>
 }) {
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => {
+    if (inputRef) inputRef.current = ref.current
     if (focused) ref.current?.focus()
-  }, [focused])
+  }, [focused, inputRef])
   return (
     <div className="flex items-center font-mono text-[12.5px]" style={{ padding: '6px 8px' }}>
       <span className="tc-dim shrink-0">$&nbsp;</span>
