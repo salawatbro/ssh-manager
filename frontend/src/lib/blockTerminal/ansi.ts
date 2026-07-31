@@ -10,6 +10,13 @@ const FG: Record<number, string> = {
   95: 'tc-mag', 96: 'tc-cyn', 97: 'tc-fg',
 }
 
+// Private-mode alt-screen enter. This is the one "complex" signal an erase must
+// NOT retract: vim and htop send ESC[?1049h and ESC[2J in the same write, and
+// from the moment a full-screen app takes over, the block belongs to xterm —
+// treating the erase that follows as `clear` would wipe the user's block list
+// and leave the app unrendered.
+const ALT_ENTER = /^\x1b\[\?(?:1049|1047|47)h/
+
 interface Style { fg: string; bold: boolean; ul: boolean }
 const EMPTY: Style = { fg: '', bold: false, ul: false }
 const clsOf = (s: Style) => [s.fg, s.bold && 'tc-bold', s.ul && 'tc-ul'].filter(Boolean).join(' ')
@@ -19,6 +26,8 @@ export function createAnsiParser() {
   let col = 0 // logical column within the last line (for \r overwrite)
   let style: Style = { ...EMPTY }
   let complex = false
+  let cleared = false
+  let alt = false
 
   const cur = () => grid[grid.length - 1]
 
@@ -64,13 +73,35 @@ export function createAnsiParser() {
       if (ch === '\x1b') {
         // Only ESC[ … m (SGR) is modelled. Everything else is complex.
         if (input[i + 1] === '[') {
+          const altM = ALT_ENTER.exec(input.slice(i))
+          if (altM) {
+            complex = true
+            alt = true
+            i += altM[0].length
+            continue
+          }
           const m = /^\x1b\[([0-9;]*)([a-zA-Z])/.exec(input.slice(i))
           if (m && m[2] === 'm') {
             sgr((m[1] ? m[1].split(';') : ['0']).map((n) => Number(n || 0)))
             i += m[0].length
             continue
           }
-          complex = true // cursor move / clear / mode — hand the block to xterm
+          // Erase-display (2J = whole screen, 3J = scrollback). `clear` sends
+          // ESC[H ESC[2J ESC[3J, and that leading cursor-home would otherwise
+          // latch `complex` and hand the block to xterm — so a full erase also
+          // retracts the latch: whatever unmodelled thing happened before the
+          // screen was wiped no longer affects what is on it. Partial erases
+          // (0J/1J/bare J) stay complex; shells emit those to redraw a prompt.
+          if (m && m[2] === 'J' && (m[1] === '2' || m[1] === '3') && !alt) {
+            grid.length = 0
+            grid.push([])
+            col = 0
+            complex = false
+            cleared = true
+            i += m[0].length
+            continue
+          }
+          complex = true // cursor move / partial erase / mode — hand the block to xterm
           i += (m ? m[0].length : 2)
           continue
         }
@@ -94,5 +125,8 @@ export function createAnsiParser() {
     write,
     lines: () => grid,
     sawComplex: () => complex,
+    // Consumed, not a latch: the caller acts on a clear exactly once, and the
+    // grid it wiped is the same array `lines()` already handed out.
+    takeCleared: () => { const c = cleared; cleared = false; return c },
   }
 }

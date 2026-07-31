@@ -74,3 +74,41 @@ describe('createBlockMachine', () => {
     expect(m.blocks()[0].folded).toBe(true)
   })
 })
+
+describe('createBlockMachine clear', () => {
+  it('drops the earlier blocks when a command erases the display', () => {
+    n = 0
+    const m = createBlockMachine(ids)
+    m.write(`${A}${B}ls${C}one\ntwo${D(0)}`)
+    m.write(`${A}${B}echo hi${C}hi${D(0)}`)
+    expect(m.blocks().length).toBe(2)
+    // `clear`: ESC[H latches complex, ESC[2J/3J wipe the screen.
+    m.write(`${A}${B}clear${C}${ESC}[H${ESC}[2J${ESC}[3J${D(0)}`)
+    const b = m.blocks()
+    expect(b.length).toBe(1)
+    expect(b[0].command).toBe('clear')
+    expect(b[0].mode).toBe('html') // NOT handed to xterm
+    expect(b[0].exitCode).toBe(0)
+  })
+
+  it('keeps output a command prints after erasing the display', () => {
+    n = 0
+    const m = createBlockMachine(ids)
+    m.write(`${A}${B}old${C}gone${D(0)}`)
+    m.write(`${A}${B}redraw${C}${ESC}[2Jfresh${D(0)}`)
+    const b = m.blocks()
+    expect(b.length).toBe(1)
+    expect(b[0].lines.map((l) => l.map((s) => s.text).join(''))).toEqual(['fresh'])
+  })
+
+  it('does not clear for an alt-screen program that erases inside its own screen', () => {
+    n = 0
+    const m = createBlockMachine(ids)
+    m.write(`${A}${B}ls${C}out${D(0)}`)
+    // Alt-screen flips the block to xterm first, so later erases are raw bytes.
+    m.write(`${A}${B}vim${C}${ESC}[?1049h${ESC}[2J`)
+    const b = m.blocks()
+    expect(b.length).toBe(2)
+    expect(b[1].mode).toBe('xterm')
+  })
+})

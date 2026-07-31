@@ -31,6 +31,15 @@ export function createBlockMachine(newId: () => string) {
     if (phase === 'running' && cur) {
       if (cur.mode === 'html') {
         ansi.write(text)
+        // Erase-display is `clear`. A block terminal's screen IS the block
+        // list, so wipe it and keep only the command that did the erasing —
+        // the parser has already emptied this block's own grid. Checked before
+        // the complex flip: `clear` leads with ESC[H, and only the parser knows
+        // the erase that followed retracted it.
+        if (ansi.takeCleared()) {
+          blocks.length = 0
+          blocks.push(cur)
+        }
         cur.lines = ansi.lines()
         if (ansi.sawComplex()) { cur.mode = 'xterm'; cur.raw = text } // seed with the chunk that flipped it
       } else {
