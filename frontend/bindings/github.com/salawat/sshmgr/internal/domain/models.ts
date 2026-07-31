@@ -245,6 +245,13 @@ export interface Settings {
     "lockUseBiometrics": boolean;
     "lockIdleEnabled": boolean;
     "lockIdleMinutes": number;
+
+    /**
+     * TerminalMode selects the terminal renderer: "classic" (xterm.js) or
+     * "blocks" (the block terminal — needs OSC 133 shell integration; falls
+     * back to classic per-session when unavailable). Opt-in: default classic.
+     */
+    "terminalMode": string;
 }
 
 /**

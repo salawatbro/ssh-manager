@@ -75,6 +75,11 @@ type Settings struct {
 	LockUseBiometrics bool `gorm:"not null;default:true" json:"lockUseBiometrics"`
 	LockIdleEnabled   bool `gorm:"not null;default:true" json:"lockIdleEnabled"`
 	LockIdleMinutes   int  `gorm:"not null;default:10" json:"lockIdleMinutes"`
+
+	// TerminalMode selects the terminal renderer: "classic" (xterm.js) or
+	// "blocks" (the block terminal — needs OSC 133 shell integration; falls
+	// back to classic per-session when unavailable). Opt-in: default classic.
+	TerminalMode string `gorm:"not null;default:'classic'" json:"terminalMode"`
 }
 
 // DefaultSettings returns the first-run defaults. Kept in code (not only in
@@ -100,6 +105,7 @@ func DefaultSettings() Settings {
 		LockUseBiometrics:  true,
 		LockIdleEnabled:    true,
 		LockIdleMinutes:    10,
+		TerminalMode:       "classic",
 	}
 }
 
@@ -165,6 +171,9 @@ func (s *Settings) Sanitise() {
 	}
 	if s.LockIdleMinutes < 1 || s.LockIdleMinutes > 120 {
 		s.LockIdleMinutes = 10
+	}
+	if s.TerminalMode != "classic" && s.TerminalMode != "blocks" {
+		s.TerminalMode = "classic"
 	}
 	s.ID = 1
 }

@@ -51,6 +51,26 @@ func TestSettingsSanitiseLockIdle(t *testing.T) {
 	}
 }
 
+func TestSettingsTerminalMode(t *testing.T) {
+	if d := DefaultSettings(); d.TerminalMode != "classic" {
+		t.Errorf("TerminalMode default = %q, want classic", d.TerminalMode)
+	}
+	for _, in := range []string{"", "weird", "BLOCKS"} {
+		s := Settings{TerminalMode: in}
+		s.Sanitise()
+		if s.TerminalMode != "classic" {
+			t.Errorf("Sanitise(%q) TerminalMode = %q, want classic", in, s.TerminalMode)
+		}
+	}
+	for _, in := range []string{"classic", "blocks"} {
+		s := Settings{TerminalMode: in}
+		s.Sanitise()
+		if s.TerminalMode != in {
+			t.Errorf("Sanitise(%q) TerminalMode = %q, want %q", in, s.TerminalMode, in)
+		}
+	}
+}
+
 // TestDefaultLocalGuardPatternsCatchCatastrophicNotEveryday documents the
 // behavioural split the local list exists for: it fires on commands that
 // would wreck the machine — including the macOS-specific disk destroyers
