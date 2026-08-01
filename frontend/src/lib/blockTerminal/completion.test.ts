@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyCompletion, shellQuote, tokenAt } from './completion'
+import { applyCompletion, escapeArg, shellQuote, tokenAt, unescapeArg } from './completion'
 
 describe('tokenAt', () => {
   it('takes the whitespace-delimited token containing the caret', () => {
@@ -40,6 +40,39 @@ describe('shellQuote', () => {
   })
 })
 
+describe('escapeArg / unescapeArg', () => {
+  it('leaves a plain name untouched, both directions', () => {
+    expect(escapeArg('src/foo.ts')).toBe('src/foo.ts')
+    expect(unescapeArg('src/foo.ts')).toBe('src/foo.ts')
+  })
+  it('backslash-escapes a shell metacharacter', () => {
+    expect(escapeArg('a;id.txt')).toBe('a\\;id.txt')
+  })
+  it('backslash-escapes an embedded single quote', () => {
+    expect(escapeArg("o'clock.txt")).toBe("o\\'clock.txt")
+  })
+  it('backslash-escapes a space', () => {
+    expect(escapeArg('my file.txt')).toBe('my\\ file.txt')
+  })
+  it('backslash-escapes a mix of $, backtick, |, &, ( and )', () => {
+    expect(escapeArg('a$b`c|d&e(f)t.txt')).toBe('a\\$b\\`c\\|d\\&e\\(f\\)t.txt')
+  })
+  it('round-trips every hostile name through escapeArg then unescapeArg', () => {
+    for (const name of ['a;id.txt', "o'clock.txt", 'my file.txt', 'a$b`c|d&e(f)t.txt']) {
+      expect(unescapeArg(escapeArg(name))).toBe(name)
+    }
+  })
+  it('strips a leading quote the user typed by hand, with no matching tail', () => {
+    expect(unescapeArg("'my fi")).toBe('my fi')
+  })
+  it('strips a matching leading and trailing quote the user typed by hand', () => {
+    expect(unescapeArg("'my file.txt'")).toBe('my file.txt')
+  })
+  it('leaves a plain prefix with no quotes or backslashes alone', () => {
+    expect(unescapeArg('plain')).toBe('plain')
+  })
+})
+
 describe('applyCompletion', () => {
   it('replaces the token and adds a trailing space for a file', () => {
     expect(applyCompletion('ls src/fo', 9, 'src/foo.ts')).toEqual({ line: 'ls src/foo.ts ', caret: 14 })
@@ -50,7 +83,25 @@ describe('applyCompletion', () => {
   it('preserves text after the token', () => {
     expect(applyCompletion('cat a.t b.txt', 7, 'a.txt')).toEqual({ line: 'cat a.txt b.txt', caret: 10 })
   })
-  it('quotes a candidate containing a space', () => {
-    expect(applyCompletion('ls my', 5, 'my file.txt')).toEqual({ line: "ls 'my file.txt' ", caret: 17 })
+  it('backslash-escapes a candidate containing a space', () => {
+    expect(applyCompletion('ls my', 5, 'my file.txt')).toEqual({ line: 'ls my\\ file.txt ', caret: 16 })
+  })
+  it('escapes a metacharacter instead of splicing it raw into the line', () => {
+    expect(applyCompletion('ls a', 4, 'a;id.txt')).toEqual({ line: 'ls a\\;id.txt ', caret: 13 })
+  })
+  it('keeps a mid-line separator intact when completing a directory (the !isDir guard)', () => {
+    // Without the !isDir half of the guard, tailStart would consume the
+    // separator space too, fusing 'sub/' directly onto 'b.txt'.
+    expect(applyCompletion('cat a.t b.txt', 7, 'sub/')).toEqual({ line: 'cat sub/ b.txt', caret: 8 })
+  })
+  it('preserves a multi-space separator exactly', () => {
+    expect(applyCompletion('cat a.t   b.txt', 7, 'a.txt')).toEqual({ line: 'cat a.txt   b.txt', caret: 10 })
+  })
+  it('normalises a tab separator to a single space (shell-equivalent after word splitting)', () => {
+    // tokenAt treats the tab as whitespace, so it's consumed as the
+    // pre-existing separator and replaced by the completion's own trailing
+    // space — this is documenting current behaviour, not asserting a
+    // requirement that the tab be preserved literally.
+    expect(applyCompletion('cat a.t\tb.txt', 7, 'a.txt')).toEqual({ line: 'cat a.txt b.txt', caret: 10 })
   })
 })
