@@ -37,6 +37,13 @@ describe('createAnsiParser', () => {
     p.write('\x1b[1mbold\x1b[0m\nnext')
     expect(p.sawComplex()).toBe(false)
   })
+
+  it('drops unsupported C0 and DEL bytes instead of rendering missing glyphs', () => {
+    const p = createAnsiParser()
+    p.write('\x01\x02snap\x0b\x0c\x7f')
+    expect(flat(p.lines())).toEqual(['snap'])
+    expect(p.sawComplex()).toBe(false)
+  })
 })
 
 describe('createAnsiParser erase-display', () => {

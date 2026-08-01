@@ -113,9 +113,18 @@ export function createAnsiParser() {
       if (ch === '\r') { col = 0; i++; continue }
       if (ch === '\b') { col = Math.max(0, col - 1); i++; continue }
       if (ch === '\t') { push('  '); i++; continue }
+      const code = ch.charCodeAt(0)
+      // Unsupported C0 controls (including Bash prompt SOH/STX wrappers) and
+      // DEL have no HTML representation in this parser. Letting them reach a
+      // text segment renders a missing-glyph box in WKWebView.
+      if (code < 0x20 || code === 0x7f) { i++; continue }
       // accumulate a run of plain chars
       let j = i
-      while (j < input.length && !'\x1b\n\r\b\t'.includes(input[j])) j++
+      while (j < input.length) {
+        const next = input.charCodeAt(j)
+        if (next < 0x20 || next === 0x7f) break
+        j++
+      }
       push(input.slice(i, j))
       i = j
     }

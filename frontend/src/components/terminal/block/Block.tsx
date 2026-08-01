@@ -56,7 +56,7 @@ export function Block({
               the header shows is exactly what a rerun sends. block.command is
               the raw OSC 133 B→C echo and can carry \r/\b/ESC from a prompt
               repaint, which HTML would render as stray spaces or nothing. */}
-          <span className="truncate tc-fg flex-1 font-mono text-[12.5px]">{rerunCommand(block.command)}</span>
+          <span className="selectable truncate tc-fg flex-1 font-mono text-[12.5px]">{rerunCommand(block.command)}</span>
           {block.running && <span className="text-[10.5px] text-textDim">● streaming</span>}
           {block.exitCode != null && block.exitCode !== 0 && (
             <span className="text-[10.5px] text-stFailed">exit {block.exitCode}</span>
@@ -82,7 +82,7 @@ export function Block({
           </button>
         </div>
         {hasOutput && !block.folded && block.mode === 'html' && (
-          <div className="font-mono text-[12.5px]" style={{ padding: '2px 12px 8px 8px' }}>
+          <div className="selectable font-mono text-[12.5px]" style={{ padding: '2px 12px 8px 8px' }}>
             {visibleLines(block).map((line, i) => (
               <div key={i} style={{ wordBreak: 'break-word' }}>
                 {splitLinks(line).map((s, j) =>

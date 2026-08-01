@@ -1,6 +1,6 @@
 # Block output control-byte cleanup and selection
 
-**Status:** approved for implementation on `feat/term-completion`.
+**Status:** implemented on `feat/term-completion`.
 
 ## Goal
 

@@ -34,6 +34,11 @@ describe('snippetFor', () => {
     expect(FISH_SNIPPET).toContain('functions -q __zish_preexec')
     expect(FISH_SNIPPET).toContain('__zish_orig_prompt')
   })
+
+  it('does not wrap Bash PS0 in readline-only nonprinting delimiters', () => {
+    expect(BASH_ZSH_SNIPPET).toContain('PS0="\\033]133;C\\007')
+    expect(BASH_ZSH_SNIPPET).not.toContain('PS0="\\[\\033]133;C\\007\\]')
+  })
 })
 
 describe('__zish_comp completion helper', () => {

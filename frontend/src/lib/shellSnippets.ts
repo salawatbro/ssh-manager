@@ -12,7 +12,7 @@ export const BASH_ZSH_SNIPPET =
   ` eval 'if [ -n "\${BASH_VERSION-}" ]; then ` +
   `__zish_pc() { local r=$?; printf "\\033]133;D;%s\\007" "$r"; }; ` +
   `case "\${PROMPT_COMMAND-}" in *__zish_pc*) ;; *) PROMPT_COMMAND="__zish_pc\${PROMPT_COMMAND:+;$PROMPT_COMMAND}";; esac; ` +
-  `PS0="\\[\\033]133;C\\007\\]\${PS0-}"; ` +
+  `PS0="\\033]133;C\\007\${PS0-}"; ` +
   `PS1="\\[\\033]133;A\\007\\]$PS1\\[\\033]133;B\\007\\]"; ` +
   `HISTCONTROL="ignorespace\${HISTCONTROL:+:$HISTCONTROL}"; ` +
   `__zish_comp() { printf "\\033]933;S\\007"; local c; for c in "$1"*; do if [ -d "$c" ]; then printf "%s/\\n" "$c"; elif [ -e "$c" ]; then printf "%s\\n" "$c"; fi; done; printf "\\033]933;E\\007"; }; ` +

@@ -4,6 +4,7 @@ import { isMac } from '../../../lib/platform'
 import { failedIds, nextFailedId } from '../../../lib/blockTerminal/errorJump'
 import { rerunCommand } from '../../../lib/blockTerminal/rerunCommand'
 import { mapKey } from '../../../lib/blockTerminal/rawKeys'
+import { shouldAllowSelectionCopy } from '../../../lib/blockTerminal/selectionCopy'
 import { usePalette } from '../../../stores/palette'
 import { useSnippets } from '../../../stores/snippets'
 import { useGuard } from '../../../stores/guard'
@@ -115,6 +116,7 @@ export function BlockTerminal({
         onKeyDown={
           snap.running && !snap.altScreen
             ? (e) => {
+                if (shouldAllowSelectionCopy(e, !!window.getSelection()?.toString(), isMac)) return
                 const data = e.ctrlKey || e.metaKey || e.altKey || e.key.length > 1 ? mapKey(e) : e.key
                 if (data) onRawKey(data)
                 e.preventDefault()
