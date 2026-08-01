@@ -17,6 +17,14 @@ describe('tokenAt', () => {
   it('handles the caret at the start of the line', () => {
     expect(tokenAt('ls', 0)).toEqual({ start: 0, end: 2, text: 'ls' })
   })
+  it('treats a backslash-escaped space as part of the token, not a separator', () => {
+    expect(tokenAt('ls my\\ dir/', 11)).toEqual({ start: 3, end: 11, text: 'my\\ dir/' })
+  })
+  it('treats a space after an escaped backslash as a real separator', () => {
+    // The two backslashes are an escaped backslash (even count), so the
+    // space that follows is unescaped and still splits the line.
+    expect(tokenAt('ls a\\\\ b', 8)).toEqual({ start: 7, end: 8, text: 'b' })
+  })
 })
 
 describe('shellQuote', () => {
@@ -57,10 +65,26 @@ describe('escapeArg / unescapeArg', () => {
   it('backslash-escapes a mix of $, backtick, |, &, ( and )', () => {
     expect(escapeArg('a$b`c|d&e(f)t.txt')).toBe('a\\$b\\`c\\|d\\&e\\(f\\)t.txt')
   })
+  it('escapes a leading tilde (bash/zsh tilde-expand at word start)', () => {
+    expect(escapeArg('~foo')).toBe('\\~foo')
+  })
+  it('leaves a mid-word tilde bare (tilde expansion only triggers at word start)', () => {
+    expect(escapeArg('a~b')).toBe('a~b')
+  })
   it('round-trips every hostile name through escapeArg then unescapeArg', () => {
-    for (const name of ['a;id.txt', "o'clock.txt", 'my file.txt', 'a$b`c|d&e(f)t.txt']) {
+    for (const name of ['a;id.txt', "o'clock.txt", 'my file.txt', 'a$b`c|d&e(f)t.txt', '~foo']) {
       expect(unescapeArg(escapeArg(name))).toBe(name)
     }
+  })
+  it('round-trips a name that begins and ends with a quote character', () => {
+    // Regression: stripping quotes after unescaping would mistake the
+    // escaped quotes for user-typed wrapping quotes and drop them.
+    expect(unescapeArg(escapeArg("'q'"))).toBe("'q'")
+  })
+  it('round-trips a name containing a newline', () => {
+    // Regression: /\\(.)/g doesn't match a line terminator, so a `\` + LF
+    // pair that escapeArg produces would survive the backslash pass intact.
+    expect(unescapeArg(escapeArg('a\nb.txt'))).toBe('a\nb.txt')
   })
   it('strips a leading quote the user typed by hand, with no matching tail', () => {
     expect(unescapeArg("'my fi")).toBe('my fi')
@@ -103,5 +127,15 @@ describe('applyCompletion', () => {
     // space — this is documenting current behaviour, not asserting a
     // requirement that the tab be preserved literally.
     expect(applyCompletion('cat a.t\tb.txt', 7, 'a.txt')).toEqual({ line: 'cat a.txt b.txt', caret: 10 })
+  })
+  it('round-trips a directory name with a space through complete, re-tokenize and unescape', () => {
+    // This is the point of the tokenAt/escapeArg/unescapeArg fixes together:
+    // completing into a space-containing name must leave the compose line in
+    // a state where the *next* Tab recovers the same literal name.
+    const applied = applyCompletion('ls ', 3, 'my dir/')
+    expect(applied).toEqual({ line: 'ls my\\ dir/', caret: 11 })
+    const token = tokenAt(applied.line, applied.caret)
+    expect(token.text).toBe('my\\ dir/')
+    expect(unescapeArg(token.text)).toBe('my dir/')
   })
 })
