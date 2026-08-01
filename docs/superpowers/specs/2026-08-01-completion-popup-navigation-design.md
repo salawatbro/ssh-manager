@@ -1,6 +1,6 @@
 # Completion popup navigation and live filtering
 
-**Status:** approved for implementation on `feat/term-completion`.
+**Status:** implemented on `feat/term-completion`.
 
 ## Goal
 

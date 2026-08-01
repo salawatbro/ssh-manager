@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { applyCompletion, tokenAt, unescapeArg } from '../../../lib/blockTerminal/completion'
-import { COMPLETION_POPUP_MAX, CompletionPopup } from './CompletionPopup'
+import { CompletionPopup } from './CompletionPopup'
+import { filterCompletionCandidates, moveCompletionSelection } from '../../../lib/blockTerminal/completionPopup'
 import { HistorySearch } from './HistorySearch'
 import { isMac } from '../../../lib/platform'
 
@@ -24,6 +25,7 @@ export function PromptLine({
   inputRef?: MutableRefObject<HTMLInputElement | null>
 }) {
   const ref = useRef<HTMLInputElement>(null)
+  const [sourceItems, setSourceItems] = useState<string[]>([])
   const [items, setItems] = useState<string[]>([])
   const [selected, setSelected] = useState(0)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -38,7 +40,7 @@ export function PromptLine({
     }
   }, [focused, inputRef])
 
-  const closeCompletion = () => { setItems([]); setSelected(0) }
+  const closeCompletion = () => { setSourceItems([]); setItems([]); setSelected(0) }
   const closeHistory = () => {
     setHistoryOpen(false)
     requestAnimationFrame(() => ref.current?.focus())
@@ -58,6 +60,14 @@ export function PromptLine({
     input.setSelectionRange(next.caret, next.caret)
     closeCompletion()
   }
+  const filterCompletion = (input: HTMLInputElement) => {
+    if (sourceItems.length === 0) return
+    const caret = input.selectionStart ?? input.value.length
+    const prefix = unescapeArg(tokenAt(input.value, caret).text)
+    const filtered = filterCompletionCandidates(sourceItems, prefix)
+    if (filtered.length === 0) closeCompletion()
+    else { setItems(filtered); setSelected(0) }
+  }
   const complete = async () => {
     const input = ref.current
     if (!input || !onComplete) return
@@ -68,12 +78,17 @@ export function PromptLine({
     const current = ref.current
     if (!current || current.value !== line || current.selectionStart !== caret) return
     if (got.length === 1) apply(got[0])
-    else if (got.length > 1) { setItems(got); setSelected(0) }
+    else if (got.length > 1) { setSourceItems(got); setItems(got); setSelected(0) }
   }
   return (
     <div className="relative flex items-center font-mono text-[12.5px]" style={{ padding: '6px 8px' }}>
       {items.length > 0 && (
-        <CompletionPopup items={items} selected={selected} onPick={(index) => apply(items[index])} />
+        <CompletionPopup
+          anchor={ref.current}
+          items={items}
+          selected={selected}
+          onPick={(index) => apply(items[index])}
+        />
       )}
       {historyOpen && <HistorySearch history={history} onPick={pickHistory} onClose={closeHistory} />}
       <span className="tc-dim shrink-0">$&nbsp;</span>
@@ -81,6 +96,8 @@ export function PromptLine({
         ref={ref}
         spellCheck={false}
         className="min-w-0 flex-1 bg-transparent tc-fg outline-none"
+        onInput={(event) => filterCompletion(event.currentTarget)}
+        onSelect={(event) => filterCompletion(event.currentTarget)}
         onKeyDown={(e) => {
           const historyChord = isMac
             ? e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'r'
@@ -91,17 +108,14 @@ export function PromptLine({
           if (items.length > 0) {
             if (e.key === 'Escape') { e.preventDefault(); closeCompletion(); return }
             if (e.key === 'ArrowDown') {
-              const visible = Math.min(items.length, COMPLETION_POPUP_MAX)
-              e.preventDefault(); setSelected((index) => (index + 1) % visible); return
+              e.preventDefault(); setSelected((index) => moveCompletionSelection(index, 1, items.length)); return
             }
             if (e.key === 'ArrowUp') {
-              const visible = Math.min(items.length, COMPLETION_POPUP_MAX)
-              e.preventDefault(); setSelected((index) => (index - 1 + visible) % visible); return
+              e.preventDefault(); setSelected((index) => moveCompletionSelection(index, -1, items.length)); return
             }
             if (e.key === 'Tab' || e.key === 'Enter') {
               e.preventDefault(); apply(items[selected]); return
             }
-            closeCompletion()
           }
           if (e.key === 'Enter') {
             const v = ref.current!.value
