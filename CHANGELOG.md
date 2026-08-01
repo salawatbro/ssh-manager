@@ -4,9 +4,49 @@ All notable changes to **Zish**. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
 follow [Semantic Versioning](https://semver.org/).
 
-Only **1.0.0**, **1.1.0**, **1.2.0**, **1.3.0**, **1.3.1** and **1.4.0** are packaged, published releases (macOS `.dmg`).
+Only **1.0.0**, **1.1.0**, **1.2.0**, **1.3.0**, **1.3.1**, **1.4.0** and **1.5.0** are packaged, published releases (macOS `.dmg`).
 Versions **0.1–0.7** are the development milestones that built up to 1.0; **1.1.1**
 was a version bump that first shipped packaged as part of 1.2.0.
+
+## [1.5.0] — 2026-08-01
+
+A new block-based terminal mode that keeps commands and their output easy to
+scan, revisit and copy, plus safe remote path completion.
+
+### Added
+
+- **Block terminal mode** — choose `Blocks` in Settings → Terminal to group each
+  command with its output, duration and exit state. Finished commands can be
+  folded, rerun, copied and revisited from command history without losing the
+  classic terminal mode.
+- **Failure navigation** — jump between failed command blocks from the terminal
+  error control or with `⌘⇧E`.
+- **Clickable output links** — web links in block output open through the app's
+  validated external-link path.
+- **Interactive Tab completion** — remote files and folders appear in a popup;
+  continue typing to filter, use the arrow keys to navigate, and press Tab or
+  Enter to apply the highlighted candidate. The popup follows the active item
+  while scrolling through long result sets.
+
+### Changed
+
+- Complex full-screen programs automatically fall back to an embedded raw
+  terminal block, while ordinary commands retain the structured block view.
+- Command guards, snippets and command history now work through the block
+  terminal's single compose/input path.
+
+### Fixed
+
+- Completion candidates are shell-escaped before insertion, including names
+  containing spaces or shell metacharacters, while directory completion still
+  supports continuing into the next path segment.
+- Commands with no output, such as `cd`, retain their command header instead of
+  producing an empty or misleading block.
+- Unsupported terminal control bytes no longer appear as unknown box glyphs in
+  block output.
+- Command and output text can be selected and copied with the native keyboard
+  shortcut or context menu; `Ctrl+C` still interrupts a running command when
+  there is no selection.
 
 ## [1.4.0] — 2026-07-31
 
