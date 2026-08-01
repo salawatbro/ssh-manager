@@ -212,4 +212,28 @@ describe('createBlockMachine completion probe', () => {
     m.write(`${A}${B}echo hi${C}hi${D(0)}`)
     expect(m.blocks()[0].command).toBe('echo hi')
   })
+
+  it('does not let a completion probe consume the next submitted command', () => {
+    const m = createBlockMachine(ids)
+    m.expectCommand('cd /srv')
+    m.expectProbe()
+    m.write(`${A}${B}probe${C}${S}${E}${D(0)}`)
+    m.write(`${A}${B}${C}${D(0)}`)
+    expect(m.blocks()[0].command).toBe('cd /srv')
+  })
+})
+
+describe('createBlockMachine submitted command source', () => {
+  it('uses the client-submitted command when PTY echo is empty', () => {
+    const m = createBlockMachine(ids)
+    m.expectCommand('cd /srv')
+    m.write(`${A}${B}${C}${D(0)}`)
+    expect(m.blocks()[0].command).toBe('cd /srv')
+  })
+
+  it('falls back to PTY echo when there is no submitted command', () => {
+    const m = createBlockMachine(ids)
+    m.write(`${A}${B}echo from-shell${C}${D(0)}`)
+    expect(m.blocks()[0].command).toBe('echo from-shell')
+  })
 })

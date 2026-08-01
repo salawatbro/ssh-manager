@@ -70,6 +70,22 @@ describe('blockSession submit/rerun', () => {
     expect(writes).toEqual([])
   })
 
+  it('shows the submitted command even when the PTY emits no command echo or output', () => {
+    const s = createBlockSession({ write: () => {}, newId })
+    s.submit('cd /srv')
+    s.feedText(`${A}${B}${C}${D0}`)
+    expect(s.snapshot().blocks[0].command).toBe('cd /srv')
+  })
+
+  it('does not queue a command when the guard cancels it', () => {
+    const s = createBlockSession({ write: () => {}, newId, guard: () => {} })
+    s.submit('rm -rf /cancelled')
+    // A later shell-originated command must keep its own PTY echo rather than
+    // inheriting the command whose guard never called send().
+    s.feedText(`${A}${B}echo real${C}${D0}`)
+    expect(s.snapshot().blocks[0].command).toBe('echo real')
+  })
+
   it('submitted commands are recalled by historyUp (newest first)', () => {
     const s = createBlockSession({ write: () => {}, newId })
     s.submit('one')

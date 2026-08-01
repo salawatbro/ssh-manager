@@ -1,6 +1,6 @@
 # Block command header and zero-output layout
 
-**Status:** approved for implementation on `feat/term-completion`.
+**Status:** implemented on `feat/term-completion`.
 
 ## Goal
 

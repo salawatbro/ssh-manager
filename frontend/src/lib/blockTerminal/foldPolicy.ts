@@ -12,6 +12,11 @@ export function visibleLines(block: TermBlock): Segment[][] {
   return block.lines.slice(Math.max(0, block.lines.length - FOLD_TAIL))
 }
 
+export function hasVisibleOutput(block: TermBlock): boolean {
+  if (block.mode === 'xterm') return true
+  return block.lines.some((line) => line.some((segment) => segment.text.length > 0))
+}
+
 export function foldLabel(block: TermBlock): string {
   const hidden = Math.max(0, block.lines.length - FOLD_TAIL)
   return `${hidden} lines folded`

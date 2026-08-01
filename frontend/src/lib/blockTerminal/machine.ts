@@ -28,16 +28,18 @@ export function createBlockMachine(newId: () => string, onCompletion?: (candidat
   let probe = false
   let collecting = false
   let candidatePayload = ''
+  const expectedCommands: string[] = []
 
   const startBlock = () => {
     ansi = createAnsiParser()
     detached = false
     probe = expectedProbes > 0
     if (probe) expectedProbes--
+    const expectedCommand = probe ? undefined : expectedCommands.shift()
     collecting = false
     candidatePayload = ''
     cur = {
-      id: newId(), command: cmd.trim(), startedAt: Date.now(), endedAt: null,
+      id: newId(), command: expectedCommand ?? cmd.trim(), startedAt: Date.now(), endedAt: null,
       exitCode: null, running: true, mode: 'html', lines: [], folded: false,
     }
     if (!probe) blocks.push(cur)
@@ -119,5 +121,9 @@ export function createBlockMachine(newId: () => string, onCompletion?: (candidat
     altScreen: () => !!cur && cur.running && cur.mode === 'xterm' && !probe,
     expectProbe: () => { expectedProbes++ },
     cancelProbe: () => { if (expectedProbes > 0) expectedProbes-- },
+    expectCommand: (command: string) => {
+      const clean = command.trim()
+      if (clean) expectedCommands.push(clean)
+    },
   }
 }

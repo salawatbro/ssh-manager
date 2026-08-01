@@ -1,6 +1,6 @@
 import { DataService } from '@bindings/github.com/salawat/sshmgr'
 import type { TermBlock } from '../../../lib/blockTerminal/types'
-import { copyText, foldLabel, visibleLines } from '../../../lib/blockTerminal/foldPolicy'
+import { copyText, foldLabel, hasVisibleOutput, visibleLines } from '../../../lib/blockTerminal/foldPolicy'
 import { splitLinks } from '../../../lib/blockTerminal/links'
 import { rerunCommand } from '../../../lib/blockTerminal/rerunCommand'
 import { toastError } from '../../../stores/toasts'
@@ -36,6 +36,7 @@ export function Block({
 }) {
   const rail = block.running ? 'bg-stConnecting' : active ? 'bg-accent' : block.exitCode ? 'bg-stFailed' : 'bg-border'
   const duration = !block.running ? fmtDuration(block) : null
+  const hasOutput = hasVisibleOutput(block)
   return (
     <div
       ref={innerRef}
@@ -45,9 +46,12 @@ export function Block({
       <div className={rail} />
       <div style={{ minWidth: 0 }}>
         <div className="flex items-center gap-[6px]" style={{ padding: '2px 8px' }}>
-          <button type="button" onClick={(e) => { e.stopPropagation(); onToggle() }} className="text-textDim hover:text-text">
-            {block.folded ? '▸' : '▾'}
-          </button>
+          {hasOutput && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); onToggle() }} className="text-textDim hover:text-text">
+              {block.folded ? '▸' : '▾'}
+            </button>
+          )}
+          <span className="tc-dim shrink-0">$</span>
           {/* Rendered through the same sanitiser the ↻ button submits, so what
               the header shows is exactly what a rerun sends. block.command is
               the raw OSC 133 B→C echo and can carry \r/\b/ESC from a prompt
@@ -77,7 +81,7 @@ export function Block({
             ⧉
           </button>
         </div>
-        {!block.folded && block.mode === 'html' && (
+        {hasOutput && !block.folded && block.mode === 'html' && (
           <div className="font-mono text-[12.5px]" style={{ padding: '2px 12px 8px 8px' }}>
             {visibleLines(block).map((line, i) => (
               <div key={i} style={{ wordBreak: 'break-word' }}>
@@ -120,7 +124,7 @@ export function Block({
               </div>
             )
         )}
-        {block.folded && (
+        {hasOutput && block.folded && (
           <button
             type="button"
             onClick={onToggle}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FOLD_THRESHOLD, copyText, foldLabel, shouldAutoFold, visibleLines } from './foldPolicy'
+import { FOLD_THRESHOLD, copyText, foldLabel, hasVisibleOutput, shouldAutoFold, visibleLines } from './foldPolicy'
 import type { TermBlock } from './types'
 
 const mk = (nLines: number, folded = false): TermBlock => ({
@@ -27,5 +27,10 @@ describe('foldPolicy', () => {
   })
   it('foldLabel reports the hidden count', () => {
     expect(foldLabel(mk(100, true))).toMatch(/lines folded/)
+  })
+  it('distinguishes empty HTML output from visible and xterm output', () => {
+    expect(hasVisibleOutput({ ...mk(0), lines: [[]] })).toBe(false)
+    expect(hasVisibleOutput(mk(1))).toBe(true)
+    expect(hasVisibleOutput({ ...mk(0), mode: 'xterm', raw: '' })).toBe(true)
   })
 })

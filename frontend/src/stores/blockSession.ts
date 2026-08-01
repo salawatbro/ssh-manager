@@ -33,7 +33,10 @@ export function createBlockSession({ write, newId, guard }: Deps) {
   const submit = (line?: string) => {
     const cmd = line ?? ''
     history.add(cmd)
-    const send = () => write(cmd + '\r')
+    const send = () => {
+      machine.expectCommand(cmd)
+      write(cmd + '\r')
+    }
     if (guard) guard(cmd, send)
     else send()
   }
