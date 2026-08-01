@@ -35,3 +35,24 @@ describe('snippetFor', () => {
     expect(FISH_SNIPPET).toContain('__zish_orig_prompt')
   })
 })
+
+describe('__zish_comp completion helper', () => {
+  it('is defined with OSC 933 markers in every snippet', () => {
+    expect(BASH_ZSH_SNIPPET).toContain('__zish_comp()')
+    expect(FISH_SNIPPET).toContain('function __zish_comp')
+    for (const snippet of [BASH_ZSH_SNIPPET, FISH_SNIPPET]) {
+      expect(snippet).toContain('933;S')
+      expect(snippet).toContain('933;E')
+    }
+  })
+
+  it('uses bash-parseable zsh nullglob setup', () => {
+    expect(BASH_ZSH_SNIPPET).not.toContain('*(N)')
+    expect(BASH_ZSH_SNIPPET).toContain('setopt localoptions nullglob')
+  })
+
+  it('keeps space-prefixed probes out of bash/zsh history', () => {
+    expect(BASH_ZSH_SNIPPET).toContain('ignorespace')
+    expect(BASH_ZSH_SNIPPET).toContain('hist_ignore_space')
+  })
+})

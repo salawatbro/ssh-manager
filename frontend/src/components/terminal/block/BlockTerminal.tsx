@@ -22,10 +22,12 @@ export function BlockTerminal({
   session,
   focused,
   onRawKey,
+  completionEnabled,
 }: {
   session: Session
   focused: boolean
   onRawKey: (data: string) => void
+  completionEnabled: boolean
 }) {
   const snap = useSyncExternalStore(session.subscribe, session.snapshot)
   const ref = useRef<HTMLDivElement>(null)
@@ -144,6 +146,8 @@ export function BlockTerminal({
             inputRef={promptRef}
             onSubmit={(line) => session.submit(line)}
             onHistory={(dir, cur) => (dir === 'up' ? session.historyUp(cur) : session.historyDown())}
+            history={session.historyItems()}
+            onComplete={completionEnabled ? (prefix) => session.requestCompletion(prefix) : undefined}
           />
         )}
       </div>

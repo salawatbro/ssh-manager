@@ -249,7 +249,7 @@ export interface Settings {
     /**
      * TerminalMode selects the terminal renderer: "classic" (xterm.js) or
      * "blocks" (the block terminal — needs OSC 133 shell integration; falls
-     * back to classic per-session when unavailable). Opt-in: default classic.
+     * back to classic per-session when unavailable). New installs default to blocks.
      */
     "terminalMode": string;
 }

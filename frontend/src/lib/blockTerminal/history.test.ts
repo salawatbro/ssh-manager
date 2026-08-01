@@ -21,4 +21,12 @@ describe('createHistory', () => {
     expect(h.up('')).toBe('ls')
     expect(h.up('')).toBe('ls')
   })
+
+  it('exposes a defensive newest-first snapshot', () => {
+    const h = createHistory()
+    h.add('one'); h.add('two')
+    const snapshot = h.items()
+    snapshot.push('mutated')
+    expect(h.items()).toEqual(['two', 'one'])
+  })
 })

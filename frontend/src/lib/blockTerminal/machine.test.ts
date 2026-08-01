@@ -138,3 +138,78 @@ describe('createBlockMachine clear', () => {
     expect(b[1].mode).toBe('xterm')
   })
 })
+
+describe('createBlockMachine completion probe', () => {
+  const S = `${ESC}]933;S${BEL}`, E = `${ESC}]933;E${BEL}`
+
+  it('forms no block and reports candidates', () => {
+    n = 0
+    const got: string[][] = []
+    const m = createBlockMachine(ids, (c) => got.push(c))
+    m.write(`${A}${B}ls${C}out${D(0)}`)
+    m.expectProbe()
+    m.write(`${A}${B}probe${C}${S}a.txt\nassets/\n${E}${D(0)}`)
+    expect(m.blocks()).toHaveLength(1)
+    expect(got).toEqual([['a.txt', 'assets/']])
+  })
+
+  it('never looks running while a probe is in flight', () => {
+    const m = createBlockMachine(ids)
+    m.expectProbe()
+    m.write(`${A}${B}probe${C}`)
+    expect(m.running()).toBe(false)
+    expect(m.blocks()).toEqual([])
+  })
+
+  it('suppresses helper errors and reports an empty result', () => {
+    const got: string[][] = []
+    const m = createBlockMachine(ids, (c) => got.push(c))
+    m.expectProbe()
+    m.write(`${A}${B}probe${C}command not found${D(127)}`)
+    expect(m.blocks()).toEqual([])
+    expect(got).toEqual([[]])
+  })
+
+  it('survives a split OSC 933 marker', () => {
+    const got: string[][] = []
+    const m = createBlockMachine(ids, (c) => got.push(c))
+    m.expectProbe()
+    m.write(`${A}${B}p${C}${S}one\n${ESC}]933;`)
+    m.write(`E${BEL}${D(0)}`)
+    expect(got).toEqual([['one']])
+  })
+
+  it('joins a candidate split across frames and normalises PTY CRLF', () => {
+    const got: string[][] = []
+    const m = createBlockMachine(ids, (c) => got.push(c))
+    m.expectProbe()
+    m.write(`${A}${B}p${C}${S}long-fi`)
+    m.write(`le.txt\r\ndir/\r\n${E}${D(0)}`)
+    expect(got).toEqual([['long-file.txt', 'dir/']])
+  })
+
+  it('returns to normal blocks after a probe', () => {
+    const m = createBlockMachine(ids)
+    m.expectProbe()
+    m.write(`${A}${B}p${C}${S}${E}${D(0)}`)
+    m.write(`${A}${B}echo hi${C}hi${D(0)}`)
+    expect(m.blocks().map((b) => b.command)).toEqual(['echo hi'])
+  })
+
+  it('counts repeated expectations before either probe starts', () => {
+    const got: string[][] = []
+    const m = createBlockMachine(ids, (c) => got.push(c))
+    m.expectProbe(); m.expectProbe()
+    m.write(`${A}${B}p1${C}${S}one\n${E}${D(0)}`)
+    m.write(`${A}${B}p2${C}${S}two\n${E}${D(0)}`)
+    expect(got).toEqual([['one'], ['two']])
+    expect(m.blocks()).toEqual([])
+  })
+
+  it('cancelProbe clears one pending expectation', () => {
+    const m = createBlockMachine(ids)
+    m.expectProbe(); m.cancelProbe()
+    m.write(`${A}${B}echo hi${C}hi${D(0)}`)
+    expect(m.blocks()[0].command).toBe('echo hi')
+  })
+})

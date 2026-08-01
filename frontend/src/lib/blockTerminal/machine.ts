@@ -1,4 +1,5 @@
 import { splitOsc133 } from './osc133'
+import { splitOsc933 } from './osc933'
 import { createAnsiParser } from './ansi'
 import { shouldAutoFold } from './foldPolicy'
 import type { Segment, TermBlock } from './types'
@@ -11,7 +12,7 @@ const hasText = (lines: Segment[][]) => lines.some((l) => l.some((s) => s.text.l
 // A block is created at C (or B if we prefer; here at C so pre-C noise is
 // dropped). Complex output flips the block to mode 'xterm' (RawBlock renders
 // the raw stream via the fallback path).
-export function createBlockMachine(newId: () => string) {
+export function createBlockMachine(newId: () => string, onCompletion?: (candidates: string[]) => void) {
   const blocks: TermBlock[] = []
   let pending = '' // trailing partial ESC held across chunk boundaries
   let phase: 'idle' | 'cmd' | 'running' = 'idle'
@@ -21,20 +22,41 @@ export function createBlockMachine(newId: () => string) {
   // The running block erased the screen and was pulled out of `blocks`. It is
   // detached rather than discarded: if it prints after erasing, it comes back.
   let detached = false
+  // A count, rather than a boolean: repeated Tab presses can enqueue several
+  // probe lines before the shell emits C for the first one.
+  let expectedProbes = 0
+  let probe = false
+  let collecting = false
+  let candidatePayload = ''
 
   const startBlock = () => {
     ansi = createAnsiParser()
     detached = false
+    probe = expectedProbes > 0
+    if (probe) expectedProbes--
+    collecting = false
+    candidatePayload = ''
     cur = {
       id: newId(), command: cmd.trim(), startedAt: Date.now(), endedAt: null,
       exitCode: null, running: true, mode: 'html', lines: [], folded: false,
     }
-    blocks.push(cur)
+    if (!probe) blocks.push(cur)
   }
 
   const absorb = (text: string) => {
     if (phase === 'cmd') { cmd += text; return } // echoed command → header
     if (phase === 'running' && cur) {
+      if (probe) {
+        for (const part of splitOsc933(text)) {
+          if ('marker' in part) {
+            if (part.marker === 'S') { collecting = true; candidatePayload = '' }
+            else collecting = false
+            continue
+          }
+          if (collecting) candidatePayload += part.text
+        }
+        return
+      }
       if (cur.mode === 'html') {
         ansi.write(text)
         // Erase-display is `clear`. A block terminal's screen IS the block
@@ -60,8 +82,8 @@ export function createBlockMachine(newId: () => string) {
 
   function write(chunk: string) {
     const buf = pending + chunk
-    // Hold a trailing partial OSC (ESC ] 133 ; … without BEL) for the next write.
-    const cut = buf.lastIndexOf('\x1b]133;')
+    // Hold a trailing partial OSC 133/933 marker for the next write.
+    const cut = Math.max(buf.lastIndexOf('\x1b]133;'), buf.lastIndexOf('\x1b]933;'))
     let head = buf, tail = ''
     if (cut >= 0 && buf.indexOf('\x07', cut) < 0) { head = buf.slice(0, cut); tail = buf.slice(cut) }
     pending = tail
@@ -73,7 +95,14 @@ export function createBlockMachine(newId: () => string) {
         case 'B': phase = 'cmd'; break
         case 'C': phase = 'running'; startBlock(); break
         case 'D':
-          if (cur) {
+          if (probe) {
+            const candidates = candidatePayload
+              .split('\n')
+              .map((candidate) => candidate.endsWith('\r') ? candidate.slice(0, -1) : candidate)
+              .filter(Boolean)
+            onCompletion?.(candidates)
+            probe = false; collecting = false; candidatePayload = ''; cur = null
+          } else if (cur) {
             cur.running = false; cur.exitCode = part.event.exit; cur.endedAt = Date.now()
             cur.folded = shouldAutoFold(cur)
           }
@@ -86,7 +115,9 @@ export function createBlockMachine(newId: () => string) {
     write,
     rawTail: () => pending, // exposed for tests only
     blocks: () => blocks,
-    running: () => phase === 'running',
-    altScreen: () => !!cur && cur.running && cur.mode === 'xterm',
+    running: () => phase === 'running' && !probe,
+    altScreen: () => !!cur && cur.running && cur.mode === 'xterm' && !probe,
+    expectProbe: () => { expectedProbes++ },
+    cancelProbe: () => { if (expectedProbes > 0) expectedProbes-- },
   }
 }

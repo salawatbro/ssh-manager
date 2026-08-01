@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createBlockSession } from './blockSession'
+import { COMPLETION_TIMEOUT_MS, createBlockSession } from './blockSession'
 
 const ESC = '\x1b', BEL = '\x07'
+const A = `${ESC}]133;A${BEL}`, B = `${ESC}]133;B${BEL}`, C = `${ESC}]133;C${BEL}`, D0 = `${ESC}]133;D;0${BEL}`
+const S = `${ESC}]933;S${BEL}`, E = `${ESC}]933;E${BEL}`
 
 describe('createBlockSession', () => {
   it('feed drives the machine and exposes blocks', () => {
@@ -74,5 +76,45 @@ describe('blockSession submit/rerun', () => {
     s.rerun('two')
     expect(s.historyUp('')).toBe('two')
     expect(s.historyUp('two')).toBe('one')
+    expect(s.historyItems()).toEqual(['two', 'one'])
+  })
+})
+
+describe('blockSession requestCompletion', () => {
+  it('writes a quoted, space-prefixed probe without history or guard', () => {
+    const writes: string[] = []
+    const guard = vi.fn()
+    const s = createBlockSession({ write: (d) => writes.push(d), newId, guard })
+    void s.requestCompletion("src/o'clock")
+    expect(writes).toEqual([" __zish_comp 'src/o'\\''clock'\r"])
+    expect(s.historyUp('')).toBeNull()
+    expect(guard).not.toHaveBeenCalled()
+  })
+
+  it('resolves with shell candidates', async () => {
+    const s = createBlockSession({ write: () => {}, newId })
+    const result = s.requestCompletion('a')
+    s.feedText(`${A}${B}p${C}${S}a.txt\nassets/\n${E}${D0}`)
+    await expect(result).resolves.toEqual(['a.txt', 'assets/'])
+  })
+
+  it('resolves empty on timeout', async () => {
+    vi.useFakeTimers()
+    try {
+      const s = createBlockSession({ write: () => {}, newId })
+      const result = s.requestCompletion('a')
+      vi.advanceTimersByTime(COMPLETION_TIMEOUT_MS)
+      await expect(result).resolves.toEqual([])
+    } finally { vi.useRealTimers() }
+  })
+
+  it('keeps repeated probe responses paired in FIFO order', async () => {
+    const s = createBlockSession({ write: () => {}, newId })
+    const first = s.requestCompletion('a')
+    const second = s.requestCompletion('ab')
+    await expect(first).resolves.toEqual([])
+    s.feedText(`${A}${B}p1${C}${S}old.txt\n${E}${D0}`)
+    s.feedText(`${A}${B}p2${C}${S}abc.txt\n${E}${D0}`)
+    await expect(second).resolves.toEqual(['abc.txt'])
   })
 })

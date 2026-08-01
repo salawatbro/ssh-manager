@@ -78,8 +78,8 @@ type Settings struct {
 
 	// TerminalMode selects the terminal renderer: "classic" (xterm.js) or
 	// "blocks" (the block terminal — needs OSC 133 shell integration; falls
-	// back to classic per-session when unavailable). Opt-in: default classic.
-	TerminalMode string `gorm:"not null;default:'classic'" json:"terminalMode"`
+	// back to classic per-session when unavailable). New installs default to blocks.
+	TerminalMode string `gorm:"not null;default:'blocks'" json:"terminalMode"`
 }
 
 // DefaultSettings returns the first-run defaults. Kept in code (not only in
@@ -105,7 +105,7 @@ func DefaultSettings() Settings {
 		LockUseBiometrics:  true,
 		LockIdleEnabled:    true,
 		LockIdleMinutes:    10,
-		TerminalMode:       "classic",
+		TerminalMode:       "blocks",
 	}
 }
 

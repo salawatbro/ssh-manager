@@ -52,8 +52,8 @@ func TestSettingsSanitiseLockIdle(t *testing.T) {
 }
 
 func TestSettingsTerminalMode(t *testing.T) {
-	if d := DefaultSettings(); d.TerminalMode != "classic" {
-		t.Errorf("TerminalMode default = %q, want classic", d.TerminalMode)
+	if d := DefaultSettings(); d.TerminalMode != "blocks" {
+		t.Errorf("TerminalMode default = %q, want blocks", d.TerminalMode)
 	}
 	for _, in := range []string{"", "weird", "BLOCKS"} {
 		s := Settings{TerminalMode: in}

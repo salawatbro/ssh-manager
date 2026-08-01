@@ -23,6 +23,7 @@ export function createHistory() {
       idx -= 1
       return items[idx]
     },
+    items: () => [...items],
     reset() { idx = -1 },
   }
 }

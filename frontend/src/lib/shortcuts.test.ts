@@ -10,7 +10,7 @@ import type { Action } from './keymap'
 //
 // Rows with no probes are advertised in the cheat-sheet but bound elsewhere:
 // "Show / hide window" is the native cgo hotkey (global_hotkey_darwin.go) and
-// "Find in terminal" is bound inside Terminal.tsx, not keymap.ts.
+// "Find in terminal" and "Search block history" are pane-local bindings.
 
 // Both modules read `isMac` at import time, so each platform run needs the
 // mock in place before a fresh module graph loads.
@@ -66,6 +66,7 @@ const MAC: Row[] = [
     ],
   },
   { label: 'Find in terminal', keys: '⌘F', probes: [] },
+  { label: 'Search block history', keys: '⌘R', probes: [] },
   { label: 'Jump to failed command', keys: '⌘⇧E', probes: [] },
   { label: 'Snippet palette', keys: '⌘E', probes: [{ event: key({ metaKey: true, key: 'e' }), action: 'snippets' }] },
   {
@@ -103,6 +104,7 @@ const WIN: Row[] = [
     ],
   },
   { label: 'Find in terminal', keys: 'Ctrl+Shift+F', probes: [] },
+  { label: 'Search block history', keys: 'Ctrl+Shift+R', probes: [] },
   { label: 'Jump to failed command', keys: 'Ctrl+Shift+J', probes: [] },
   { label: 'Snippet palette', keys: 'Ctrl+Shift+S', probes: [{ event: key({ ctrlKey: true, shiftKey: true, key: 's' }), action: 'snippets' }] },
   {
