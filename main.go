@@ -219,7 +219,7 @@ func main() {
 		// runModal] when no parent window is attached — so Show() only returns
 		// after the pressed button's OnClick has already run. That is why a
 		// plain closure-captured bool below is safe (no channel, no goroutine):
-		// verified by reading the Wails v3 alpha2.117 source, since the brief's
+		// verified by reading the Wails v3.1.0 source, since the brief's
 		// assumed `Show() string` return does not exist in this version — the
 		// pressed button is reported via AddButton(label).OnClick(func()), not
 		// a return value.
@@ -415,9 +415,9 @@ func showMainWindow() {
 // Measured, not assumed, that application.New() alone does not make a
 // dialog safe to show here: MessageDialog.Show() dispatches onto the
 // native main-thread run loop via InvokeSync, and that loop does not exist
-// until app.Run() sets App.impl up and starts pumping it. Calling Show()
-// before Run() does not silently no-op — it panics with a nil-pointer
-// dereference in dispatchOnMainThread. Deferring the Show() to the
+// until app.Run() sets App.impl up and starts pumping it. In Wails v3.1.0 a
+// Show() before Run() is skipped with a warning, so no dialog would ever
+// appear. Deferring the Show() to the
 // events.Common.ApplicationStarted hook, which only fires once Run() has
 // done that setup, is what actually puts a dialog on screen; confirmed
 // with a scratch program that the dialog appears and genuinely blocks on

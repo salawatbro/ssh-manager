@@ -191,7 +191,7 @@ This app is built around a few hard invariants:
 
 ## Tech stack
 
-- **[Wails v3](https://wails.io/)** (`alpha2.117`) — Go backend bridged to a
+- **[Wails v3](https://wails.io/)** (`v3.1.0`) — Go backend bridged to a
   native `WKWebView` frontend.
 - **Backend:** Go (module `github.com/salawat/sshmgr`), `golang.org/x/crypto/ssh`,
   GORM over the pure-Go **`glebarez/sqlite`** driver (no C toolchain needed),
@@ -217,7 +217,7 @@ This app is built around a few hard invariants:
 - The **`wails3` CLI**, pinned to the version in `go.mod`:
 
   ```bash
-  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha2.117
+  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
   ```
 
 ---

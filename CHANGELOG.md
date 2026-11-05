@@ -68,6 +68,7 @@ existing database and older backups open unchanged.
   example a development build) reports "In use by another Zish".
 - The keep-alive setting now lives in Settings → Connect and applies to the
   launched ssh session.
+- Built on the stable Wails v3.1.0 (was v3.0.0-alpha2.117).
 
 ## [1.5.0] — 2026-08-01
 
