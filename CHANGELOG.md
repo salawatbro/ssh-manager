@@ -4,15 +4,18 @@ All notable changes to **Zish**. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
 follow [Semantic Versioning](https://semver.org/).
 
-Only **1.0.0**, **1.1.0**, **1.2.0**, **1.3.0**, **1.3.1**, **1.4.0** and **1.5.0** are packaged, published releases (macOS `.dmg`).
+Only **1.0.0**, **1.1.0**, **1.2.0**, **1.3.0**, **1.3.1**, **1.4.0**, **1.5.0** and **2.0.0** are packaged, published releases (macOS `.dmg`).
 Versions **0.1–0.7** are the development milestones that built up to 1.0; **1.1.1**
 was a version bump that first shipped packaged as part of 1.2.0.
 
 ## [Unreleased]
 
-Zish stops being a terminal. It now manages your servers, opens them in your own
-terminal app with stored secrets filled in, runs its own ssh-agent with keys in
-the Keychain behind Touch ID, and keeps port-forwarding tunnels. Existing
+## [2.0.0] — 2026-11-06
+
+Zish stops being a terminal and gets a new face. It now manages your servers,
+opens them in your own terminal app with stored secrets filled in, runs its own
+ssh-agent with keys in the Keychain behind Touch ID, and keeps port-forwarding
+tunnels — all in a redesigned app with a Night and a Day theme. Existing
 servers, settings, tunnels, Keychain secrets and the App Lock PIN carry over; an
 existing database and older backups open unchanged.
 
@@ -29,14 +32,16 @@ existing database and older backups open unchanged.
 - Terminal settings (font, size, cursor, scrollback, mode). Their database
   columns and tables are left in place, unused, so existing databases keep
   opening.
+- The three-slide welcome tour, replaced by the first-run screen below.
 
 ### Added
 
 - **Connect in your terminal app** — Terminal (default), iTerm2, Ghostty,
-  WezTerm, kitty, Alacritty, or a custom command (run without a shell), in a
-  new window or, where the app supports it, a tab. Settings → Connect picks the
+  WezTerm, kitty, Alacritty, Warp, or a custom command (run without a shell),
+  in a new window or, where the app supports it, a tab (Warp picks itself). Settings → Connect picks the
   app and has a "Test terminal" button that triggers macOS's Automation prompt
-  up front. A missing app falls back to Terminal with a notice.
+  up front. A missing app falls back to Terminal with a notice. A server can
+  override the terminal and run a command right after it connects.
 - **System OpenSSH** — sessions run Apple's `/usr/bin/ssh` with the server's
   port, user, key, jump hosts (through a generated, self-deleting config),
   connection timeout and keep-alive; your own `~/.ssh/config` still applies to
@@ -46,19 +51,61 @@ existing database and older backups open unchanged.
   within three minutes, never on disk, in argv or in the environment. Host-key
   questions are always left to you in the terminal. Can be turned off.
 - **Copy ssh command** now renders the whole jump chain.
-- **Built-in ssh-agent** — a Keys page (sidebar Servers / Keys switch) to
-  generate Ed25519, ECDSA P-256 or RSA 4096 keys or import existing ones into
-  the Keychain; per-key "Confirm every use" (on by default) asks for Touch ID,
-  Apple Watch or the Mac password; a sign log of every decision; temporary
+- **Built-in ssh-agent** — generate Ed25519, ECDSA P-256 or RSA 4096 keys or
+  import existing ones into the Keychain; per-key "Confirm every use" (on by
+  default) asks for Touch ID, Apple Watch or the Mac password; temporary
   `ssh-add` keys; `ssh-add -x`/`-X`; "Install on server…" to append the public
   key to `authorized_keys`; copyable `~/.ssh/config` and `SSH_AUTH_SOCK`
-  snippets (Zish never edits those files).
+  snippets (Zish never edits those files). Settings → Agent turns the socket on
+  or off and shows its status.
 - **"Key from Zish"** server auth method — Connect, tunnels and Test connection
   sign with an agent key through the same confirmation policy.
-- **Settings → Keys** — turn the agent socket on or off and see its status.
+- **Approvals** — Zish's own approval window names the key, the server, the
+  route and the app asking, and lets you approve once, for 15 minutes or until
+  Zish locks. Production servers can be set to ask every time. Open approvals
+  can be revoked from the Keys page.
+- **Keys and agent page** — the agent's state, key cards with age, Touch ID and
+  the servers that use each key, open approvals and recent signatures.
+- **Tunnels page** — every tunnel in one table with an on/off switch, its
+  route and 10 minutes of traffic. Tunnels can start when Zish opens and
+  reconnect on their own after a drop, after sleep and when the network
+  changes. A tunnel whose port is taken says which app holds it and offers a
+  free one.
+- **New server and New tunnel sheets** — paste an `ssh` command to fill the
+  form, pick how to sign in from tiles, put a Zish key on the server while
+  saving, see the route through jump hosts; tunnel presets (Postgres, MySQL,
+  Redis, Web, Kubernetes), a live port check and the equivalent `ssh` line.
+- **Icons and colours** for servers and tunnels; new servers take their
+  group's colour.
+- **Security check** — ten checks over your servers, keys and settings with a
+  score, inline fixes and an ignore list; the sidebar shows how many fail.
+  Nothing leaves your Mac.
+- **Stacks** — open several servers and tunnels in one go: tunnels first, then
+  servers in tabs, windows or iTerm2 split panes, under one Touch ID. Stacks
+  can sit in the menu bar and have their own global shortcut. Exports now
+  carry tunnels and stacks too; older exports still import.
+- **Launcher** — ⌥Space from any app finds servers, stacks and tunnels, or
+  connects to a typed `user@host`. The shortcut can be changed or turned off;
+  while Zish is locked it offers Touch ID first.
+- **Day theme** — Settings → Appearance picks Night, Day or Match macOS. Menus,
+  dialogs, the launcher, the approval window and the full-screen title bar
+  follow it.
+- **Lock on sleep** — the App Lock engages when the Mac sleeps, its display
+  sleeps, the screen locks or you switch users.
+- **First run** — a welcome screen imports hosts from `~/.ssh/config` with a
+  checkbox each and a guessed group, and shows a short set-up checklist.
 
 ### Changed
 
+- **A new design throughout** — a single pink accent on a Night palette,
+  Geist and Geist Mono bundled with the app, a sidebar with Servers, Stacks,
+  Tunnels, Keys and agent and Security, grouped server rows, and an inspector
+  with the route through jump hosts, what happens on connect, tunnels and
+  notes. Compact density is one switch away.
+- **Settings live in the main window**, in nine sections, with new rows for
+  approvals, key rotation reminders, tunnel defaults and appearance.
+- **A new lock screen** — Touch ID first, a six-box PIN, and what keeps running
+  while Zish is locked.
 - **App Lock is enforced by the backend.** While locked, Connect is refused,
   pending auto-fills are revoked (prompts fall back to typing), and every agent
   signature needs Touch ID or the Mac password, whatever the key's setting.
@@ -69,6 +116,10 @@ existing database and older backups open unchanged.
 - The keep-alive setting now lives in Settings → Connect and applies to the
   launched ssh session.
 - Built on the stable Wails v3.1.0 (was v3.0.0-alpha2.117).
+
+### Fixed
+
+- The full-screen title bar no longer shows as a tall white band over the app.
 
 ## [1.5.0] — 2026-08-01
 

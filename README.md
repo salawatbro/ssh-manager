@@ -12,7 +12,7 @@ in your own terminal app (Terminal, iTerm2, Ghostty, …) running the system
 
 ## Install
 
-1. Download `Zish-1.5.0.dmg`.
+1. Download `Zish-2.0.0.dmg`.
 2. Open the DMG and drag **Zish** into **Applications**.
 3. **First launch:** right-click (or Control-click) the app → **Open** →
    **Open** again. The app is ad-hoc signed but not notarized, so macOS asks
@@ -298,7 +298,7 @@ copy of the version appears somewhere new.
 task darwin:dmg
 ```
 
-Produces `bin/Zish-1.5.0.dmg`. The app inside is ad-hoc signed but not
+Produces `bin/Zish-2.0.0.dmg`. The app inside is ad-hoc signed but not
 notarized, so recipients need to right-click → **Open** on first launch (see
 [Install](#install)).
 
