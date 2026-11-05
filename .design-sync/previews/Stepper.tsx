@@ -6,15 +6,15 @@ function Surface({ children }: { children: React.ReactNode }) {
 
 const noop = () => undefined
 
-// The terminal font-size stepper — its one real use in the app.
-export function FontSize() {
+// The connection-timeout stepper — its first real use in the app.
+export function ConnectionTimeout() {
   return (
     <Surface>
       {/* The control is a block-level flex row — `w-fit` keeps it at its
           natural width instead of stretching, exactly as a Row's right side
           does with `shrink-0`. */}
       <div className="w-fit">
-        <Stepper value={13} min={8} max={32} onChange={noop} />
+        <Stepper value={10} min={1} max={120} onChange={noop} />
       </div>
     </Surface>
   )
@@ -35,8 +35,8 @@ export function InSettingsRow() {
   return (
     <Surface>
       <div className="max-w-2xl">
-        <Row label="Font size" hint="Applies to new sessions." last>
-          <Stepper value={13} min={8} max={32} onChange={noop} />
+        <Row label="Auto-lock after" hint="Minutes of inactivity before Zish locks." last>
+          <Stepper value={10} min={1} max={120} suffix="min" onChange={noop} />
         </Row>
       </div>
     </Surface>

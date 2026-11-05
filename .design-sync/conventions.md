@@ -11,11 +11,7 @@ Two rules:
 1. Load `styles.css` (it `@import`s the fonts and `_ds_bundle.css`).
 2. **Give your root element the app surface**: `className="bg-bg0 text-text font-sans"`.
    Component internals are dark-on-dark, so anything rendered on a white page
-   looks broken. Fixed-size panes matter too: overlays (`ConfirmModal`,
-   `PromptModal`) are `absolute inset-0`, and `FindBar` / `PaneNotice` are
-   absolutely positioned inside the terminal pane — put them in a `relative`
-   parent with a real height, not at page level. `ContextMenu` is `fixed` and
-   takes viewport coordinates.
+   looks broken. `ContextMenu` is `fixed` and takes viewport coordinates.
 
 ## The styling idiom: a Tailwind v4 theme, statically compiled
 
@@ -36,7 +32,6 @@ silently does nothing — use `style={{ height: 260 }}` for off-scale values.
 | Accent | `bg-`/`text-`/`border-` | `accent` (teal) · `accentDim` · `accentFg` · `onAccent` (text ON an accent fill) |
 | Status | `bg-`/`text-`/`border-` | `stConnected` · `stConnecting` · `stFailed` · `stDisc` · `stUnknown` |
 | Environment | `bg-`/`text-`/`border-` | `envProd` · `envStaging` · `envDev` |
-| Terminal | `bg-`/`text-` | `termFg` · `termGreen` · `termBlue` · `termGood`; the full ANSI palette is `var(--term-*)` only |
 
 `hover:` and `focus:` variants exist for all of the above. Also available:
 spacing/sizing (`p-4`, `gap-3`, `h-64`, `max-w-2xl`, `w-full`, `mx-auto`),
@@ -50,9 +45,7 @@ type (`text-xs…text-4xl`, `font-mono`, `font-medium`, `font-semibold`,
 blindness, so never colour a non-environment element with `envProd`/
 `envStaging`/`envDev`.
 
-Terminal surfaces use the `--term-*` properties directly:
-`style={{ background: 'var(--term-bg)', color: 'var(--term-fg)' }}` plus
-`font-mono` (JetBrains Mono ships with this system).
+`font-mono` is JetBrains Mono, which ships with this system.
 
 ## Where the truth is
 

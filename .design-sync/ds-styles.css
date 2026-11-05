@@ -17,7 +17,7 @@
 
 /* Colour tokens × the utilities that consume them, plus the two interaction
    variants the components use. Names must match tokens.css's @theme block. */
-@source inline("{,hover:,focus:}{bg,text,border}-{bg0,bg1,bg1b,bg2,bgSel,border,borderStrong,text,textMuted,textDim,accent,accentDim,accentFg,onAccent,termFg,termGreen,termBlue,termGood,envProd,envStaging,envDev,stConnected,stConnecting,stFailed,stDisc,stUnknown}");
+@source inline("{,hover:,focus:}{bg,text,border}-{bg0,bg1,bg1b,bg2,bgSel,border,borderStrong,text,textMuted,textDim,accent,accentDim,accentFg,onAccent,envProd,envStaging,envDev,stConnected,stConnecting,stFailed,stDisc,stUnknown}");
 
 /* Layout glue: spacing, sizing, type and the flex/grid primitives. */
 @source inline("{p,m}{,x,y,t,r,b,l}-{0,px,1,2,3,4,5,6,8,10,12,16}");

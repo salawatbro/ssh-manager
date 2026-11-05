@@ -57,8 +57,8 @@ export function Triggers() {
   )
 }
 
-// A plain (swatch-less) select opened — the shape reused for Group, Jump host
-// and the snippet scope pickers.
+// A plain (swatch-less) select opened — the shape reused for the Group and
+// Jump host pickers.
 export function PlainOpen() {
   return (
     <Surface>

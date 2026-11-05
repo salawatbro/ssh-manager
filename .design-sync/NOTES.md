@@ -6,9 +6,9 @@ Repo-specific gotchas for the next sync. Config lives in `config.json`;
 ## What is being synced
 
 Zish is an **app**, not a component library, so the sync covers a deliberate
-slice: the **22 presentational components** that render from props alone — no
+slice: the **13 presentational components** that render from props alone — no
 Wails bindings, no Zustand stores. `frontend/.ds-entry.tsx` (generated, see
-below) re-exports exactly that set, and `cfg.componentSrcMap` pins the same 22
+below) re-exports exactly that set, and `cfg.componentSrcMap` pins the same 13
 names. **Keep the two in sync** — a name in one and not the other silently
 drops or breaks a component.
 
@@ -72,18 +72,14 @@ Run it before every capture. It caught real breakage during the first sync
 common utility is missing, add it to `ds-styles.css`'s inline list and rebuild
 the stylesheet — don't work around it in a preview.
 
-## Preview conventions (all 22 previews follow these)
+## Preview conventions (all 13 previews follow these)
 
 - Every cell paints its own surface: the card page hardcodes `background:#fff`,
   and this DS is dark-only. `<div className="bg-bg0 text-text font-sans p-4">`.
-- Overlays (`ConfirmModal`, `PromptModal`) are `absolute inset-0` → wrap in a
-  `relative h-64 overflow-hidden` "window". `FindBar` / `PaneNotice` are
-  absolutely positioned in the terminal pane → same, with
-  `style={{ background: 'var(--term-bg)' }}`.
 - `ContextMenu` is `position: fixed` and escapes any wrapper → it is a
   `cardMode: "single"` card with one story (`cfg.overrides`).
 - `DestFields` renders wider than a grid cell → `cardMode: "column"`.
-- Block-level controls (`Stepper`, `Segmented`) stretch unless wrapped in
+- Block-level controls (`Stepper`) stretch unless wrapped in
   `w-fit`, which is what a Row's `shrink-0` right side does in the app.
 - Helper components inside a preview must NOT be exported — every named export
   becomes a card cell.
@@ -94,10 +90,6 @@ None. The last full validate exited 0 with zero warnings.
 
 ## States that cannot render statically
 
-- **FindBar** — the match counter (`3/9`, `no matches`, `240+`) is derived from
-  the bar's OWN query state, which starts empty and only fills by typing. Every
-  `results` value renders identically in a static capture, so the preview is a
-  single cell by design, not an oversight.
 - Hover / focus / drag states generally: the captures are static.
 
 ## Fonts

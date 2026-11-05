@@ -28,14 +28,10 @@ export function InSettingsRows() {
   return (
     <Surface>
       <div className="max-w-2xl">
-        <Row label="Blink cursor">
+        <Row label="Menu bar agent">
           <Toggle on onChange={noop} />
         </Row>
-        <Row
-          label="Shell integration"
-          hint="Distinguish prompt, commands and output; mark failed commands. Applies to new sessions."
-          last
-        >
+        <Row label="Start at login" hint="Launch Zish when you log in." last>
           <Toggle on={false} onChange={noop} />
         </Row>
       </div>

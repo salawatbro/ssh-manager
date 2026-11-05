@@ -19,7 +19,7 @@ export function ServerRowMenu() {
         y={70}
         items={[
           { label: 'Connect', run: noop },
-          { label: 'Open SFTP', run: noop },
+          { label: 'Copy SSH command', run: noop },
           'separator',
           { label: 'Edit…', run: noop },
           { label: 'Duplicate', run: noop },

@@ -15,26 +15,9 @@ export { ServerFormGroup } from './src/components/server/ServerFormGroup'
 export { TwoFactorFields } from './src/components/server/TwoFactorFields'
 export { DestFields } from './src/components/server/DestFields'
 
-export { CodeRow } from './src/components/authenticator/CodeRow'
-
 export { Row } from './src/components/settings/Row'
 export { ShortcutsSection } from './src/components/settings/ShortcutsSection'
-export { TerminalPreview } from './src/components/settings/TerminalPreview'
-export {
-  Toggle,
-  Stepper,
-  Segmented,
-  NumberBox,
-  InertSelect,
-  ThemeSwatch,
-  ProdBadge,
-} from './src/components/settings/controls'
-
-export { ConfirmModal } from './src/components/sftp/ConfirmModal'
-export { PromptModal } from './src/components/sftp/PromptModal'
-
-export { FindBar } from './src/components/terminal/FindBar'
-export { PaneNotice } from './src/components/terminal/PaneNotice'
+export { Toggle, Stepper } from './src/components/settings/controls'
 
 export { ContextMenu } from './src/components/ui/ContextMenu'
 export { Input } from './src/components/ui/Input'
