@@ -1,18 +1,10 @@
 // Small settings controls, shared by the sections. Kept in one file so the
 // sections stay focused on wiring.
 
+import { Switch } from '../ui/Switch'
+
 export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!on)}
-      className={`flex h-[16px] w-[28px] items-center rounded-[8px] px-[1px] ${
-        on ? 'justify-end bg-accent' : 'justify-start border border-borderStrong bg-bg0'
-      }`}
-    >
-      <span className={`h-[12px] w-[12px] rounded-full ${on ? 'bg-text' : 'bg-textDim'}`} />
-    </button>
-  )
+  return <Switch checked={on} onChange={onChange} />
 }
 
 export function Stepper({

@@ -1,39 +1,102 @@
 @import "tailwindcss";
 
-@theme {
-  /* Cool graphite — dark, the primary mode (TZ 12.1) */
-  --color-bg0: #13161b;
-  --color-bg1: #171b21;
-  --color-bg1b: #1a1f26;
-  --color-bg2: #212730;
-  --color-bgSel: #232d3b;
-  --color-border: #2a313b;
-  --color-borderStrong: #39424f;
+/* `static` emits every variable even when no utility names it: icon tints and
+   env fills are also read at runtime through inline `var(--color-…)` styles. */
+@theme static {
+  /* Night palette — docs/superpowers/new-design-plan.md. Brand pink is the only
+     accent; green/amber/red mean status (a circle), ember/violet/sky mean
+     environment (a labelled square). */
+  --color-bg: #0c0d10;
+  --color-side: #111217;
+  --color-s1: #15171c;
+  --color-s2: #1b1e25;
+  --color-s3: #252932;
+  --color-line: #22252d;
+  --color-line2: #333844;
+  --color-scrim: rgb(4 5 8 / 0.62);
 
-  --color-text: #dfe4ea;
-  --color-textMuted: #98a3b2;
-  --color-textDim: #69727f;
+  --color-tx: #eef0f4;
+  --color-tx2: #b0b6c2;
+  --color-tx3: #8f96a4;
 
-  --color-accent: #35c9d6;
-  --color-accentDim: #123f44;
-  --color-accentFg: #7fe6ef;
-  --color-onAccent: #04252a;
+  --color-acc: #ff4f8b;
+  --color-acc-on: #1d0612;
+  --color-acc-soft: rgb(255 79 139 / 0.14);
+  --color-acc-tx: #ff8fb5;
 
-  /* Semantic — these do not change with the theme (TZ 12.1).
-     Environment is always a square, status is always a circle (UI-11).
-     Never reuse an env colour to mean anything but that environment. */
-  --color-envProd: #cf6bc9;
-  --color-envStaging: #c99a3f;
-  --color-envDev: #5b8def;
+  --color-ok: #2fd27f;
+  --color-ok-tx: #4ade94;
+  --color-warn: #f5b73b;
+  --color-warn-tx: #f7c560;
+  --color-warn-soft: rgb(245 183 59 / 0.12);
+  --color-bad: #ff5a5f;
+  --color-bad-tx: #ff8a8d;
+  --color-bad-soft: rgb(255 90 95 / 0.12);
+  --color-idle: #6b7280;
 
-  --color-stConnected: #46c771;
-  --color-stConnecting: #e0a92e;
-  --color-stFailed: #e5544b;
-  --color-stDisc: #5f6773;
-  --color-stUnknown: #41474f;
+  --color-prod: #ff8a4c;
+  --color-prod-soft: rgb(255 138 76 / 0.14);
+  --color-stg: #a68bff;
+  --color-stg-soft: rgb(166 139 255 / 0.15);
+  --color-dev: #45b8ff;
+  --color-dev-soft: rgb(69 184 255 / 0.14);
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  /* Icon tints: a server/tunnel colour only ever tints its icon tile. */
+  --color-t-gray: #b0b6c2;
+  --color-t-gray-bg: rgb(176 182 194 / 0.14);
+  --color-t-red: #ff8a8d;
+  --color-t-red-bg: rgb(255 90 95 / 0.16);
+  --color-t-orange: #ffa36e;
+  --color-t-orange-bg: rgb(255 138 76 / 0.16);
+  --color-t-amber: #f7c560;
+  --color-t-amber-bg: rgb(245 183 59 / 0.16);
+  --color-t-lime: #bde46a;
+  --color-t-lime-bg: rgb(170 220 80 / 0.15);
+  --color-t-green: #4ade94;
+  --color-t-green-bg: rgb(47 210 127 / 0.15);
+  --color-t-teal: #4fd8c8;
+  --color-t-teal-bg: rgb(45 200 185 / 0.15);
+  --color-t-sky: #6ccaff;
+  --color-t-sky-bg: rgb(69 184 255 / 0.16);
+  --color-t-blue: #8eacff;
+  --color-t-blue-bg: rgb(100 140 255 / 0.17);
+  --color-t-violet: #b9a3ff;
+  --color-t-violet-bg: rgb(166 139 255 / 0.17);
+  --color-t-pink: #ff8fb5;
+  --color-t-pink-bg: rgb(255 79 139 / 0.16);
+  --color-t-fuchsia: #ef93ff;
+  --color-t-fuchsia-bg: rgb(225 110 255 / 0.16);
+
+  /* Old names, kept so every existing screen re-skins at once. Removed in
+     Phase 9 once no component uses them. */
+  --color-bg0: var(--color-bg);
+  --color-bg1: var(--color-side);
+  --color-bg1b: var(--color-s1);
+  --color-bg2: var(--color-s2);
+  --color-bgSel: var(--color-s3);
+  --color-border: var(--color-line);
+  --color-borderStrong: var(--color-line2);
+  --color-text: var(--color-tx);
+  --color-textMuted: var(--color-tx2);
+  --color-textDim: var(--color-tx3);
+  --color-accent: var(--color-acc);
+  --color-accentDim: var(--color-acc-soft);
+  --color-accentFg: var(--color-acc-tx);
+  --color-onAccent: var(--color-acc-on);
+  --color-envProd: var(--color-prod);
+  --color-envStaging: var(--color-stg);
+  --color-envDev: var(--color-dev);
+  --color-stConnected: var(--color-ok);
+  --color-stConnecting: var(--color-warn);
+  --color-stFailed: var(--color-bad);
+  --color-stDisc: var(--color-idle);
+  --color-stUnknown: var(--color-line2);
+
+  --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
+
+  --shadow-sheet: 0 24px 64px rgb(0 0 0 / 0.55);
+  --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.45);
 
   /* UI-11: the environment marker is a square at exactly this radius. Status is
      always a circle (rounded-full). The two axes must never share a shape. */
@@ -54,8 +117,8 @@
   }
 
   body {
-    background: var(--color-bg0);
-    color: var(--color-text);
+    background: var(--color-bg);
+    color: var(--color-tx);
     font-family: var(--font-sans);
     font-size: 13px; /* UI-01 */
     -webkit-font-smoothing: antialiased;
@@ -105,7 +168,7 @@
 
   /* UI-10 */
   :focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-acc);
     outline-offset: 1px;
   }
 }
@@ -151,5 +214,20 @@
   100% {
     opacity: 0;
     transform: scale(1.5);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* No fill-mode: the transform must be gone once the drop ends, or the sheet
+   would become the containing block of its `fixed` popovers. */
+@keyframes sheet-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }
