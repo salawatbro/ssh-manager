@@ -12,7 +12,7 @@ interface Props {
   empty: boolean
   onHover: (i: number) => void
   onRun: (row: Row, inTab: boolean) => void
-  // Settings › Appearance › Use icons in the launcher.
+  // Settings › Appearance › Use icons in the launcher and menu bar.
   icons: boolean
 }
 

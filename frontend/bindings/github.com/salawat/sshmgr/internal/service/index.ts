@@ -57,6 +57,5 @@ export type {
     TempKeyView,
     TerminalOption,
     TestResult,
-    TrayConnect,
     TunnelRow
 } from "./models.js";

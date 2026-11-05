@@ -35,7 +35,7 @@ export function ServerContextMenu({ server, x, y, onClose, onEdit, reorderable }
 
   const items: MenuEntry[] = [
     { label: 'Connect', run: () => openServer(server.id) },
-    { label: server.pinned ? 'Unpin from tray' : 'Pin to tray', run: () => void setPinned(server.id, !server.pinned) },
+    { label: server.pinned ? 'Unpin from menu bar' : 'Pin to menu bar', run: () => void setPinned(server.id, !server.pinned) },
     // moveWithinGroup returns null (already at that edge of the group) or a non-empty reordered
     // list — never []. This `run` guard is a null guard, redundant with `disabled` only as
     // defense in depth: written as `!== null` (not truthiness) so it reads identically to

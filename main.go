@@ -27,10 +27,10 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// mainWindow is captured so the global ⌘⇧S hot key and the tray can show/hide
-// it. onGlobalHotkey is the toggle the cgo hot-key callback invokes; it is set
-// in the ApplicationStarted hook (after NSApp exists) so the callback never
-// runs before it is wired.
+// mainWindow is captured so the global ⌘⇧S hot key and the menu-bar panel
+// can show/hide it. onGlobalHotkey is the toggle the cgo hot-key callback
+// invokes; it is set in the ApplicationStarted hook (after NSApp exists) so
+// the callback never runs before it is wired.
 var (
 	mainWindow     *application.WebviewWindow
 	onGlobalHotkey func()
@@ -229,6 +229,7 @@ func main() {
 			application.NewService(securityService),
 			application.NewService(stackService),
 			application.NewService(launcherWindowService),
+			application.NewService(&TrayPanelService{}),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -372,55 +373,14 @@ func main() {
 		fullscreenTitlebarChanged(false)
 	})
 
-	// Tray-lite: a menu-bar presence so the app is reachable while its window is
-	// hidden (by ⌘⇧S or the close button). A text label (not an icon) is the
-	// v0.4 identity — a proper template icon is v0.5 polish (docs/v0.5-notes.md).
-	// Left-click toggles the window IN PLACE via toggleMainWindow — deliberately
-	// NOT AttachWindow, whose built-in ToggleWindow repositions the window under
-	// the menu-bar icon (wrong for a full-size window). Right-click shows the
-	// menu below (Wails' smart default when a menu is set).
-	tray := app.SystemTray.New()
-	tray.SetLabel("Zish")
-	tray.OnClick(func() { toggleMainWindow() })
+	// The menu-bar bolt opens the panel (tray.html) under it. It reads its
+	// lists on every show, so nothing here rebuilds it.
+	setupTray(app)
 
-	// The tray's server list mirrors the pinned set. rebuildTray refreshes it
-	// from the live list; SetOnServersChanged (below) reruns it whenever a
-	// server is pinned/renamed/deleted. Building it once here is the initial menu.
-	rebuildTray := func() {
-		servers, err := serverService.List()
-		if err != nil {
-			servers = nil // best-effort: an unreadable list just yields no pinned section
-		}
-		stacks, err := stackService.List()
-		if err != nil {
-			stacks = nil
-		}
-		tray.SetMenu(buildTrayMenu(app, trayMenu{
-			pinned: service.PinnedForTray(servers),
-			stacks: stacks,
-			connect: func(id string) {
-				showMainWindow()
-				application.Get().Event.Emit("tray:connect", service.TrayConnect{ServerID: id})
-			},
-			launch: func(id string) { go launchStackNative(stackService, id) },
-		}))
-	}
-	rebuildTray() // initial build: setup-time, on the main thread — direct call is safe
-	// Live rebuilds fire from the SetPinned/Update/Delete bound-method
-	// goroutines, which run off the main thread after app.Run(). Mutating the
-	// AppKit tray menu (tray.SetMenu) off the main thread can crash on macOS, so
-	// marshal each live rebuild onto the main thread. InvokeAsync's
-	// dispatchOnMainThread has an isOnMainThread fast path, so this stays cheap.
-	service.SetOnServersChanged(serverService, func() {
-		application.InvokeAsync(rebuildTray)
-	})
-	// A stack change moves the tray's Stacks section and the global shortcuts;
-	// Carbon hot keys, like the tray menu, are main-thread only.
+	// A stack change moves the global shortcuts; Carbon hot keys are
+	// main-thread only.
 	refreshStacks := func() {
-		application.InvokeAsync(func() {
-			rebuildTray()
-			syncStackHotkeys(stackService)
-		})
+		application.InvokeAsync(func() { syncStackHotkeys(stackService) })
 	}
 	service.SetOnStacksChanged(stackService, refreshStacks)
 	service.SetStackDeps(serverService, stackRepo, refreshStacks)
@@ -476,8 +436,8 @@ func toggleMainWindow() {
 	}
 }
 
-// showMainWindow brings the window back and focuses it (used by the tray's
-// "Show" item and the show half of the toggle).
+// showMainWindow brings the window back and focuses it (the menu-bar panel's
+// Open Zish, and the show half of the toggle).
 func showMainWindow() {
 	if mainWindow == nil {
 		return
@@ -596,7 +556,6 @@ func init() {
 	application.RegisterEvent[service.CodeRequest]("code:request")
 	application.RegisterEvent[forward.Status]("forward:status")
 	application.RegisterEvent[forward.TrafficReport]("forward:stats")
-	application.RegisterEvent[service.TrayConnect]("tray:connect")
 	application.RegisterEvent[service.StackLaunched]("stack:launched")
 	application.RegisterEvent[domain.AgentSignEvent]("agent:sign")
 	application.RegisterEvent[service.AgentStatus]("agent:status")
@@ -607,4 +566,6 @@ func init() {
 	application.RegisterEvent[string]("theme:changed")
 	application.RegisterEvent[string]("servers:changed")
 	application.RegisterEvent[application.Void]("launcher:show")
+	application.RegisterEvent[application.Void]("tray:show")
+	application.RegisterEvent[application.Void]("settings:open")
 }

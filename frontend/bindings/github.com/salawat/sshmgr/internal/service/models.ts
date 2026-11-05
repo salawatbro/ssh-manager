@@ -465,18 +465,6 @@ export interface TestResult {
 }
 
 /**
- * TrayConnect is the tray:connect event payload: the id of the pinned server
- * whose menu-bar entry was clicked. main.go emits it (after showing the window)
- * and the frontend connects to that server. Named here — like
- * HostKeyRequest/CodeRequest — so main.go's application.RegisterEvent[TrayConnect]
- * gives the binding generator a type for typed TypeScript, while
- * internal/service stays cgo-free.
- */
-export interface TrayConnect {
-    "serverID": string;
-}
-
-/**
  * TunnelRow is one line of the Tunnels page: a saved forward, the name of the
  * server it runs on, its last status and its recent traffic.
  */

@@ -1021,60 +1021,6 @@ func TestSetPinnedUnpinAlwaysAllowed(t *testing.T) {
 	}
 }
 
-func TestSetPinnedNotifiesServersChanged(t *testing.T) {
-	svc, repo := newServiceWithRepo(t)
-	_ = repo.Create(sample("s1", "a", "Prod"))
-	calls := 0
-	SetOnServersChanged(svc, func() { calls++ })
-
-	if err := svc.SetPinned("s1", true); err != nil {
-		t.Fatalf("SetPinned error = %v", err)
-	}
-	if calls != 1 {
-		t.Fatalf("onServersChanged calls = %d, want 1", calls)
-	}
-}
-
-func TestUpdateAndDeleteNotifyServersChanged(t *testing.T) {
-	svc, repo := newServiceWithRepo(t)
-	_ = repo.Create(sample("s1", "a", "Prod"))
-	calls := 0
-	SetOnServersChanged(svc, func() { calls++ })
-
-	if _, err := svc.Update("s1", validInput()); err != nil {
-		t.Fatalf("Update error = %v", err)
-	}
-	if err := svc.Delete("s1"); err != nil {
-		t.Fatalf("Delete error = %v", err)
-	}
-	if calls != 2 {
-		t.Fatalf("onServersChanged calls = %d, want 2 (Update + Delete)", calls)
-	}
-}
-
-func TestPinnedForTrayFiltersAndCaps(t *testing.T) {
-	servers := []domain.Server{
-		{ID: "a", Name: "a", Pinned: true},
-		{ID: "b", Name: "b", Pinned: false},
-		{ID: "c", Name: "c", Pinned: true},
-		{ID: "d", Name: "d", Pinned: true},
-		{ID: "e", Name: "e", Pinned: true},
-		{ID: "f", Name: "f", Pinned: true},
-		{ID: "g", Name: "g", Pinned: true}, // 6th pinned — must be dropped
-	}
-	got := PinnedForTray(servers)
-	if len(got) != maxPinned {
-		t.Fatalf("len = %d, want %d (cap)", len(got), maxPinned)
-	}
-	// Order preserved, unpinned skipped: a, c, d, e, f.
-	wantIDs := []string{"a", "c", "d", "e", "f"}
-	for i, id := range wantIDs {
-		if got[i].ID != id {
-			t.Fatalf("got[%d].ID = %q, want %q", i, got[i].ID, id)
-		}
-	}
-}
-
 func TestSetGroupOrderServiceValidatesAndPersists(t *testing.T) {
 	svc, repo := newServiceWithRepo(t)
 

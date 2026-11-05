@@ -69,6 +69,11 @@ export const LockChanged = "lock:changed";
 export const ServersChanged = "servers:changed";
 
 /**
+ * Name of the custom event "settings:open".
+ */
+export const SettingsOpen = "settings:open";
+
+/**
  * Name of the custom event "stack:launched".
  */
 export const StackLaunched = "stack:launched";
@@ -79,7 +84,7 @@ export const StackLaunched = "stack:launched";
 export const ThemeChanged = "theme:changed";
 
 /**
- * Name of the custom event "tray:connect".
+ * Name of the custom event "tray:show".
  */
-export const TrayConnect = "tray:connect";
+export const TrayShow = "tray:show";
 

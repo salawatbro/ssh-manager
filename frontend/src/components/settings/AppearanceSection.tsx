@@ -55,8 +55,8 @@ export function AppearanceSection() {
             onChange={(colorBy) => void update({ colorBy })}
           />
         </Row>
-        <Row label="Use icons in the launcher" hint="Off shows the launcher’s rows as plain text.">
-          <Toggle label="Use icons in the launcher" on={s.menuIcons} onChange={(v) => void update({ menuIcons: v })} />
+        <Row label="Use icons in the launcher and menu bar" hint="Off shows their rows as plain text.">
+          <Toggle label="Use icons in the launcher and menu bar" on={s.menuIcons} onChange={(v) => void update({ menuIcons: v })} />
         </Row>
       </Group>
     </>

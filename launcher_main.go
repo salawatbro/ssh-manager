@@ -75,9 +75,10 @@ func syncLauncherHotkey(sc string, stacks *service.StackService) {
 	syncStackHotkeys(stacks)
 }
 
-// LauncherWindowService is what the launcher window needs from package main:
-// connecting and launching in a way the main window hears about, and the main
-// window itself. Bound to the frontend as LauncherWindowService.
+// LauncherWindowService is what the launcher and the menu-bar panel need from
+// package main: connecting and launching in a way the main window hears
+// about, and the main window itself. Bound to the frontend as
+// LauncherWindowService.
 type LauncherWindowService struct {
 	launcher *service.LauncherService
 	stacks   *service.StackService
@@ -97,8 +98,8 @@ func (s *LauncherWindowService) Connect(serverID string, inTab bool) (service.Op
 	return res, err
 }
 
-// LaunchStack launches a stack and reports it on stack:launched, as the tray
-// does, without bringing the main window forward.
+// LaunchStack launches a stack and reports it on stack:launched without
+// bringing the main window forward.
 func (s *LauncherWindowService) LaunchStack(id string) (service.StackLaunch, error) {
 	res, err := s.stacks.Launch(id)
 	ev := service.StackLaunched{StackID: id, Result: res}

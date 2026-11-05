@@ -33,9 +33,10 @@ declare module "@wailsio/runtime" {
             "launcher:show": void;
             "lock:changed": boolean;
             "servers:changed": string;
+            "settings:open": void;
             "stack:launched": service$0.StackLaunched;
             "theme:changed": string;
-            "tray:connect": service$0.TrayConnect;
+            "tray:show": void;
         }
     }
 }

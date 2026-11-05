@@ -40,13 +40,15 @@ export default defineConfig({
     },
   },
   // approval.html is the agent's approval window (approval_window_darwin.go),
-  // launcher.html the ⌥Space launcher (launcher_main.go).
+  // launcher.html the ⌥Space launcher (launcher_main.go), tray.html the
+  // menu-bar panel (tray_panel.go).
   build: {
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),
         approval: path.resolve(__dirname, "approval.html"),
         launcher: path.resolve(__dirname, "launcher.html"),
+        tray: path.resolve(__dirname, "tray.html"),
       },
     },
   },

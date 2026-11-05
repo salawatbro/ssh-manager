@@ -107,11 +107,6 @@ type ServerService struct {
 	stacks           *store.StackRepo
 	onStacksImported func()
 
-	// onServersChanged, when set (SetOnServersChanged), fires after any change
-	// to the server set the menu-bar tray reflects: SetPinned, Update, Delete.
-	// nil for every non-tray caller (all tests) — then notify is a no-op.
-	onServersChanged func()
-
 	// agent signs for Zish-key servers; nil until SetSignerSource.
 	agent *AgentService
 }
@@ -152,30 +147,14 @@ func SetForwardDeps(s *ServerService, forwards *store.ForwardRepo, stopper forwa
 	s.stopper = stopper
 }
 
-// maxPinned caps how many servers show in the menu-bar tray's quick-connect
-// list. SetPinned refuses the (maxPinned+1)-th pin; PinnedForTray also truncates.
+// maxPinned caps how many servers the menu-bar panel lists. SetPinned refuses
+// the (maxPinned+1)-th pin.
 const maxPinned = 5
 
-// SetOnServersChanged registers the tray-rebuild callback. Package-level, not a
-// method, for the SAME reason as SetForwardDeps: application.NewService binds
-// every EXPORTED METHOD to the frontend, and a method here would leak a
-// spurious, unusable ServerService binding (a func param has no JS
-// construction). A package-level function stays callable by main.go yet
-// invisible to the binding generator.
-func SetOnServersChanged(s *ServerService, fn func()) {
-	s.onServersChanged = fn
-}
-
-func (s *ServerService) notifyServersChanged() {
-	if s.onServersChanged != nil {
-		s.onServersChanged()
-	}
-}
-
-// SetPinned pins or unpins a server for the menu-bar tray. Pinning is capped at
+// SetPinned pins or unpins a server for the menu-bar panel. Pinning is capped at
 // maxPinned; the next pin is refused with a validation error the frontend
 // surfaces. Re-pinning an already-pinned server and unpinning are always
-// allowed. A successful change fires onServersChanged so the tray rebuilds.
+// allowed.
 func (s *ServerService) SetPinned(id string, pinned bool) error {
 	if pinned {
 		srv, err := s.repo.Get(id)
@@ -189,19 +168,18 @@ func (s *ServerService) SetPinned(id string, pinned bool) error {
 			}
 			if n >= maxPinned {
 				return domain.NewError(domain.CodeValidation,
-					"You can pin up to 5 servers to the tray. Unpin one first.")
+					"You can pin up to 5 servers to the menu bar. Unpin one first.")
 			}
 		}
 	}
 	if err := s.repo.SetPinned(id, pinned); err != nil {
 		return err
 	}
-	s.notifyServersChanged()
 	return nil
 }
 
 // SetLook changes only a server's icon and colour, with the same rules as a
-// form save. It fires onServersChanged so the tray follows.
+// form save.
 func (s *ServerService) SetLook(id, icon, color string) error {
 	srv, err := s.repo.Get(id)
 	if err != nil {
@@ -214,13 +192,11 @@ func (s *ServerService) SetLook(id, icon, color string) error {
 	if err := s.repo.SetLook(id, srv.Icon, srv.Color); err != nil {
 		return err
 	}
-	s.notifyServersChanged()
 	return nil
 }
 
 // SetGroupOrder persists a sidebar drag-reorder: ids is one group's full row
-// list in its new visual order. A successful change fires onServersChanged so
-// the tray's pinned list follows the sidebar's order.
+// list in its new visual order.
 func (s *ServerService) SetGroupOrder(group string, ids []string) error {
 	if len(ids) == 0 {
 		return domain.NewError(domain.CodeValidation, "Nothing to reorder.")
@@ -228,27 +204,7 @@ func (s *ServerService) SetGroupOrder(group string, ids []string) error {
 	if err := s.repo.SetGroupOrder(group, ids); err != nil {
 		return err
 	}
-	s.notifyServersChanged()
 	return nil
-}
-
-// PinnedForTray returns the servers to show in the menu-bar tray: those the
-// user pinned, in the given order, capped at maxPinned. Pure (no repo access)
-// so it stays trivially testable; main.go feeds it serverService.List(). The
-// cap is belt-and-suspenders — SetPinned already refuses a 6th pin, but a
-// hand-edited database must never flood the menu.
-func PinnedForTray(servers []domain.Server) []domain.Server {
-	out := make([]domain.Server, 0, maxPinned)
-	for _, srv := range servers {
-		if !srv.Pinned {
-			continue
-		}
-		out = append(out, srv)
-		if len(out) == maxPinned {
-			break
-		}
-	}
-	return out
 }
 
 // List returns every server, ordered for the sidebar.
@@ -347,7 +303,6 @@ func (s *ServerService) Update(id string, input CreateServerInput) (*domain.Serv
 	if err := s.writeSecrets(id, input); err != nil {
 		return nil, err
 	}
-	s.notifyServersChanged()
 	// Return the freshly stored row so the caller sees the real usage
 	// state, which Update did not touch.
 	return s.repo.Get(id)
@@ -389,7 +344,6 @@ func (s *ServerService) Delete(id string) error {
 	// Best-effort: the secret is now unreachable (no server references it)
 	// and will be overwritten if the same UUID ever recurs (it won't).
 	_ = s.secret.Delete(id)
-	s.notifyServersChanged()
 	return nil
 }
 

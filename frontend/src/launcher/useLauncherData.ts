@@ -24,10 +24,11 @@ export interface LauncherLock {
   touchId: boolean
 }
 
-// What the launcher shows, read through the services on every ⌥Space. The
-// windows share no store: changes made elsewhere arrive as the same events
-// the main window hears. While Zish is locked nothing is read.
-export function useLauncherData() {
+// What the launcher shows, read through the services on every ⌥Space (or
+// every click on the menu-bar icon, for the panel). The windows share no
+// store: changes made elsewhere arrive as the same events the main window
+// hears. While Zish is locked nothing is read.
+export function useLauncherData(showEvent: 'launcher:show' | 'tray:show' = 'launcher:show') {
   const [data, setData] = useState<LauncherData>(EMPTY)
   const [lock, setLock] = useState<LauncherLock>({ locked: false, touchId: false })
   const [hotkey, setHotkey] = useState('')
@@ -62,7 +63,7 @@ export function useLauncherData() {
   useEffect(() => {
     void refresh()
     const offs = [
-      Events.On('launcher:show', () => void refresh()),
+      Events.On(showEvent, () => void refresh()),
       Events.On('lock:changed', (ev) => {
         setLock((l) => ({ ...l, locked: ev.data }))
         if (ev.data) setData(EMPTY)
@@ -74,7 +75,7 @@ export function useLauncherData() {
       Events.On('stack:launched', () => void loadLists()),
     ]
     return () => offs.forEach((off) => off())
-  }, [refresh, loadLists])
+  }, [refresh, loadLists, showEvent])
 
   return { data, lock, hotkey, prefs, loadLists }
 }

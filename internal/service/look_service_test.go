@@ -73,18 +73,12 @@ func TestServerSetLook(t *testing.T) {
 	if err := repo.Create(s); err != nil {
 		t.Fatal(err)
 	}
-	calls := 0
-	SetOnServersChanged(svc, func() { calls++ })
-
 	if err := svc.SetLook("s1", " letters:DB ", "pink"); err != nil {
 		t.Fatalf("SetLook = %v", err)
 	}
 	got, _ := svc.Get("s1")
 	if got.Icon != "letters:DB" || got.Color != "pink" || got.Notes != "keep" || got.RunAfterConnect != "htop" {
 		t.Fatalf("after SetLook: %+v", got)
-	}
-	if calls != 1 {
-		t.Fatalf("onServersChanged calls = %d, want 1", calls)
 	}
 
 	if err := svc.SetLook("s1", "unicorn", ""); codeOf(t, err) != domain.CodeValidation {
@@ -93,8 +87,8 @@ func TestServerSetLook(t *testing.T) {
 	if err := svc.SetLook("s1", "", "magenta"); codeOf(t, err) != domain.CodeValidation {
 		t.Fatalf("bad colour: %v", err)
 	}
-	if got, _ := svc.Get("s1"); got.Icon != "letters:DB" || got.Color != "pink" || calls != 1 {
-		t.Fatalf("rejected SetLook changed the row or notified: %+v, calls %d", got, calls)
+	if got, _ := svc.Get("s1"); got.Icon != "letters:DB" || got.Color != "pink" {
+		t.Fatalf("rejected SetLook changed the row: %+v", got)
 	}
 	if err := svc.SetLook("missing", "", ""); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("missing: %v", err)

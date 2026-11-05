@@ -8,7 +8,7 @@ import (
 	"github.com/salawat/sshmgr/internal/service"
 )
 
-// launchStackNative launches a stack from the tray or a global shortcut and
+// launchStackNative launches a stack from a global shortcut and
 // tells the window how it went; a failure brings the window up to show it.
 func launchStackNative(stacks *service.StackService, id string) {
 	res, err := stacks.Launch(id)

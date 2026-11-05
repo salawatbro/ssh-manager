@@ -71,7 +71,7 @@ export function tunnelSub(f: PortForward, serverName: string): string {
   return `${flag} ${f.bindPort} → ${to} · ${serverName}`
 }
 
-function serverRow(s: Server, data: LauncherData): LauncherRow {
+export function serverRow(s: Server, data: LauncherData): LauncherRow {
   const states = data.tunnels.filter((t) => t.forward.serverId === s.id).map((t) => stateOf(t, data))
   const dot = states.includes('failed')
     ? { tone: 'bad' as const, label: 'A tunnel failed' }
@@ -94,7 +94,7 @@ function serverRow(s: Server, data: LauncherData): LauncherRow {
   }
 }
 
-function stackRow(st: Stack, data: LauncherData): LauncherRow {
+export function stackRow(st: Stack, data: LauncherData): LauncherRow {
   return {
     key: `stack:${st.id}`,
     kind: 'stack',
@@ -111,7 +111,7 @@ function stackRow(st: Stack, data: LauncherData): LauncherRow {
   }
 }
 
-function tunnelRow(t: TunnelRow, data: LauncherData): LauncherRow {
+export function tunnelRow(t: TunnelRow, data: LauncherData): LauncherRow {
   const f = t.forward
   const state = stateOf(t, data)
   return {

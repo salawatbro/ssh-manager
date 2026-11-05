@@ -15,7 +15,6 @@ import { LockOverlay } from './components/lock/LockOverlay'
 import { ForgotResetModal } from './components/lock/ForgotResetModal'
 import { useAppKeymap } from './hooks/useAppKeymap'
 import { useLockBoot } from './hooks/useLockBoot'
-import { useTrayConnect } from './hooks/useTrayConnect'
 import { useWindowSync } from './hooks/useWindowSync'
 import { useServers } from './stores/servers'
 import { useServerForm } from './stores/serverForm'
@@ -116,7 +115,6 @@ export default function App() {
   // Boots the App Lock: locks on launch once settings load (async), then
   // runs the idle timer while enabled. Manual ⌘L is in useAppKeymap above.
   useLockBoot()
-  useTrayConnect()
   useWindowSync()
 
   return (

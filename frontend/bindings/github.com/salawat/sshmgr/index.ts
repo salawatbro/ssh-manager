@@ -4,8 +4,10 @@
 import * as BiometricService from "./biometricservice.js";
 import * as DataService from "./dataservice.js";
 import * as LauncherWindowService from "./launcherwindowservice.js";
+import * as TrayPanelService from "./traypanelservice.js";
 export {
     BiometricService,
     DataService,
-    LauncherWindowService
+    LauncherWindowService,
+    TrayPanelService
 };
