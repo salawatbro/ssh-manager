@@ -4,6 +4,7 @@ import type { StackLaunch } from '@bindings/github.com/salawat/sshmgr/internal/s
 import { jumpChain } from './route'
 
 export const ITERM2 = 'iterm2'
+const WARP = 'warp'
 
 // The terminal the stack opens in, as the launch sees it.
 export interface StackTerminal {
@@ -83,6 +84,7 @@ export function layoutPreview(st: Pick<Stack, 'steps'>, term: StackTerminal, ser
 // The note under the layout preview: where split panes work.
 export function layoutNote(term: StackTerminal): string {
   if (term.id === ITERM2) return 'Split panes need iTerm2. Other terminals open each server in its own tab.'
+  if (term.id === WARP) return 'Split panes need iTerm2. Warp picks a tab or a window for each server itself.'
   return `Split panes need iTerm2. ${term.name || 'Your terminal'} opens each server in its own ${term.supportsTab ? 'tab' : 'window'}.`
 }
 

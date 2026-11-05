@@ -64,7 +64,7 @@ func TestSettingsSanitiseTerminal(t *testing.T) {
 			t.Errorf("Sanitise kept %q as %q", id, s.Terminal)
 		}
 	}
-	for _, id := range []string{"", "warp", "Terminal", "iterm2 ", "x;y"} {
+	for _, id := range []string{"", "hyper", "Terminal", "iterm2 ", "x;y"} {
 		s := Settings{Terminal: id}
 		s.Sanitise()
 		if s.Terminal != TerminalApple {

@@ -22,6 +22,7 @@ var bundleNames = map[string]string{
 	"com.github.wez.wezterm": "WezTerm.app",
 	"net.kovidgoyal.kitty":   "kitty.app",
 	"org.alacritty":          "Alacritty.app",
+	"dev.warp.Warp-Stable":   "Warp.app",
 }
 
 func (pathAppLocator) Locate(bundleID string) (launcher.AppInfo, bool) {

@@ -45,6 +45,7 @@ const deploy = {
 const iterm: StackTerminal = { id: 'iterm2', name: 'iTerm2', supportsTab: true }
 const ghostty: StackTerminal = { id: 'ghostty', name: 'Ghostty', supportsTab: true }
 const alacritty: StackTerminal = { id: 'alacritty', name: 'Alacritty', supportsTab: false }
+const warp: StackTerminal = { id: 'warp', name: 'Warp', supportsTab: false }
 
 describe('stepMode', () => {
   it('mirrors the launcher', () => {
@@ -93,6 +94,7 @@ describe('layout', () => {
     expect(layoutPreview(deploy, alacritty, servers)).toHaveLength(3)
     expect(layoutNote(ghostty)).toBe('Split panes need iTerm2. Ghostty opens each server in its own tab.')
     expect(layoutNote(alacritty)).toBe('Split panes need iTerm2. Alacritty opens each server in its own window.')
+    expect(layoutNote(warp)).toBe('Split panes need iTerm2. Warp picks a tab or a window for each server itself.')
   })
 })
 

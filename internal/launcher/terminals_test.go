@@ -39,6 +39,8 @@ func TestOpenCommands(t *testing.T) {
 		{domain.TerminalWezTerm, app, true, [][]string{{"/Applications/X.app/Contents/MacOS/wezterm", "cli", "spawn", "--", scriptPath}, {openPath, "-n", "-b", "com.github.wez.wezterm", "--args", "start", "--", scriptPath}}},
 		{domain.TerminalKitty, app, true, [][]string{{openPath, "-n", "-b", "net.kovidgoyal.kitty", "--args", "--single-instance", "--instance-group", "zish", scriptPath}}},
 		{domain.TerminalAlacritty, app, false, [][]string{{"/Applications/X.app/Contents/MacOS/alacritty", "msg", "create-window", "-e", scriptPath}, {openPath, "-n", "-b", "org.alacritty", "--args", "-e", scriptPath}}},
+		{domain.TerminalWarp, app, false, [][]string{{openPath, "-b", "dev.warp.Warp-Stable", scriptPath}}},
+		{domain.TerminalWarp, app, true, [][]string{{openPath, "-b", "dev.warp.Warp-Stable", scriptPath}}},
 		{domain.TerminalAlacritty, AppInfo{}, false, [][]string{{openPath, "-n", "-b", "org.alacritty", "--args", "-e", scriptPath}}},
 	}
 	for _, c := range cases {
@@ -55,7 +57,7 @@ func TestOpenCommands(t *testing.T) {
 			}
 		}
 	}
-	if _, err := OpenCommands("warp", app, scriptPath, false); err == nil {
+	if _, err := OpenCommands("hyper", app, scriptPath, false); err == nil {
 		t.Fatal("unknown terminal accepted")
 	}
 }

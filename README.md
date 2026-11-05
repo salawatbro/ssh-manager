@@ -40,9 +40,10 @@ in your own terminal app (Terminal, iTerm2, Ghostty, …) running the system
 - **Your terminal app** — Connect (detail page, double-click or Enter on a row,
   the row menu, the palette, a tray pin, Quick Connect) opens a new window in
   the terminal chosen under Settings → Connect: Terminal (default), iTerm2,
-  Ghostty, WezTerm, kitty, Alacritty, or a custom command. Tabs instead of
-  windows work in iTerm2, Ghostty 1.3+ and WezTerm. If the chosen app isn't
-  installed, Zish opens Terminal and says so.
+  Ghostty, WezTerm, kitty, Alacritty, Warp, or a custom command. Tabs instead
+  of windows work in iTerm2, Ghostty 1.3+ and WezTerm; Warp picks a tab or a
+  window itself. If the chosen app isn't installed, Zish opens Terminal and
+  says so.
 - **Automation permission** — iTerm2 and Ghostty are driven by AppleScript, so
   macOS asks once to let Zish control them (System Settings › Privacy &
   Security › Automation). "Test terminal" in Settings triggers that prompt up

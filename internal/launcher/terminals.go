@@ -30,6 +30,9 @@ var Catalog = []Terminal{
 	{ID: domain.TerminalWezTerm, Name: "WezTerm", BundleID: "com.github.wez.wezterm", SupportsTab: true},
 	{ID: domain.TerminalKitty, Name: "kitty", BundleID: "net.kovidgoyal.kitty"},
 	{ID: domain.TerminalAlacritty, Name: "Alacritty", BundleID: "org.alacritty"},
+	// Warp has no AppleScript, and its warp:// links cannot run a command, so it
+	// gets the script like Terminal does and picks a tab or window itself.
+	{ID: domain.TerminalWarp, Name: "Warp", BundleID: "dev.warp.Warp-Stable"},
 }
 
 // Lookup returns the catalog entry for id.
@@ -131,7 +134,7 @@ func OpenCommands(id string, app AppInfo, script string, inTab bool) ([]Attempt,
 	bin := func(name string) string { return filepath.Join(app.Path, "Contents", "MacOS", name) }
 
 	switch id {
-	case domain.TerminalApple:
+	case domain.TerminalApple, domain.TerminalWarp:
 		return []Attempt{open("-b", t.BundleID, script)}, nil
 	case domain.TerminalITerm2:
 		return []Attempt{

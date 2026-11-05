@@ -178,13 +178,14 @@ const (
 	TerminalWezTerm   = "wezterm"
 	TerminalKitty     = "kitty"
 	TerminalAlacritty = "alacritty"
+	TerminalWarp      = "warp"
 	TerminalCustom    = "custom"
 )
 
 // TerminalIDs lists every accepted Settings.Terminal value.
 var TerminalIDs = []string{
 	TerminalApple, TerminalITerm2, TerminalGhostty, TerminalWezTerm,
-	TerminalKitty, TerminalAlacritty, TerminalCustom,
+	TerminalKitty, TerminalAlacritty, TerminalWarp, TerminalCustom,
 }
 
 // MaxCustomCommandBytes caps Settings.TerminalCustomCommand.

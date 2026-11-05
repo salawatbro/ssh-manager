@@ -117,6 +117,16 @@ describe('setupSteps', () => {
     expect(preferredTerminal(only.installed)).toBeNull()
     expect(byId(only).terminal).toMatchObject({ done: true, action: '' })
   })
+
+  it('suggests Warp over kitty and Alacritty', () => {
+    const apps = [
+      { id: 'terminal', name: 'Terminal' },
+      { id: 'kitty', name: 'kitty' },
+      { id: 'warp', name: 'Warp' },
+      { id: 'alacritty', name: 'Alacritty' },
+    ]
+    expect(preferredTerminal(apps)).toEqual({ id: 'warp', name: 'Warp' })
+  })
 })
 
 describe('hero', () => {

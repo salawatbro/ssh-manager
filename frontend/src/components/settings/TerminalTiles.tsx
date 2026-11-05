@@ -9,6 +9,7 @@ const LOOK: Record<string, { glyph: string; tint: Tint | null }> = {
   wezterm: { glyph: 'W', tint: 'orange' },
   kitty: { glyph: 'K', tint: 'sky' },
   alacritty: { glyph: 'A', tint: 'pink' },
+  warp: { glyph: 'Wp', tint: 'teal' },
   custom: { glyph: '…', tint: null },
 }
 
@@ -26,7 +27,7 @@ export function TerminalTiles({
   return (
     <section className="flex flex-col gap-[8px]">
       <h2 className="m-0 text-[12px] font-semibold text-tx2">Open servers in</h2>
-      <div role="radiogroup" aria-label="Open servers in" className="grid grid-cols-7 gap-[8px]">
+      <div role="radiogroup" aria-label="Open servers in" className="grid grid-cols-8 gap-[8px]">
         {options.map((o) => {
           const on = o.id === value
           const look = LOOK[o.id] ?? { glyph: o.name.slice(0, 1), tint: 'gray' as Tint }

@@ -108,7 +108,7 @@ export interface SetupState {
 }
 
 // The apps worth suggesting over Terminal, best first.
-const PREFERRED = ['iterm2', 'ghostty', 'wezterm', 'kitty', 'alacritty']
+const PREFERRED = ['iterm2', 'ghostty', 'wezterm', 'warp', 'kitty', 'alacritty']
 
 export function preferredTerminal(installed: SetupState['installed']): { id: string; name: string } | null {
   for (const id of PREFERRED) {
