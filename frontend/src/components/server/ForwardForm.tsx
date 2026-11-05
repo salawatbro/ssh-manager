@@ -91,6 +91,8 @@ export function ForwardForm({ serverId, initial, onDone }: Props) {
       // form can still be '' here (its untouched initial state) — send 0
       // rather than the literal empty string to the int-typed wire field.
       destPort: destPort === '' ? 0 : destPort,
+      icon: initial?.icon ?? '',
+      color: initial?.color ?? '',
     }
     const err = initial
       ? await useForwards.getState().update(input)

@@ -7,7 +7,7 @@ import { keyNameError, keyTypeLabel } from '../../lib/keyFormat'
 import { CopyButton } from '../ui/CopyButton'
 import { Input } from '../ui/Input'
 import { Toggle } from '../settings/controls'
-import { DetailCard } from '../detail/ConnectionCard'
+import { DetailCard } from './DetailCard'
 import { DeleteKeyModal } from './DeleteKeyModal'
 import { InstallKeyModal } from './InstallKeyModal'
 

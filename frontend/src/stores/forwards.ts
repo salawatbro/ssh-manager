@@ -18,6 +18,7 @@ interface ForwardsState {
   create: (input: ForwardInput) => Promise<string | null>
   update: (input: ForwardInput) => Promise<string | null>
   remove: (id: string, serverID: string) => Promise<string | null>
+  setLook: (f: PortForward, icon: string, color: string) => Promise<string | null>
   start: (id: string) => Promise<string | null>
   stop: (id: string) => Promise<string | null>
   // listen wires the forward:status event once, at app mount, and returns an
@@ -61,6 +62,16 @@ export const useForwards = create<ForwardsState>((set, get) => ({
     try {
       await ForwardService.Update(input)
       await get().load(input.serverId)
+      return null
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e)
+    }
+  },
+
+  setLook: async (f, icon, color) => {
+    try {
+      await ForwardService.SetLook(f.id, icon, color)
+      await get().load(f.serverId)
       return null
     } catch (e) {
       return e instanceof Error ? e.message : String(e)

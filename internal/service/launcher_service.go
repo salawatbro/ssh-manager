@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -151,6 +152,7 @@ func (s *LauncherService) Open(serverID string) (OpenResult, error) {
 	if err != nil {
 		return OpenResult{}, err
 	}
+	set = withServerTerminal(set, srv)
 	dir, err := s.newLaunchDir()
 	if err != nil {
 		return OpenResult{}, err
@@ -167,6 +169,16 @@ func (s *LauncherService) Open(serverID string) (OpenResult, error) {
 	}
 	_ = s.repo.BumpUsage(serverID)
 	return OpenResult{Note: note}, nil
+}
+
+// withServerTerminal returns a copy of set using the server's terminal, if it
+// names a known one; an empty or unknown value keeps the Settings default.
+func withServerTerminal(set *domain.Settings, srv *domain.Server) *domain.Settings {
+	out := *set
+	if slices.Contains(domain.TerminalIDs, srv.Terminal) {
+		out.Terminal = srv.Terminal
+	}
+	return &out
 }
 
 // prepare writes ssh_config and connect.command into dir and registers the

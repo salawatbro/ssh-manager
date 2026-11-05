@@ -1,6 +1,6 @@
 import type { TempKeyView } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { keyTypeLabel, shortFingerprint } from '../../lib/keyFormat'
-import { DetailCard } from '../detail/ConnectionCard'
+import { DetailCard } from './DetailCard'
 
 // Keys added with ssh-add: kept in memory only, gone when Zish quits.
 export function TempKeys({ keys }: { keys: TempKeyView[] }) {

@@ -7,7 +7,8 @@ describe('serverInputWithKey', () => {
     const s = {
       id: 's1', name: 'db', host: 'db.internal', port: 2222, user: 'deploy', authType: AuthType.AuthPassword,
       keyPath: '~/.ssh/old', agentKeyId: null, jumpId: 'j1', group: 'Prod', environment: Environment.EnvProd,
-      tags: 'pg,eu', notes: 'n', twoFactor: true, pinned: true, lastUsedAt: null, useCount: 3, sortOrder: 1,
+      tags: 'pg,eu', notes: 'n', icon: 'database', color: 'teal', runAfterConnect: 'htop', terminal: 'iterm',
+      twoFactor: true, pinned: true, lastUsedAt: null, useCount: 3, sortOrder: 1,
       createdAt: '', updatedAt: '',
     } as Server
     const input = serverInputWithKey(s, 'k1')
@@ -15,6 +16,7 @@ describe('serverInputWithKey', () => {
       name: 'db', host: 'db.internal', port: 2222, user: 'deploy', authType: AuthType.AuthZishKey,
       keyPath: '', agentKeyId: 'k1', password: '', passphrase: '', totpSecret: '', twoFactor: true,
       jumpId: 'j1', group: 'Prod', environment: Environment.EnvProd, tags: ['pg', 'eu'], notes: 'n',
+      icon: 'database', color: 'teal', runAfterConnect: 'htop', terminal: 'iterm',
     })
   })
 })

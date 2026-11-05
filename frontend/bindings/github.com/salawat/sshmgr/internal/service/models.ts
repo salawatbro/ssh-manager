@@ -89,6 +89,10 @@ export interface CreateServerInput {
     "environment": domain$0.Environment;
     "tags": string[] | null;
     "notes": string;
+    "icon": string;
+    "color": string;
+    "runAfterConnect": string;
+    "terminal": string;
 }
 
 /**
@@ -105,6 +109,8 @@ export interface ForwardInput {
     "destHost": string;
     "bindPort": number;
     "destPort": number;
+    "icon": string;
+    "color": string;
 }
 
 /**

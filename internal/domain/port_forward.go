@@ -30,6 +30,8 @@ type PortForward struct {
 	BindPort  int         `gorm:"not null" json:"bindPort"`
 	DestHost  string      `gorm:"not null" json:"destHost"`
 	DestPort  int         `gorm:"not null" json:"destPort"`
+	Icon      string      `gorm:"not null;default:''" json:"icon"`
+	Color     string      `gorm:"not null;default:''" json:"color"`
 	CreatedAt time.Time   `json:"createdAt"`
 	UpdatedAt time.Time   `json:"updatedAt"`
 }
@@ -51,6 +53,9 @@ func (f *PortForward) Validate() error {
 	}
 	if !validPort(f.BindPort) {
 		return validationError("The bind port must be between 1 and 65535.")
+	}
+	if err := validateLook(&f.Icon, &f.Color); err != nil {
+		return err
 	}
 	// -D (dynamic/SOCKS5) has no fixed destination: the SOCKS client
 	// negotiates one per proxied connection, so DestHost/DestPort don't

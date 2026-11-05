@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useServers } from '../../stores/servers'
-// AuthType/Environment are real enums (type and value), not just string
-// unions — imported as values so EMPTY's defaults are actual enum members
-// rather than string literals the compiler would reject against
-// CreateServerInput.
 import { AuthType, Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { KeyInfo } from '@bindings/github.com/salawat/sshmgr/internal/sshx'
 import { useTestConnection } from '../../hooks/useTestConnection'
+import { LookPicker } from '../look/LookPicker'
 import { ServerFormFields } from './ServerFormFields'
 import { TestConnectionStrip } from './TestConnectionStrip'
 
@@ -15,15 +12,8 @@ interface Props {
   onClose: () => void
 }
 
-// The `as` annotations are load-bearing. Without them TypeScript infers the
-// literal types from these defaults — `jumpId: null` becomes type `null`, and
-// `authType`/`environment` become their literal enum-member types — and
-// assigning a server's wider `AuthType`/`Environment` (or `string | null`)
-// back into state fails to compile.
-// A factory, not a module-level constant: EMPTY's `tags` array must be a
-// fresh reference each call. A shared array would let v0.2's tag editing
-// (`.push()`) mutate every `emptyForm()` caller ever produced, since they'd
-// all point at the same array in memory.
+// The `as` annotations widen the literal defaults so a stored server's values
+// fit back into state. A factory so every form gets its own `tags` array.
 function emptyForm() {
   return {
     name: '',
@@ -46,6 +36,10 @@ function emptyForm() {
     tags: [] as string[],
     notes: '',
     jumpId: null as string | null,
+    icon: '',
+    color: '',
+    runAfterConnect: '',
+    terminal: '',
   }
 }
 
@@ -59,6 +53,7 @@ export function ServerForm({ serverId, onClose }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [detectedKeys, setDetectedKeys] = useState<KeyInfo[]>([])
+  const [picking, setPicking] = useState(false)
   const { testing, testResult, runTest } = useTestConnection(serverId)
 
   useEffect(() => {
@@ -68,14 +63,7 @@ export function ServerForm({ serverId, onClose }: Props) {
   }, [])
 
   useEffect(() => {
-    // App.tsx keys this component by serverId, so the target changing
-    // already remounts it with fresh state — this effect only needs to seed
-    // that fresh mount once. Reading the store directly via getState()
-    // (rather than the subscribed `useServers((s) => s.servers)` selector)
-    // means the array is fetched once, right now, instead of being a
-    // reactive dependency: no re-run — and no clobbered in-progress
-    // typing — when a background refresh later changes the array's
-    // identity (e.g. v0.2 status polling).
+    // Seeded once from getState(): a background refresh must not clobber typing.
     const existing = useServers.getState().servers.find((s) => s.id === serverId)
     setForm(
       existing
@@ -98,6 +86,10 @@ export function ServerForm({ serverId, onClose }: Props) {
             tags: existing.tags ? existing.tags.split(',') : [],
             notes: existing.notes,
             jumpId: existing.jumpId,
+            icon: existing.icon,
+            color: existing.color,
+            runAfterConnect: existing.runAfterConnect,
+            terminal: existing.terminal,
           }
         : emptyForm(),
     )
@@ -107,14 +99,14 @@ export function ServerForm({ serverId, onClose }: Props) {
   }, [serverId])
 
   useEffect(() => {
+    // The open picker owns Escape; isComposing keeps an IME commit from closing the form.
+    if (picking) return
     function onKeyDown(e: KeyboardEvent) {
-      // isComposing guards against an IME commit keystroke (which also fires
-      // as "Escape" in some input methods) closing the form mid-composition.
       if (e.key === 'Escape' && !e.isComposing) onClose()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  }, [onClose, picking])
 
   async function onSave() {
     const err = await save(serverId, { ...form, port: form.port === '' ? 0 : form.port })
@@ -134,9 +126,6 @@ export function ServerForm({ serverId, onClose }: Props) {
   }
 
   return (
-    // The redesign moves the form off the 392px right-hand slot and into a
-    // centered 620px modal (dizayn manbasi: Zish.dc.html `formOpen`), so the
-    // content area keeps the detail page behind it instead of being squeezed. Same state, same validation, same save path.
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
       <div
         className="flex w-[620px] flex-col overflow-hidden rounded-[9px] border border-borderStrong bg-bg2 shadow-[0_16px_48px_rgba(0,0,0,.5)]"
@@ -162,6 +151,7 @@ export function ServerForm({ serverId, onClose }: Props) {
           error={error}
           detectedKeys={detectedKeys}
           serverId={serverId}
+          onPickLook={() => setPicking(true)}
         />
 
         <TestConnectionStrip result={testResult} testing={testing} />
@@ -209,6 +199,19 @@ export function ServerForm({ serverId, onClose }: Props) {
           </button>
         </div>
       </div>
+      {picking && (
+        <LookPicker
+          name={form.name || 'New server'}
+          group={form.group}
+          kindLabel={form.host ? `${form.user ? `${form.user}@` : ''}${form.host}` : 'Server'}
+          initial={{ icon: form.icon, color: form.color }}
+          onSave={(look) => {
+            setForm({ ...form, ...look })
+            return null
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
     </div>
   )
 }

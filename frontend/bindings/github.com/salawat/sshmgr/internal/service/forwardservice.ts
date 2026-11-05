@@ -46,6 +46,14 @@ export function List(serverID: string): $CancellablePromise<domain$0.PortForward
 }
 
 /**
+ * SetLook changes only a forward's icon and colour, with the same rules as a
+ * form save.
+ */
+export function SetLook(id: string, icon: string, color: string): $CancellablePromise<void> {
+    return $Call.ByID(1949321419, id, icon, color);
+}
+
+/**
  * Start dials the forward's server (through its full jump chain, if any)
  * and starts the tunnel over that connection. Every step propagates its
  * error with its original code: an unknown forward or server is

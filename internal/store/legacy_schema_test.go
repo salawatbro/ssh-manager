@@ -127,6 +127,63 @@ func TestOpenLegacyDatabaseKeepsSettingsAndServersWorking(t *testing.T) {
 	}
 }
 
+// The new-design columns (icon, color, run_after_connect, terminal) are added
+// to a 1.5 database: old rows read back empty, then take writes.
+func TestOpenLegacyDatabaseAddsLookAndOnConnectColumns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	writeLegacyDB(t, path,
+		"INSERT INTO servers (id, name, host, port, user, auth_type, notes, created_at, updated_at) "+
+			"VALUES ('srv-1', 'web', 'web.example.com', 22, 'deploy', 'agent', 'old notes', '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+		"INSERT INTO port_forwards (id, server_id, name, type, bind_addr, bind_port, dest_host, dest_port, created_at, updated_at) "+
+			"VALUES ('fwd-1', 'srv-1', 'pg', 'L', '127.0.0.1', 5432, 'localhost', 5432, '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+	)
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open legacy database: %v", err)
+	}
+	servers, forwards := NewServerRepo(db), NewForwardRepo(db)
+
+	srv, err := servers.Get("srv-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if srv.Icon != "" || srv.Color != "" || srv.RunAfterConnect != "" || srv.Terminal != "" || srv.Notes != "old notes" {
+		t.Fatalf("legacy server read back wrong: %+v", srv)
+	}
+	fwd, err := forwards.Get("fwd-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fwd.Icon != "" || fwd.Color != "" || fwd.BindPort != 5432 {
+		t.Fatalf("legacy forward read back wrong: %+v", fwd)
+	}
+
+	srv.RunAfterConnect, srv.Terminal = "cd /srv/web", domain.TerminalGhostty
+	if err := servers.Update(srv); err != nil {
+		t.Fatalf("Update against legacy servers table: %v", err)
+	}
+	if err := servers.SetLook("srv-1", "globe", "sky"); err != nil {
+		t.Fatalf("SetLook against legacy servers table: %v", err)
+	}
+	fwd.Icon, fwd.Color = "database", "teal"
+	if err := forwards.Update(fwd); err != nil {
+		t.Fatalf("Update against legacy port_forwards table: %v", err)
+	}
+
+	srv, _ = servers.Get("srv-1")
+	if srv.Icon != "globe" || srv.Color != "sky" || srv.RunAfterConnect != "cd /srv/web" || srv.Terminal != domain.TerminalGhostty {
+		t.Fatalf("server writes not persisted: %+v", srv)
+	}
+	if err := forwards.SetLook("fwd-1", "letters:PG", "lime"); err != nil {
+		t.Fatalf("SetLook against legacy port_forwards table: %v", err)
+	}
+	fwd, _ = forwards.Get("fwd-1")
+	if fwd.Icon != "letters:PG" || fwd.Color != "lime" {
+		t.Fatalf("forward writes not persisted: %+v", fwd)
+	}
+}
+
 // An upgraded install whose settings row was never seeded must still get one:
 // the INSERT omits every legacy NOT NULL column, which only works because each
 // has a column default.

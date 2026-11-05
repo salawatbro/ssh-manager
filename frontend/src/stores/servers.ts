@@ -19,6 +19,7 @@ interface ServersState {
   copySSHCommand: (id: string) => Promise<void>
   setPinned: (id: string, pinned: boolean) => Promise<void>
   setGroupOrder: (group: string, ids: string[]) => Promise<void>
+  setLook: (id: string, icon: string, color: string) => Promise<string | null>
   select: (id: string | null) => void
   detectKeys: () => Promise<KeyInfo[]>
   testConnection: (id: string) => Promise<TestResult | null>
@@ -112,6 +113,16 @@ export const useServers = create<ServersState>((set, get) => ({
     }
   },
 
+  setLook: async (id, icon, color) => {
+    try {
+      await ServerService.SetLook(id, icon, color)
+      await get().load()
+      return null
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e)
+    }
+  },
+
   // FR-01.9. navigator.clipboard is local, not a network call (SEC-09 is
   // about outbound network) — no store state to update, the store is just
   // where the other server-scoped backend calls already live.
@@ -163,26 +174,3 @@ export const useServers = create<ServersState>((set, get) => ({
     }
   },
 }))
-
-// FR-01.5. Servers arrive already ordered by group from the backend, so this
-// only has to fold them into runs — no sorting here, or the two orderings
-// could drift apart.
-//
-// Fold on the RAW s.group, not on a display label. `group` is free text
-// (internal/domain/validate.go only trims it — nothing forbids a server
-// literally named "Ungrouped"), so mapping '' -> 'Ungrouped' before folding
-// can collide two distinct runs onto the same key: a '' run and a literal
-// "Ungrouped" run become indistinguishable, either merging adjacent runs
-// (counts conflated) or producing two runs sharing one React key
-// (React drops one). Keep '' and 'Ungrouped' distinct here; only the
-// renderer maps '' to the "Ungrouped" display label.
-export function groupServers(servers: Server[]): { group: string; servers: Server[] }[] {
-  const out: { group: string; servers: Server[] }[] = []
-  for (const s of servers) {
-    const group = s.group
-    const last = out[out.length - 1]
-    if (last && last.group === group) last.servers.push(s)
-    else out.push({ group, servers: [s] })
-  }
-  return out
-}

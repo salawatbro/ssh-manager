@@ -3,7 +3,9 @@ package domain
 import (
 	"net"
 	"regexp"
+	"slices"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -36,6 +38,8 @@ func (s *Server) Validate() error {
 	s.User = strings.TrimSpace(s.User)
 	s.KeyPath = strings.TrimSpace(s.KeyPath)
 	s.GroupName = strings.TrimSpace(s.GroupName)
+	s.RunAfterConnect = strings.TrimSpace(s.RunAfterConnect)
+	s.Terminal = strings.TrimSpace(s.Terminal)
 
 	// Count runes, not bytes: the spec says 64 characters, and a name in
 	// Cyrillic or with emoji is two to four bytes per character.
@@ -87,6 +91,34 @@ func (s *Server) Validate() error {
 		return validationError("Environment must be prod, staging, dev, or none.")
 	}
 
+	if err := validateLook(&s.Icon, &s.Color); err != nil {
+		return err
+	}
+	if err := validateRunAfterConnect(s.RunAfterConnect); err != nil {
+		return err
+	}
+	if s.Terminal != "" && !slices.Contains(TerminalIDs, s.Terminal) {
+		return validationError("Choose a terminal app from the list, or use the default.")
+	}
+
+	return nil
+}
+
+// MaxRunAfterConnectRunes caps Server.RunAfterConnect.
+const MaxRunAfterConnectRunes = 512
+
+func validateRunAfterConnect(cmd string) error {
+	if !utf8.ValidString(cmd) {
+		return validationError("The command to run after connecting is not valid text.")
+	}
+	if utf8.RuneCountInString(cmd) > MaxRunAfterConnectRunes {
+		return validationError("The command to run after connecting must be at most 512 characters.")
+	}
+	for _, r := range cmd {
+		if unicode.IsControl(r) {
+			return validationError("The command to run after connecting must be one line, with no tabs or control characters.")
+		}
+	}
 	return nil
 }
 

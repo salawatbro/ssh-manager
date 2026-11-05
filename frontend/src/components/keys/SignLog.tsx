@@ -3,7 +3,7 @@ import { useKeys } from '../../stores/keys'
 import { useSignLog } from '../../stores/signLog'
 import { TONE_CLASS, clientLine, eventTime, filterEvents, outcomeLabel, outcomeTone } from '../../lib/signLog'
 import { Select } from '../ui/Select'
-import { DetailCard } from '../detail/ConnectionCard'
+import { DetailCard } from './DetailCard'
 
 // Every signing decision, newest first: which key, which program, where to,
 // and what happened. Never the signed data.

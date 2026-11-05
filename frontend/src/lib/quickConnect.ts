@@ -81,6 +81,10 @@ export async function runQuickConnect(target: QuickConnectTarget, deps: QuickCon
       environment: Environment.EnvNone,
       tags: [],
       notes: '',
+      icon: '',
+      color: '',
+      runAfterConnect: '',
+      terminal: '',
     })
     if (!created) return
     deps.open(created.id)

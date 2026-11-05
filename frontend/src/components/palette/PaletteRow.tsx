@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { envClassOf } from '../../lib/env'
 import { formatRecency } from '../../lib/relativeTime'
 import { formatQuickTarget } from '../../lib/quickConnect'
-import { StatusDot } from '../server/StatusDot'
+import { StatusDot } from '../ui/StatusDot'
 import type { PaletteRowData } from '../../stores/palette'
 
 // One palette row. mouseDown (not click) so it fires before the input blur, and

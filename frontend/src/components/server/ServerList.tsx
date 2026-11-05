@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { groupServers, useServers } from '../../stores/servers'
+import { useServers } from '../../stores/servers'
 import { useSidebar } from '../../stores/sidebar'
-import { useView } from '../../stores/view'
+import { useForwards } from '../../stores/forwards'
 import { useServerForm } from '../../stores/serverForm'
-import { filterServers } from '../../lib/sidebarFilter'
+import { groupRuns, inScope, sharedEnv, tunnelSummary } from '../../lib/serverList'
 import { useServerDrag } from '../../hooks/useServerDrag'
 import { GroupHeader } from './GroupHeader'
 import { ServerRow } from './ServerRow'
@@ -19,82 +19,78 @@ interface MenuState {
 export function ServerList() {
   const servers = useServers((s) => s.servers)
   const selectedId = useServers((s) => s.selectedId)
-  const select = useServers((s) => s.select)
-  const query = useSidebar((s) => s.query)
-  const tags = useSidebar((s) => s.tags)
+  const scope = useSidebar((s) => s.scope)
+  const sort = useSidebar((s) => s.sort)
   const collapsed = useSidebar((s) => s.collapsed)
-  const toggleGroup = useSidebar((s) => s.toggleGroup)
-  const clearFilter = useSidebar((s) => s.clearFilter)
-  // One open menu at a time, keyed by the server it targets — a second
-  // right-click (on the same or a different row) just replaces it.
+  const byServer = useForwards((s) => s.byServer)
+  const statusById = useForwards((s) => s.statusById)
   const [menu, setMenu] = useState<MenuState | null>(null)
 
-  // Filter FIRST, then fold into group runs — filterServers preserves the
-  // backend order, so runs stay intact. While any filter is active the
-  // stored collapse state is overridden (matches inside a folded group must
-  // be visible) but never mutated.
-  const filtering = query.trim() !== '' || tags.length > 0
-  const { rowProps } = useServerDrag(!filtering)
-  const visible = useMemo(() => filterServers(servers, query, tags), [servers, query, tags])
-  const groups = groupServers(visible)
+  const visible = useMemo(() => servers.filter((s) => inScope(s, scope)), [servers, scope])
+  const runs = useMemo(() => groupRuns(visible, sort), [visible, sort])
+  const nameById = useMemo(() => new Map(servers.map((s) => [s.id, s.name])), [servers])
+  // Reordering only makes sense on the stored order of whole groups.
+  const reorderable = sort === 'manual' && scope.kind !== 'tag'
+  const { rowProps } = useServerDrag(reorderable)
 
-  if (servers.length === 0) {
-    // dizayn manbasi: EmptyState.dc.html sidebar — a centered "No servers
-    // yet" line fills the list area instead of leaving it blank.
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center p-[20px] text-center">
-        <span className="text-[12px] leading-[1.5] text-textDim">No servers yet</span>
-      </div>
-    )
-  }
+  // Tunnel chips need every server's forwards, not just the selected one's.
+  useEffect(() => {
+    const loaded = useForwards.getState().byServer
+    for (const s of servers) if (!(s.id in loaded)) void useForwards.getState().load(s.id)
+  }, [servers])
+
+  // The inspector always has a server to show while the list has one.
+  useEffect(() => {
+    if (visible.length > 0 && !visible.some((s) => s.id === selectedId)) useServers.getState().select(visible[0].id)
+  }, [visible, selectedId])
 
   if (visible.length === 0) {
-    // The redesign turns the dead end into an exit: say which filters are
-    // hiding everything, and offer the one gesture that clears them.
     return (
-      <div className="min-h-0 flex-1 px-[10px] pt-[16px]">
-        <div className="text-[12px] leading-[1.5] text-textDim">Nothing matches these filters.</div>
+      <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-[8px] text-center">
+        <span className="text-[12.5px] text-tx3">No servers here.</span>
         <button
           type="button"
-          onClick={clearFilter}
-          className="mt-[6px] block text-[11.5px] text-accentFg hover:text-accent"
+          onClick={() => useSidebar.getState().setScope({ kind: 'all' })}
+          className="text-[12px] text-acc-tx hover:underline"
         >
-          Clear filters
+          Show all servers
         </button>
       </div>
     )
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto py-[4px]">
-      {groups.map((g) => (
-        // key is the raw group value (possibly '') so it stays distinct from
-        // the literal string "Ungrouped" a user could name a group — only the
-        // label shown below folds '' into "Ungrouped". The collapse store is
-        // keyed the same way.
-        <div key={g.group}>
-          <GroupHeader
-            group={g.group || 'Ungrouped'}
-            count={g.servers.length}
-            collapsed={!filtering && !!collapsed[g.group]}
-            onToggle={() => toggleGroup(g.group)}
-          />
-          {(filtering || !collapsed[g.group]) &&
-            g.servers.map((s) => (
-              <ServerRow
-                key={s.id}
-                server={s}
-                selected={s.id === selectedId}
-                onSelect={() => {
-                  select(s.id)
-                  useView.getState().showDetail(s.id)
-                }}
-                onContextMenu={(x, y) => setMenu({ server: s, x, y })}
-                drag={rowProps(s)}
-              />
-            ))}
-        </div>
-      ))}
+    <section aria-label="Server list" className="min-w-0 flex-1 overflow-y-auto px-[10px] pb-[12px] pt-[6px]">
+      {runs.map((run) => {
+        const folded = scope.kind === 'all' && !!collapsed[run.group]
+        return (
+          <div key={run.group}>
+            <GroupHeader
+              group={run.group}
+              count={run.servers.length}
+              env={sharedEnv(run.servers)}
+              collapsed={folded}
+              onToggle={() => useSidebar.getState().toggleGroup(run.group)}
+            />
+            {!folded &&
+              run.servers.map((s) => (
+                <ServerRow
+                  key={s.id}
+                  server={s}
+                  via={s.jumpId ? (nameById.get(s.jumpId) ?? null) : null}
+                  tunnels={tunnelSummary(
+                    (byServer[s.id] ?? []).map((f) => f.id),
+                    (id) => statusById[id]?.state,
+                  )}
+                  selected={s.id === selectedId}
+                  onSelect={() => useServers.getState().select(s.id)}
+                  onContextMenu={(x, y) => setMenu({ server: s, x, y })}
+                  drag={rowProps(s)}
+                />
+              ))}
+          </div>
+        )
+      })}
       {menu && (
         <ServerContextMenu
           server={menu.server}
@@ -102,10 +98,9 @@ export function ServerList() {
           y={menu.y}
           onClose={() => setMenu(null)}
           onEdit={() => useServerForm.getState().openEdit(menu.server.id)}
-          onTunnels={() => useView.getState().showDetail(menu.server.id)}
-          filtering={filtering}
+          reorderable={reorderable}
         />
       )}
-    </div>
+    </section>
   )
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AgentService, type AgentSnippet } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { useSettings } from '../../stores/settings'
 import { CopyButton } from '../ui/CopyButton'
-import { DetailCard } from '../detail/ConnectionCard'
+import { DetailCard } from './DetailCard'
 
 function Snippet({ title, text }: { title: string; text: string }) {
   return (

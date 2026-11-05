@@ -64,11 +64,26 @@ func (r *ForwardRepo) Create(f *domain.PortForward) error {
 func (r *ForwardRepo) Update(f *domain.PortForward) error {
 	res := r.db.Model(&domain.PortForward{}).
 		Where("id = ?", f.ID).
-		Select("name", "type", "bind_addr", "bind_port", "dest_host", "dest_port", "updated_at").
+		Select("name", "type", "bind_addr", "bind_port", "dest_host", "dest_port", "icon", "color", "updated_at").
 		Updates(f)
 	if res.Error != nil {
 		return fmt.Errorf(
 			"cannot update forward %s; check the database file is writable and not locked by another instance: %w", f.ID, res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// SetLook writes ONLY the icon and color columns of a forward.
+func (r *ForwardRepo) SetLook(id, icon, color string) error {
+	res := r.db.Model(&domain.PortForward{}).
+		Where("id = ?", id).
+		UpdateColumns(map[string]any{"icon": icon, "color": color})
+	if res.Error != nil {
+		return fmt.Errorf(
+			"cannot update the icon for forward %s; check the database file is writable and not locked by another instance: %w", id, res.Error)
 	}
 	if res.RowsAffected == 0 {
 		return domain.ErrNotFound

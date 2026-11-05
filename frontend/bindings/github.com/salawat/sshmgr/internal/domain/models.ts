@@ -143,6 +143,8 @@ export interface PortForward {
     "bindPort": number;
     "destHost": string;
     "destPort": number;
+    "icon": string;
+    "color": string;
     "createdAt": string;
     "updatedAt": string;
 }
@@ -187,6 +189,22 @@ export interface Server {
      * (updatableColumns excludes it) — only by ServerService.SetPinned.
      */
     "pinned": boolean;
+
+    /**
+     * Icon and Color style the icon tile only (rules in look.go).
+     */
+    "icon": string;
+    "color": string;
+
+    /**
+     * RunAfterConnect is one line run by the remote shell after login.
+     */
+    "runAfterConnect": string;
+
+    /**
+     * Terminal overrides Settings.Terminal for this server; "" keeps the default.
+     */
+    "terminal": string;
     "lastUsedAt": string | null;
     "useCount": number;
     "sortOrder": number;

@@ -1,32 +1,39 @@
 import { useServers } from '../../stores/servers'
 import { useView } from '../../stores/view'
 import { EmptyState } from '../EmptyState'
-import { ServerDetail } from '../detail/ServerDetail'
+import { Inspector } from '../detail/Inspector'
 import { KeysView } from '../keys/KeysView'
+import { ServerList } from '../server/ServerList'
+import { ListHeader } from './ListHeader'
 
-interface Props {
-  onAdd: () => void
-}
-
-// The content area: the Keys page, the first-run hero with no servers, the
-// selected server's detail page, or a quiet prompt to pick one.
-export function MainContent({ onAdd }: Props) {
+// Everything right of the sidebar: the Keys page, the first-run hero, or the
+// server list beside the inspector.
+export function MainContent({ onAdd }: { onAdd: () => void }) {
   const serverCount = useServers((s) => s.servers.length)
-  const detailId = useView((s) => s.detailId)
-  const detailExists = useServers((s) => s.servers.some((srv) => srv.id === detailId))
   const section = useView((s) => s.section)
 
-  if (section === 'keys') return <KeysView />
-  if (serverCount === 0) return <EmptyState onAdd={onAdd} />
-  if (detailExists) return <ServerDetail />
+  if (section === 'keys') {
+    return (
+      <main className="flex min-w-0 flex-1 flex-col bg-bg">
+        <div className="drag h-[28px] shrink-0" />
+        <KeysView />
+      </main>
+    )
+  }
+  if (serverCount === 0) {
+    return (
+      <main className="drag flex min-w-0 flex-1 bg-bg">
+        <EmptyState onAdd={onAdd} />
+      </main>
+    )
+  }
   return (
-    <div className="flex flex-1 items-center justify-center bg-bg0">
-      <div className="flex w-[360px] flex-col items-center text-center">
-        <div className="text-[15px] font-semibold text-text">No server selected</div>
-        <div className="mt-[6px] text-[12.5px] leading-[1.55] text-textMuted">
-          Pick a server in the sidebar to see its connection details and tunnels, or press ⌘K to jump to one.
-        </div>
+    <main className="flex min-w-0 flex-1 bg-bg">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <ListHeader onAdd={onAdd} />
+        <ServerList />
       </div>
-    </div>
+      <Inspector />
+    </main>
   )
 }

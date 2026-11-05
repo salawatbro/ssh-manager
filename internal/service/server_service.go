@@ -48,6 +48,11 @@ type CreateServerInput struct {
 	Environment domain.Environment `json:"environment"`
 	Tags        []string           `json:"tags"`
 	Notes       string             `json:"notes"`
+
+	Icon            string `json:"icon"`
+	Color           string `json:"color"`
+	RunAfterConnect string `json:"runAfterConnect"`
+	Terminal        string `json:"terminal"`
 }
 
 // TestResult is the outcome of TestConnection (FR-04). A connection outcome
@@ -185,6 +190,24 @@ func (s *ServerService) SetPinned(id string, pinned bool) error {
 		}
 	}
 	if err := s.repo.SetPinned(id, pinned); err != nil {
+		return err
+	}
+	s.notifyServersChanged()
+	return nil
+}
+
+// SetLook changes only a server's icon and colour, with the same rules as a
+// form save. It fires onServersChanged so the tray follows.
+func (s *ServerService) SetLook(id, icon, color string) error {
+	srv, err := s.repo.Get(id)
+	if err != nil {
+		return err
+	}
+	srv.Icon, srv.Color = icon, color
+	if err := srv.Validate(); err != nil {
+		return err
+	}
+	if err := s.repo.SetLook(id, srv.Icon, srv.Color); err != nil {
 		return err
 	}
 	s.notifyServersChanged()
@@ -582,5 +605,10 @@ func (in CreateServerInput) toServer() *domain.Server {
 		Environment: env,
 		Tags:        strings.Join(in.Tags, ","),
 		Notes:       in.Notes,
+
+		Icon:            in.Icon,
+		Color:           in.Color,
+		RunAfterConnect: in.RunAfterConnect,
+		Terminal:        in.Terminal,
 	}
 }

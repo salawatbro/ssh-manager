@@ -108,6 +108,14 @@ export function SetGroupOrder(group: string, ids: string[] | null): $Cancellable
 }
 
 /**
+ * SetLook changes only a server's icon and colour, with the same rules as a
+ * form save. It fires onServersChanged so the tray follows.
+ */
+export function SetLook(id: string, icon: string, color: string): $CancellablePromise<void> {
+    return $Call.ByID(2438680625, id, icon, color);
+}
+
+/**
  * SetPinned pins or unpins a server for the menu-bar tray. Pinning is capped at
  * maxPinned; the next pin is refused with a validation error the frontend
  * surfaces. Re-pinning an already-pinned server and unpinning are always

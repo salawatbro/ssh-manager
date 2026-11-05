@@ -9,7 +9,7 @@ import { CommandPalette } from './components/palette/CommandPalette'
 import { WelcomeTour } from './components/tour/WelcomeTour'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { ImportPreview } from './components/palette/ImportPreview'
-import { StatusBar } from './components/layout/StatusBar'
+import { ServerLookPicker } from './components/look/ServerLookPicker'
 import { Toasts } from './components/ui/Toasts'
 import { LockOverlay } from './components/lock/LockOverlay'
 import { ForgotResetModal } from './components/lock/ForgotResetModal'
@@ -28,10 +28,6 @@ import { useSignLog } from './stores/signLog'
 
 export default function App() {
   const load = useServers((s) => s.load)
-  // The edit form is opened EXPLICITLY now (Add server, the row menu's Edit…,
-  // the detail page's Edit…) rather than being derived from the sidebar
-  // selection: a single click on a row opens that server's detail page
-  // instead (redesign decision, docs/superpowers/redesign-plan.md §2).
   const formFor = useServerForm((s) => s.target)
 
   const hostKeyRequest = useHostKey((s) => s.request)
@@ -67,8 +63,9 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    // The agent can start, sign or take ssh-add keys before the Keys page
-    // is open; keep its status and log live from the start.
+    // The sidebar shows the agent and key count from the start, and the agent
+    // can sign before the Keys page is ever opened.
+    void useKeys.getState().refresh()
     const offStatus = useKeys.getState().listen()
     const offSign = useSignLog.getState().listen()
     return () => {
@@ -109,49 +106,11 @@ export default function App() {
   useTrayConnect()
 
   return (
-    // pb lifts the bottom status bar clear of macOS Tahoe's large rounded
-    // window corners, which otherwise clip its lower edge in windowed mode.
-    // bg-bg1b makes that inset the SAME colour as the status bar — the only
-    // place this root background shows is that 6px strip (every content row
-    // paints its own bg over the rest), so the bar reads as seamlessly a touch
-    // taller rather than floating above a darker gap.
-    <div className="flex h-full flex-col bg-bg1b pb-[6px]">
-      {/* Title bar: the macOS traffic-light clearance and the app label in one
-          52px draggable band (dizayn manbasi: MainWindow.dc.html title bar).
-          The design mocks the traffic lights as three HTML dots, but on this
-          Wails/WKWebView macOS build the REAL lights are native, drawn by the
-          OS over the window's top-left corner — so they are never rendered
-          here, only the clearance is left empty. 52px leaves equal space
-          above/below the lights, which Tahoe draws lower than the pre-Tahoe
-          38px of TZ 12.1. Kept in fullscreen too, so the top chrome stays
-          consistent. */}
-      <div className="drag flex h-[52px] shrink-0 border-b border-border bg-bg1b">
-        {/* First title-bar cell spans the sidebar's exact 220px, so its divider
-            lines up with the sidebar's right edge in the row below. Inside it, a
-            92px gap clears the native macOS traffic lights (Tahoe draws them
-            further right/lower than the pre-Tahoe layout the old 78px was tuned
-            for), then the app label. */}
-        <div className="flex w-[220px] shrink-0 items-center border-r border-border">
-          <div className="w-[92px] shrink-0" />
-          <span className="text-[12px] font-semibold tracking-[0.02em] text-textMuted">Zish</span>
-        </div>
-      </div>
-
-      <div className="flex min-h-0 flex-1">
-        {/* Kept mounted at 0 servers too (dizayn manbasi: EmptyState.dc.html)
-            — the design's empty state still shows the sidebar shell (dimmed
-            search box, "No servers yet" placeholder, "+ Add server" footer),
-            only the content area swaps to the centered hero. */}
-        <Sidebar onAdd={openAdd} />
-        <MainContent onAdd={openAdd} />
-        {/* key remounts the form whenever the target server changes, so its
-            internal state (including confirmDelete) always starts fresh —
-            see ServerForm's effect comment for why this matters. */}
-        {formFor && <ServerForm key={formFor.id ?? 'new'} serverId={formFor.id} onClose={closeForm} />}
-      </div>
-
-      {/* TZ 12.1: 26px status bar (dizayn manbasi: MainWindow.dc.html). */}
-      <StatusBar />
+    <div className="flex h-full bg-bg">
+      <Sidebar />
+      <MainContent onAdd={openAdd} />
+      {formFor && <ServerForm key={formFor.id ?? 'new'} serverId={formFor.id} onClose={closeForm} />}
+      <ServerLookPicker />
 
       {/* key={hostKeyRequest.requestID} remounts the modal per request, so a
           NEW host-key request always starts fresh — most importantly, so

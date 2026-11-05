@@ -24,6 +24,8 @@ type ForwardInput struct {
 	DestHost string             `json:"destHost"`
 	BindPort int                `json:"bindPort"`
 	DestPort int                `json:"destPort"`
+	Icon     string             `json:"icon"`
+	Color    string             `json:"color"`
 }
 
 // tunnelManager is the slice of *forward.Manager the service needs.
@@ -89,6 +91,20 @@ func (s *ForwardService) Update(in ForwardInput) (*domain.PortForward, error) {
 		return nil, err
 	}
 	return s.repo.Get(fwd.ID)
+}
+
+// SetLook changes only a forward's icon and colour, with the same rules as a
+// form save.
+func (s *ForwardService) SetLook(id, icon, color string) error {
+	fwd, err := s.repo.Get(id)
+	if err != nil {
+		return err
+	}
+	fwd.Icon, fwd.Color = icon, color
+	if err := fwd.Validate(); err != nil {
+		return err
+	}
+	return s.repo.SetLook(id, fwd.Icon, fwd.Color)
 }
 
 // Delete removes a saved forward definition. It first stops any running tunnel
@@ -176,5 +192,7 @@ func (in ForwardInput) toPortForward() *domain.PortForward {
 		BindPort: in.BindPort,
 		DestHost: in.DestHost,
 		DestPort: in.DestPort,
+		Icon:     in.Icon,
+		Color:    in.Color,
 	}
 }
