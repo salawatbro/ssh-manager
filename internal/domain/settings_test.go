@@ -103,3 +103,47 @@ func TestSettingsSanitiseCustomCommandCap(t *testing.T) {
 		t.Fatalf("cap = %d bytes, want %d", len(s.TerminalCustomCommand), MaxCustomCommandBytes)
 	}
 }
+
+func TestSettingsAppearanceAndTunnelDefaults(t *testing.T) {
+	d := DefaultSettings()
+	if d.Theme != ThemeNight || d.Density != DensityComfortable || d.IconStyle != IconStyleIcon ||
+		d.ColorBy != ColorByGroup || !d.MenuIcons || d.OpenAgain != OpenAgainAsk {
+		t.Fatalf("appearance defaults = theme %q density %q icons %q colour %q menu %v open %q",
+			d.Theme, d.Density, d.IconStyle, d.ColorBy, d.MenuIcons, d.OpenAgain)
+	}
+	if !d.LockOnSleep || !d.TunnelsAutoStart || !d.TunnelsReconnect || !d.TunnelsKeepWhileLocked ||
+		!d.TunnelsNotify || !d.TunnelsSuggestPort {
+		t.Fatalf("lock/tunnel defaults = %+v", d)
+	}
+}
+
+func TestSettingsSanitiseChoices(t *testing.T) {
+	s := Settings{Theme: "Dusk", Density: "", IconStyle: "emoji", ColorBy: "tag", OpenAgain: "close"}
+	s.Sanitise()
+	if s.Theme != ThemeNight || s.Density != DensityComfortable || s.IconStyle != IconStyleIcon ||
+		s.ColorBy != ColorByGroup || s.OpenAgain != OpenAgainAsk {
+		t.Fatalf("Sanitise repaired to %q %q %q %q %q", s.Theme, s.Density, s.IconStyle, s.ColorBy, s.OpenAgain)
+	}
+	ok := Settings{Theme: ThemeAuto, Density: DensityCompact, IconStyle: IconStyleLetters, ColorBy: ColorByNone, OpenAgain: OpenAgainNew}
+	ok.Sanitise()
+	if ok.Theme != ThemeAuto || ok.Density != DensityCompact || ok.IconStyle != IconStyleLetters ||
+		ok.ColorBy != ColorByNone || ok.OpenAgain != OpenAgainNew {
+		t.Fatalf("Sanitise changed valid choices: %q %q %q %q %q", ok.Theme, ok.Density, ok.IconStyle, ok.ColorBy, ok.OpenAgain)
+	}
+}
+
+func TestSettingsNewServerLook(t *testing.T) {
+	cases := []struct {
+		style, by, icon, color string
+	}{
+		{IconStyleIcon, ColorByGroup, NewServerIcon, ""},
+		{IconStyleLetters, ColorByGroup, "", ""},
+		{IconStyleIcon, ColorByNone, NewServerIcon, "gray"},
+	}
+	for _, c := range cases {
+		icon, color := Settings{IconStyle: c.style, ColorBy: c.by}.NewServerLook()
+		if icon != c.icon || color != c.color {
+			t.Errorf("%s/%s look = %q %q, want %q %q", c.style, c.by, icon, color, c.icon, c.color)
+		}
+	}
+}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { usePalette, type PaletteRowData } from '../../stores/palette'
 import { useServers } from '../../stores/servers'
+import { useStacks } from '../../stores/stacks'
 import { searchServers } from '../../lib/fuzzy'
 import { openServer } from '../../lib/launch'
 import { PaletteRow } from './PaletteRow'
@@ -9,6 +10,8 @@ import { paletteCommands } from './commands'
 import { ServerService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { findExistingServer, parseQuickConnect, runQuickConnect } from '../../lib/quickConnect'
 import { toastError } from '../../stores/toasts'
+import { newServerLook } from '../../lib/look'
+import { useSettings } from '../../stores/settings'
 
 // The ⌘K command palette (FR-08). A quick-connect row when the input parses
 // as user@host[:port] (spec 2026-07-20), then servers (fuzzy / recency),
@@ -18,14 +21,14 @@ export function CommandPalette({ onNewServer }: { onNewServer: () => void }) {
   const open = usePalette((s) => s.open)
   const hide = usePalette((s) => s.hide)
   const servers = useServers((s) => s.servers)
-  const selectedId = useServers((s) => s.selectedId)
+  const stacks = useStacks((s) => s.stacks)
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
 
   const rows = useMemo<PaletteRowData[]>(() => {
     const serverRows: PaletteRowData[] = searchServers(servers, q).map((server) => ({ kind: 'server', server }))
     const ql = q.trim().toLowerCase()
-    const commands: PaletteRowData[] = paletteCommands({ onNewServer, selectedId }).filter(
+    const commands: PaletteRowData[] = paletteCommands({ onNewServer, stacks }).filter(
       (c) => !ql || c.label.toLowerCase().includes(ql),
     )
     // Quick connect is always row 0 when the input parses — Enter connects
@@ -35,7 +38,7 @@ export function CommandPalette({ onNewServer }: { onNewServer: () => void }) {
       ? [{ kind: 'quick-connect', target, existingName: findExistingServer(servers, target)?.name }]
       : []
     return [...quickRows, ...serverRows, ...commands]
-  }, [servers, q, onNewServer, selectedId])
+  }, [servers, stacks, q, onNewServer])
 
   useEffect(() => {
     setI(0)
@@ -65,6 +68,7 @@ export function CommandPalette({ onNewServer }: { onNewServer: () => void }) {
         open: openServer,
         reload: useServers.getState().load,
         onError: toastError,
+        look: newServerLook(useSettings.getState().settings),
       })
     }
   }
@@ -75,13 +79,13 @@ export function CommandPalette({ onNewServer }: { onNewServer: () => void }) {
   const hasServerRows = rows.some((row) => row.kind === 'server')
 
   return (
-    <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/50 pt-[96px]" onMouseDown={hide}>
+    <div className="absolute inset-0 z-50 flex items-start justify-center bg-scrim pt-[96px]" onMouseDown={hide}>
       <div
-        className="flex max-h-[420px] w-[560px] flex-col overflow-hidden rounded-[9px] border border-borderStrong bg-bg2 shadow-[0_20px_60px_rgba(0,0,0,.45)]"
+        className="flex max-h-[420px] w-[560px] flex-col overflow-hidden rounded-[9px] border border-line2 bg-s2 shadow-sheet"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex h-[46px] shrink-0 items-center gap-[11px] border-b border-border px-[15px]">
-          <Search size={16} strokeWidth={2.2} className="shrink-0 text-textDim" />
+        <div className="flex h-[46px] shrink-0 items-center gap-[11px] border-b border-line px-[15px]">
+          <Search size={16} strokeWidth={2.2} className="shrink-0 text-tx3" />
           <input
             autoFocus
             value={q}
@@ -102,16 +106,16 @@ export function CommandPalette({ onNewServer }: { onNewServer: () => void }) {
               }
             }}
             placeholder="Search servers or type a command…"
-            className="h-full min-w-0 flex-1 bg-transparent text-[14px] text-text outline-none placeholder:text-textDim"
+            className="h-full min-w-0 flex-1 bg-transparent text-[14px] text-tx outline-none placeholder:text-tx3"
           />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-[6px]">
-          {rows.length === 0 && <div className="px-[10px] py-[14px] text-[13px] text-textDim">No matches</div>}
+          {rows.length === 0 && <div className="px-[10px] py-[14px] text-[13px] text-tx3">No matches</div>}
           {rows[0]?.kind === 'quick-connect' && (
             <PaletteRow row={rows[0]} active={i === 0} onChoose={() => choose(0)} onHover={() => setI(0)} />
           )}
           {hasServerRows && (
-            <div className="px-[10px] pb-[4px] pt-[6px] text-[10px] font-semibold tracking-[.07em] text-textDim">
+            <div className="px-[10px] pb-[4px] pt-[6px] text-[10px] font-semibold tracking-[.07em] text-tx3">
               SERVERS
             </div>
           )}
@@ -131,13 +135,13 @@ export function CommandPalette({ onNewServer }: { onNewServer: () => void }) {
             tags hints that used to sit here were the design's prefix modes,
             which this build has no parser for — a keyboard hint that does
             nothing is worse than a shorter footer. */}
-        <div className="flex h-[34px] shrink-0 items-center gap-[16px] border-t border-border bg-bg1 px-[14px] text-[11px] text-textDim">
+        <div className="flex h-[34px] shrink-0 items-center gap-[16px] border-t border-line bg-side px-[14px] text-[11px] text-tx3">
           <span>
-            <span className="font-mono text-textMuted">↵</span> connect
+            <span className="font-mono text-tx2">↵</span> connect
           </span>
           <span className="flex-1" />
           <span>
-            <span className="font-mono text-textMuted">↑↓</span> navigate
+            <span className="font-mono text-tx2">↑↓</span> navigate
           </span>
         </div>
       </div>

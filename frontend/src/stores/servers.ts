@@ -8,12 +8,17 @@ import { toastError, toastSuccess } from './toasts'
 
 interface ServersState {
   servers: Server[]
+  // True once the first List has answered, so an empty list means "none"
+  // rather than "not read yet".
+  loaded: boolean
   loading: boolean
   error: string | null
   selectedId: string | null
 
   load: () => Promise<void>
   save: (id: string | null, input: CreateServerInput) => Promise<string | null>
+  // The created server, or the backend's message.
+  create: (input: CreateServerInput) => Promise<Server | string>
   remove: (id: string) => Promise<string | null>
   duplicate: (id: string) => Promise<string | null>
   copySSHCommand: (id: string) => Promise<void>
@@ -27,6 +32,7 @@ interface ServersState {
 
 export const useServers = create<ServersState>((set, get) => ({
   servers: [],
+  loaded: false,
   loading: false,
   error: null,
   selectedId: null,
@@ -37,9 +43,9 @@ export const useServers = create<ServersState>((set, get) => ({
       // List returns Server[] | null — GORM hands back a nil slice when the
       // table is empty, and that crosses the binding as null.
       const servers = (await ServerService.List()) ?? []
-      set({ servers, loading: false })
+      set({ servers, loading: false, loaded: true })
     } catch (e) {
-      set({ error: String(e), loading: false })
+      set({ error: String(e), loading: false, loaded: true })
     }
   },
 
@@ -54,6 +60,16 @@ export const useServers = create<ServersState>((set, get) => ({
       // Call.ByID rejects with a RuntimeError (extends Error), so a bare
       // String(e) would prefix the message with "RuntimeError: "; unwrap
       // .message to keep only the backend's text.
+      return e instanceof Error ? e.message : String(e)
+    }
+  },
+
+  create: async (input) => {
+    try {
+      const created = await ServerService.Create(input)
+      await get().load()
+      return created ?? 'The server was not saved.'
+    } catch (e) {
       return e instanceof Error ? e.message : String(e)
     }
   },
@@ -147,7 +163,7 @@ export const useServers = create<ServersState>((set, get) => ({
   select: (id) => set({ selectedId: id }),
 
   // Key detection is best-effort (FR-02.5): a scan failure must not block
-  // the form — the manual path picker in ServerFormKey still works.
+  // the server sheet — a typed key path still works.
   detectKeys: async () => {
     try {
       return (await ServerService.DetectKeys()) ?? []

@@ -58,7 +58,8 @@ type AgentService struct {
 	secret  secret.Store
 	pubDir  string
 
-	rt agentRuntime
+	rt        agentRuntime
+	approvals approvalBroker
 }
 
 // NewAgentService wires the repositories, the Keychain and the folder for
@@ -220,6 +221,10 @@ func (s *AgentService) SetRequireConfirm(id string, require bool) (*domain.Agent
 	if err := s.keys.UpdateRequireConfirm(id, require); err != nil {
 		return nil, err
 	}
+	// Approvals opened under the old setting must not outlive it.
+	if c := s.rt.core(); c != nil {
+		c.Forget(id)
+	}
 	return s.keys.Get(id)
 }
 
@@ -295,9 +300,10 @@ func (s *AgentService) ClearSignLog() error { return s.log.DeleteAll() }
 // the inner script has no single quote, so any login shell parses it.
 const installKeyCommand = `sh -c 'umask 077; mkdir -p "$HOME/.ssh" || exit 1; f="$HOME/.ssh/authorized_keys"; IFS= read -r line || exit 1; if [ -f "$f" ] && grep -qxF -- "$line" "$f"; then exit 0; fi; if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf "%s\n" "$line" >> "$f"'`
 
-// InstallPublicKey adds the key to the server's ~/.ssh/authorized_keys,
-// connecting with the server's current auth method.
-func (s *AgentService) InstallPublicKey(keyID, serverID string) error {
+// InstallPublicKey adds the key to the server's ~/.ssh/authorized_keys. With
+// an empty password Zish signs in the way the server is set up; otherwise the
+// server itself takes that password just this once and nothing is stored.
+func (s *AgentService) InstallPublicKey(keyID, serverID, password string) error {
 	k, err := s.keys.Get(keyID)
 	if err != nil {
 		return err
@@ -317,6 +323,9 @@ func (s *AgentService) InstallPublicKey(keyID, serverID string) error {
 	if err != nil {
 		return err
 	}
+	if password != "" {
+		signInOnceWithPassword(chain, password)
+	}
 	conn, err := dialer.DialChain(context.Background(), chain)
 	zeroChainCreds(chain)
 	if err != nil {
@@ -332,4 +341,14 @@ func (s *AgentService) InstallPublicKey(keyID, serverID string) error {
 		return domain.NewError(domain.CodeInternal, "The server couldn't add the key: "+agent.Label(strings.TrimSpace(out)))
 	}
 	return nil
+}
+
+// signInOnceWithPassword switches the chain's last hop to password sign-in.
+// Jump hops keep their own method; a stored TOTP secret still answers 2FA.
+func signInOnceWithPassword(chain []sshx.Hop, password string) {
+	t := &chain[len(chain)-1]
+	t.Server.AuthType = domain.AuthPassword
+	t.Creds.Password = password
+	t.Creds.Passphrase = ""
+	t.Creds.AgentSigner = nil
 }

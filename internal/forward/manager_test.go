@@ -46,6 +46,13 @@ func echoServer(t *testing.T) (addr string) {
 // it can't be reused directly from this package). It closes on test cleanup.
 func startForwardingSSHServer(t *testing.T) (addr string, hostKey ssh.PublicKey) {
 	t.Helper()
+	return startSSHServer(t, func(reqs <-chan *ssh.Request) { ssh.DiscardRequests(reqs) }, nil)
+}
+
+// startSSHServer is startForwardingSSHServer with the global-request handler
+// and a per-connection hook left to the caller.
+func startSSHServer(t *testing.T, handleReqs func(<-chan *ssh.Request), onConn func(*ssh.ServerConn)) (addr string, hostKey ssh.PublicKey) {
+	t.Helper()
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +82,10 @@ func startForwardingSSHServer(t *testing.T) (addr string, hostKey ssh.PublicKey)
 					_ = c.Close()
 					return
 				}
-				go ssh.DiscardRequests(reqs)
+				if onConn != nil {
+					onConn(sc)
+				}
+				go handleReqs(reqs)
 				go func() {
 					for ch := range chans {
 						if ch.ChannelType() != "direct-tcpip" {
@@ -398,8 +408,8 @@ func TestStartBindErrorAlreadyInUse(t *testing.T) {
 	if err := m.Start(fwd, conn); err == nil {
 		t.Fatal("Start on an already-bound port unexpectedly succeeded")
 	}
-	if got := m.Status(fwd.ID); got.State != StateError {
-		t.Fatalf("Status after bind failure = %+v, want error", got)
+	if got := m.Status(fwd.ID); got.State != StateError || !got.PortBusy {
+		t.Fatalf("Status after bind failure = %+v, want a busy-port error", got)
 	}
 
 	// Manager took ownership of conn and must have closed it on this

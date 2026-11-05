@@ -67,7 +67,7 @@ in your own terminal app (Terminal, iTerm2, Ghostty, …) running the system
 Zish is itself an ssh-agent, in the style of Secretive or 1Password: its keys
 live in the Keychain and each use can ask for Touch ID.
 
-- **Keys page** — the sidebar's Servers / Keys switch (or "Keys" in `⌘K`).
+- **Keys and agent** — in the sidebar (or "Keys" in `⌘K`).
   Generate an Ed25519 (default), ECDSA P-256 or RSA 4096 key, or import one
   from `~/.ssh` (OpenSSH, PKCS#1, SEC1 or PKCS#8; passphrase-protected keys
   too — the passphrase is used once and not stored). Rename, copy the public
@@ -91,8 +91,12 @@ live in the Keychain and each use can ask for Touch ID.
 - **Everywhere else** — the Keys page shows lines to copy into
   `~/.ssh/config` (`IdentityAgent`) or your shell rc (`SSH_AUTH_SOCK`). Zish
   never edits those files itself. The agent runs while Zish runs (also from
-  the tray); turn on Start at login to always have it. Settings → Keys turns
+  the tray); turn on Start at login to always have it. Settings → Agent turns
   the socket off; in-process signing keeps working.
+- **Approvals** — Zish's own approval window names the key, the server, the
+  route and the app asking, and lets you approve once, for 15 minutes or
+  until Zish locks; production servers can ask every time. Open approvals
+  are listed on the Keys page and can be revoked.
 - **Sign log** — every decision (signed, approved, denied, blocked while
   locked, error) with key, program, app and destination; the newest 500 are
   kept, and it can be cleared. It never contains the signed data.
@@ -114,27 +118,43 @@ forward, keep confirmation on so a remote server can't sign unnoticed.
 ### Tunnels & workflow
 - **Port forwarding** — local (`-L`), remote (`-R`), and dynamic (`-D`, a
   SOCKS5 proxy) tunnels; a tunnel is torn down when its server is deleted.
+- **Tunnels page** — every tunnel in one table with a switch, its route and
+  10 minutes of traffic. Tunnels can start when Zish opens and reconnect on
+  their own after a drop, after sleep or a network change. A busy port shows
+  which app holds it and offers a free one; presets cover Postgres, MySQL,
+  Redis, web and Kubernetes.
+- **Stacks** — open several servers and tunnels in one go: tunnels first, then
+  servers in tabs, windows or iTerm2 split panes, under one Touch ID. A stack
+  can sit in the menu bar and have its own global shortcut.
 
 ### Productivity
 - **Command palette** (`⌘K`) — fuzzy-search servers and actions
   (powered by Fuse.js).
+- **Launcher** (`⌥Space`) — from any app, find a server, stack or tunnel, or
+  connect to a typed `user@host`. The shortcut can be changed or turned off.
+- **Security check** — ten checks over your servers, keys and settings with
+  inline fixes; the sidebar shows how many fail. Nothing leaves your Mac.
+- **Night and Day** — Settings → Appearance picks Night, Day or Match macOS;
+  menus, dialogs and the full-screen title bar follow.
 - **Global hotkey** (`⌘⇧S`) — show/hide the window from anywhere, even when the
   app is in the background.
 - **Menu-bar tray** — the app lives in the tray; closing the window hides it
   instead of quitting, so tunnels stay up. Pin up to five servers there for
   one-click connect.
 - **App Lock** — an optional 6-digit PIN (a bcrypt hash in the Keychain) with
-  Touch ID, engaged with `⌘L`, after idle time, or at launch. While locked,
+  Touch ID, engaged with `⌘L`, after idle time, when the Mac sleeps or its
+  screen locks, or at launch. While locked,
   Connect does nothing, auto-fill falls back to typing, and every agent
   signature needs Touch ID or the Mac password.
 
 ### Import & Settings
-- **`~/.ssh/config` import** — preview every host (imported and skipped, with
-  the reason), pick which to import, and map `ProxyJump` to jump hosts by name.
-- **Settings** — General (start-at-login, keep-in-tray, confirm-on-quit,
-  connection timeout, App Lock), Connect (terminal app, tabs, auto-fill,
-  keep-alive, test terminal), Keys (agent socket on/off and status), a
-  read-only Shortcuts reference, Data, and About.
+- **`~/.ssh/config` import** — on first run or from `⌘K`: preview every host
+  (imported and skipped, with the reason), pick which to import with a guessed
+  group, and map `ProxyJump` to jump hosts by name.
+- **Settings** — in the main window: General, Connect (terminal app, tabs,
+  auto-fill, keep-alive, test terminal), Lock (PIN, Touch ID, idle and sleep,
+  approvals), Agent, Tunnels, Appearance (theme, density, icons and colours),
+  Shortcuts, Data, and About.
 - **Data tools** — export/import servers as JSON (secret-free), back up the
   database (WAL-safe), and reveal the data folder in Finder.
 
@@ -182,6 +202,7 @@ This app is built around a few hard invariants:
 |---|---|
 | `⌘K` | Open the command palette |
 | `⌘⇧S` | Show/hide the window (works globally, system-wide) |
+| `⌥Space` | Open the launcher from any app (configurable) |
 | `⌘N` | New server |
 | `⌘,` | Open Settings |
 | `⌘L` | Lock Zish (needs a passcode) |
@@ -353,11 +374,13 @@ those platforms are not yet runtime-tested.
 
 ## Project status
 
-**Unreleased** — Zish becomes a connection manager without an embedded
-terminal: Connect opens your own terminal app with auto-filled secrets, and a
-built-in ssh-agent keeps keys in the Keychain behind Touch ID. The embedded
-terminal, SFTP, the file editor, snippets, the Authenticator panel, health
-checks and session history are gone. See `CHANGELOG.md`.
+**v2.0** — Zish becomes a connection manager without an embedded terminal:
+Connect opens your own terminal app with auto-filled secrets, and a built-in
+ssh-agent keeps keys in the Keychain behind Touch ID, with its own approval
+window. A new design with Night and Day themes, a Tunnels page, Stacks, the
+⌥Space launcher and a Security check. The embedded terminal, SFTP, the file
+editor, snippets, the Authenticator panel, health checks and session history
+are gone. See `CHANGELOG.md`.
 
 **v1.1** — SFTP dual-pane file transfer (upload/download files and folders,
 progress and cancel); native right-click menus everywhere (terminal

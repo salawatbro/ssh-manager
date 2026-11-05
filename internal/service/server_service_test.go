@@ -27,6 +27,8 @@ type fakeDialer struct {
 
 	dialErr error
 	dialed  bool
+	// hops is a copy of the dialed chain, taken before the caller zeroes it.
+	hops []sshx.Hop
 }
 
 func (d *fakeDialer) Test(_ context.Context, _ domain.Server, creds sshx.Credentials) (sshx.DialResult, error) {
@@ -40,6 +42,7 @@ func (d *fakeDialer) DialChain(_ context.Context, chain []sshx.Hop) (*sshx.Conn,
 	if len(chain) > 0 {
 		d.seen = chain[len(chain)-1].Creds
 	}
+	d.hops = append([]sshx.Hop(nil), chain...)
 	d.dialed = true
 	return nil, d.dialErr
 }

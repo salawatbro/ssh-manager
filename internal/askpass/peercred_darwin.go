@@ -6,6 +6,19 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// peerPID is the peer's pid, 0 when unknown.
+func peerPID(c *net.UnixConn) int {
+	raw, err := c.SyscallConn()
+	if err != nil {
+		return 0
+	}
+	pid := 0
+	_ = raw.Control(func(fd uintptr) {
+		pid, _ = unix.GetsockoptInt(int(fd), unix.SOL_LOCAL, unix.LOCAL_PEERPID)
+	})
+	return pid
+}
+
 func peerUID(c *net.UnixConn) (int, error) {
 	raw, err := c.SyscallConn()
 	if err != nil {

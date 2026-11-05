@@ -14,6 +14,10 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 /**
  * ChangePin verifies the current PIN, then sets a new one.
  */
@@ -36,11 +40,12 @@ export function IsLocked(): $CancellablePromise<boolean> {
 }
 
 /**
- * Lock engages the lock (⌘L, idle timer). Without a PIN there would be no way
- * back in, so it does nothing then.
+ * Lock engages the lock for reason (LockReasonManual for ⌘L, LockReasonIdle
+ * for the idle timer). Without a PIN there would be no way back in, so it
+ * does nothing then.
  */
-export function Lock(): $CancellablePromise<void> {
-    return $Call.ByID(316331981);
+export function Lock(reason: string): $CancellablePromise<void> {
+    return $Call.ByID(316331981, reason);
 }
 
 /**
@@ -72,6 +77,13 @@ export function ResetAll(): $CancellablePromise<void> {
  */
 export function SetPin(pin: string): $CancellablePromise<void> {
     return $Call.ByID(3040299241, pin);
+}
+
+/**
+ * Status reports the lock state with why and since when it engaged.
+ */
+export function Status(): $CancellablePromise<$models.LockStatus> {
+    return $Call.ByID(912007788);
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { keyCommentError, keyNameError, keyOptionLabel, keyTypeLabel, shortFingerprint } from './keyFormat'
+import { keyCommentError, keyNameError, keyTypeLabel, shortFingerprint } from './keyFormat'
 
 describe('keyTypeLabel', () => {
   it('names every supported type', () => {
@@ -35,9 +35,5 @@ describe('key validation mirrors the backend', () => {
     expect(keyCommentError('x\ncommand="rm -rf /"')).toMatch(/control/)
     expect(keyCommentError('ы'.repeat(129))).toMatch(/256 bytes/)
     expect(keyCommentError('ы'.repeat(128))).toBeNull()
-  })
-
-  it('labels picker options', () => {
-    expect(keyOptionLabel({ name: 'work', type: 'ssh-rsa', bits: 4096 })).toBe('work · RSA 4096')
   })
 })

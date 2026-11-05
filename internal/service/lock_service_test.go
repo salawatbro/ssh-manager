@@ -1,6 +1,7 @@
 package service
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/salawat/sshmgr/internal/domain"
@@ -95,9 +96,18 @@ func TestResetAll(t *testing.T) {
 	_ = f.SetPassword(srv.ID, "secret")
 	_ = f.SetAppLockHash("some-hash")
 
+	stacks := store.NewStackRepo(db)
+	if err := stacks.Create(&domain.Stack{ID: "st", Name: "Both", Steps: []domain.StackStep{{Kind: domain.StepServer, ServerID: &srv.ID, Placement: domain.PlaceTab}}}); err != nil {
+		t.Fatal(err)
+	}
+
 	svc := NewLockService(f, servers, settingsRepo, nil, nil)
+	SetLockStacks(svc, stacks)
 	if err := svc.ResetAll(); err != nil {
 		t.Fatalf("ResetAll: %v", err)
+	}
+	if list, _ := stacks.List(); len(list) != 0 {
+		t.Errorf("stacks after reset = %d, want 0", len(list))
 	}
 
 	if list, _ := servers.List(); len(list) != 0 {
@@ -144,14 +154,14 @@ func TestLockServiceLocksOnlyWithAPin(t *testing.T) {
 	revoked := 0
 	gate.OnLock(func() { revoked++ })
 	svc := NewLockService(f, nil, nil, gate, nil)
-	svc.Lock()
+	svc.Lock(LockReasonManual)
 	if svc.IsLocked() || revoked != 0 {
 		t.Fatal("locked without a PIN")
 	}
 	if err := svc.SetPin("123456"); err != nil {
 		t.Fatal(err)
 	}
-	svc.Lock()
+	svc.Lock(LockReasonManual)
 	if !svc.IsLocked() || revoked != 1 {
 		t.Fatalf("locked=%v revoked=%d", svc.IsLocked(), revoked)
 	}
@@ -178,5 +188,87 @@ func TestLockServiceBootLockedAndBiometrics(t *testing.T) {
 	}
 	if NewLockService(secret.NewFake(), nil, nil, NewLockGate(true), nil).UnlockWithBiometrics("x") {
 		t.Fatal("unlocked without biometrics")
+	}
+}
+
+func TestLockServiceStatusKeepsTheFirstReason(t *testing.T) {
+	svc, _ := newPinSvc()
+	if st := svc.Status(); st.Locked || st.Reason != "" || st.Since != 0 {
+		t.Fatalf("unlocked status = %+v", st)
+	}
+	if err := svc.SetPin("123456"); err != nil {
+		t.Fatal(err)
+	}
+	svc.Lock(LockReasonIdle)
+	first := svc.Status()
+	if !first.Locked || first.Reason != LockReasonIdle || first.Since == 0 {
+		t.Fatalf("idle status = %+v", first)
+	}
+	svc.Lock(LockReasonManual)
+	if st := svc.Status(); st.Reason != LockReasonIdle || st.Since != first.Since {
+		t.Fatalf("second lock replaced the first: %+v", st)
+	}
+	if ok, _ := svc.VerifyPin("123456"); !ok {
+		t.Fatal("unlock failed")
+	}
+	// The frontend cannot claim the backend-only reasons.
+	svc.Lock(LockReasonSleep)
+	if st := svc.Status(); st.Reason != LockReasonManual {
+		t.Fatalf("frontend sleep reason = %+v", st)
+	}
+	boot := NewLockService(secret.NewFake(), nil, nil, NewLockGate(true), nil)
+	if st := boot.Status(); !st.Locked || st.Reason != LockReasonLaunch {
+		t.Fatalf("boot status = %+v", st)
+	}
+}
+
+func TestLockForSleepFollowsSettings(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := store.NewSettingsRepo(db)
+	f := secret.NewFake()
+	svc := NewLockService(f, nil, settings, NewLockGate(false), nil)
+	if err := svc.SetPin("123456"); err != nil {
+		t.Fatal(err)
+	}
+	save := func(lockEnabled, onSleep bool) {
+		t.Helper()
+		s, err := settings.Get()
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.LockEnabled, s.LockOnSleep = lockEnabled, onSleep
+		if err := settings.Save(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	save(false, true)
+	LockForSleep(svc)
+	if svc.IsLocked() {
+		t.Fatal("locked on sleep with Require unlock off")
+	}
+	save(true, false)
+	LockForSleep(svc)
+	if svc.IsLocked() {
+		t.Fatal("locked on sleep with Lock on sleep off")
+	}
+	save(true, true)
+	LockForSleep(svc)
+	if st := svc.Status(); !st.Locked || st.Reason != LockReasonSleep {
+		t.Fatalf("sleep status = %+v", st)
+	}
+	if err := f.DeleteAppLockHash(); err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := svc.VerifyPin("123456"); ok {
+		t.Fatal("verified a deleted PIN")
+	}
+	svc.gate.Unlock()
+	LockForSleep(svc)
+	if svc.IsLocked() {
+		t.Fatal("locked on sleep without a PIN")
 	}
 }

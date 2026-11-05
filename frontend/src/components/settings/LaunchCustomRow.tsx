@@ -15,9 +15,9 @@ export function LaunchCustomRow({ value, onSave }: { value: string; onSave: (v: 
   }
 
   return (
-    <div className="flex flex-col gap-[6px] border-b border-border py-[13px]">
-      <div className="text-[13px] text-text">Custom command</div>
-      <div className="text-[11.5px] text-textDim">
+    <div className="flex flex-col gap-[6px] px-[14px] py-[11px]">
+      <div className="text-[13px] text-tx">Custom command</div>
+      <div className="text-[11.5px] text-tx3">
         Runs without a shell. <span className="font-mono">{'{script}'}</span> is replaced by the launch script.
       </div>
       <Input
@@ -33,10 +33,10 @@ export function LaunchCustomRow({ value, onSave }: { value: string; onSave: (v: 
         className="font-mono text-[12px]"
       />
       {error ? (
-        <div className="text-[11.5px] text-stFailed">{error}</div>
+        <div className="text-[11.5px] text-bad-tx">{error}</div>
       ) : (
         preview && (
-          <div className="truncate font-mono text-[11px] text-textDim" title={preview.join(' ')}>
+          <div className="truncate font-mono text-[11px] text-tx3" title={preview.join(' ')}>
             {preview.map((w) => (/\s/.test(w) || w === '' ? JSON.stringify(w) : w)).join(' ')}
           </div>
         )

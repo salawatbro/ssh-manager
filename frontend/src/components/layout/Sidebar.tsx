@@ -44,7 +44,7 @@ function SidebarFooter() {
         {touchId && status?.running ? ' · Touch ID' : ''}
       </span>
       {hasPin && (
-        <FooterButton label="Lock Zish (⌘L)" onClick={() => useLock.getState().lock()}>
+        <FooterButton label="Lock Zish (⌘L)" onClick={() => useLock.getState().lock('manual')}>
           <Lock size={15} strokeWidth={1.8} />
         </FooterButton>
       )}

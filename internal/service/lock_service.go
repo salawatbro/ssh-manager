@@ -3,6 +3,8 @@ package service
 import (
 	"errors"
 	"regexp"
+	"sync"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -32,11 +34,36 @@ type LockService struct {
 	gate     *LockGate
 	bio      Biometrics
 	agent    *AgentService
+	stacks   *store.StackRepo
+
+	mu     sync.Mutex
+	reason string
+	since  time.Time
+}
+
+// Why the App Lock last engaged (LockStatus.Reason).
+const (
+	LockReasonManual = "manual"
+	LockReasonIdle   = "idle"
+	LockReasonSleep  = "sleep"
+	LockReasonLaunch = "launch"
+)
+
+// LockStatus is what the lock screen says about the lock.
+type LockStatus struct {
+	Locked bool   `json:"locked"`
+	Reason string `json:"reason"`
+	// Since is when the lock engaged, in Unix milliseconds; 0 while unlocked.
+	Since int64 `json:"since"`
 }
 
 // SetLockAgent lets ResetAll delete the agent's keys. Package-level so it
 // never becomes a frontend binding.
 func SetLockAgent(s *LockService, as *AgentService) { s.agent = as }
+
+// SetLockStacks lets ResetAll delete the stacks. Package-level so it never
+// becomes a frontend binding.
+func SetLockStacks(s *LockService, stacks *store.StackRepo) { s.stacks = stacks }
 
 // NewLockService constructs the service. The repo arguments are only used by
 // ResetAll — PIN-only callers may pass nil for both. A nil gate gets a fresh
@@ -45,19 +72,66 @@ func NewLockService(sec secret.Store, servers *store.ServerRepo, settings *store
 	if gate == nil {
 		gate = NewLockGate(false)
 	}
-	return &LockService{secret: sec, servers: servers, settings: settings, gate: gate, bio: bio}
+	s := &LockService{secret: sec, servers: servers, settings: settings, gate: gate, bio: bio}
+	if gate.Locked() {
+		s.reason, s.since = LockReasonLaunch, time.Now()
+	}
+	return s
 }
 
-// Lock engages the lock (⌘L, idle timer). Without a PIN there would be no way
-// back in, so it does nothing then.
-func (s *LockService) Lock() {
-	if s.HasPin() {
-		s.gate.Lock()
+// Lock engages the lock for reason (LockReasonManual for ⌘L, LockReasonIdle
+// for the idle timer). Without a PIN there would be no way back in, so it
+// does nothing then.
+func (s *LockService) Lock(reason string) {
+	if reason != LockReasonIdle {
+		reason = LockReasonManual
 	}
+	s.lock(reason)
+}
+
+func (s *LockService) lock(reason string) {
+	if !s.HasPin() {
+		return
+	}
+	// A second lock while locked keeps the first reason and time.
+	if !s.gate.Locked() {
+		s.mu.Lock()
+		s.reason, s.since = reason, time.Now()
+		s.mu.Unlock()
+	}
+	s.gate.Lock()
 }
 
 // IsLocked reports the backend lock state; the frontend reads it at boot.
 func (s *LockService) IsLocked() bool { return s.gate.Locked() }
+
+// Status reports the lock state with why and since when it engaged.
+func (s *LockService) Status() LockStatus {
+	if !s.gate.Locked() {
+		return LockStatus{}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := LockStatus{Locked: true, Reason: s.reason}
+	if !s.since.IsZero() {
+		st.Since = s.since.UnixMilli()
+	}
+	return st
+}
+
+// LockForSleep engages the lock when the Mac sleeps, its display sleeps or
+// its screen locks — when Require unlock and Lock on sleep are both on.
+// Package-level so it never becomes a frontend binding.
+func LockForSleep(s *LockService) {
+	if s.settings == nil || s.gate.Locked() {
+		return
+	}
+	set, err := s.settings.Get()
+	if err != nil || !set.LockEnabled || !set.LockOnSleep {
+		return
+	}
+	s.lock(LockReasonSleep)
+}
 
 // UnlockWithBiometrics shows the Touch ID prompt and unlocks on success.
 func (s *LockService) UnlockWithBiometrics(reason string) bool {
@@ -156,6 +230,9 @@ func (s *LockService) ResetAll() error {
 	_ = s.secret.DeleteAppLockHash()
 	// Bypassing the lock must not leave agent keys usable.
 	s.agent.wipeAll()
+	if s.stacks != nil {
+		_ = s.stacks.DeleteAll()
+	}
 	_ = s.servers.DeleteAll() // bulk: clears jump hosts too; cascades port-forwards
 	s.gate.Unlock()
 	def := domain.DefaultSettings()

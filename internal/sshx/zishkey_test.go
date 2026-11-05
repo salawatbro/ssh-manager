@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"io"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -170,5 +171,57 @@ func TestVerifierMatchesWithoutPrompting(t *testing.T) {
 	}
 	if len(p.seen) != 0 {
 		t.Fatalf("Matches prompted: %+v", p.seen)
+	}
+}
+
+func TestVerifierKnownReadsWithoutWriting(t *testing.T) {
+	kh := filepath.Join(t.TempDir(), "known_hosts")
+	p := &stubPrompter{accept: true}
+	v, err := NewVerifier(kh, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Known("db.example:22") {
+		t.Fatal("an empty known_hosts knows db.example")
+	}
+	time.Sleep(10 * time.Millisecond)
+	seedKnownHost(t, kh, "db.example:22", agentSigner(t).PublicKey())
+	seedKnownHost(t, kh, "[jump.example]:2222", agentSigner(t).PublicKey())
+	before, err := os.ReadFile(kh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		hostport string
+		want     bool
+	}{
+		{"db.example:22", true},
+		{"db.example:2222", false},
+		{"jump.example:2222", true},
+		{"jump.example:22", false},
+		{"other.example:22", false},
+	}
+	for _, tt := range tests {
+		if got := v.Known(tt.hostport); got != tt.want {
+			t.Errorf("Known(%q) = %v, want %v", tt.hostport, got, tt.want)
+		}
+	}
+	after, _ := os.ReadFile(kh)
+	if string(after) != string(before) || len(p.seen) != 0 {
+		t.Fatal("Known wrote known_hosts or prompted")
+	}
+}
+
+func TestVerifierKnownMissingFile(t *testing.T) {
+	kh := filepath.Join(t.TempDir(), "known_hosts")
+	v, err := NewVerifier(kh, &stubPrompter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(kh); err != nil {
+		t.Fatal(err)
+	}
+	if v.Known("db.example:22") {
+		t.Fatal("a missing file knows a host")
 	}
 }

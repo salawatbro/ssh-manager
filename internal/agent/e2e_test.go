@@ -120,7 +120,7 @@ func TestEndToEndGoClientThroughAgent(t *testing.T) {
 	}
 
 	addr, hostKey := testSSHD(t, rsaPub)
-	signer, err := f.core.Signer("k-rsa", ClientInfo{Purpose: "test connection", Destination: "db"})
+	signer, err := f.core.Signer("k-rsa", ClientInfo{Purpose: "test connection", Target: Host{Name: "db"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,5 +244,22 @@ func TestEndToEndOpenSSHWithLauncherArgv(t *testing.T) {
 	// destination is the verified host key's fingerprint.
 	if want := "host key " + shortFingerprint(ssh.FingerprintSHA256(hostKey)); ev.Destination != want || ev.Forwarded {
 		t.Fatalf("destination = %q forwarded %v, want %q", ev.Destination, ev.Forwarded, want)
+	}
+
+	// The key also signs in to a production server, so only a destination
+	// the session-bind proves for this session may be approved for longer.
+	f.core.SetHostResolver(prodKeyResolver{name: "staging-db"})
+	f.core.SetNeverProd(func() bool { return true })
+	f.keys.mu.Lock()
+	f.keys.rows[0].RequireConfirm = true
+	f.keys.mu.Unlock()
+	cmd = exec.Command(launcher.SSHPath, args...) //nolint:gosec // fixed binary, test-only
+	cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + dir}
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("second ssh: %v\n%s", err, out)
+	}
+	req := f.conf.requests()[0]
+	if req.Destination != "staging-db" || !req.Grantable || req.Client.Holder.PID <= 1 {
+		t.Fatalf("confirm request = %+v", req)
 	}
 }

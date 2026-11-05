@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { ForwardType } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { PortForward } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import { rowState, wanted, type RowState } from '../../lib/tunnels'
 import { useForwards } from '../../stores/forwards'
 import { toastError } from '../../stores/toasts'
 import { IconTile } from '../ui/IconTile'
 import { Switch } from '../ui/Switch'
 import { LookPicker } from '../look/LookPicker'
-import { AddForwardModal } from './AddForwardModal'
+import { TunnelSheet } from '../tunnel/TunnelSheet'
 
 const TYPE_FLAG: Record<string, string> = {
   [ForwardType.ForwardLocal]: 'L',
@@ -21,10 +22,17 @@ function route(f: PortForward): string {
   return `${flag} ${f.bindAddr}:${f.bindPort} → ${f.destHost}:${f.destPort}`
 }
 
-async function toggle(f: PortForward, running: boolean) {
+async function toggle(f: PortForward, on: boolean) {
   const st = useForwards.getState()
-  const err = running ? await st.stop(f.id) : await st.start(f.id)
+  const err = on ? await st.stop(f.id) : await st.start(f.id)
   if (err) toastError(err)
+}
+
+const STATE_TEXT: Record<RowState, [string, string]> = {
+  running: ['on', 'text-ok-tx'],
+  failed: ['failed', 'text-bad-tx'],
+  retrying: ['retrying', 'text-warn-tx'],
+  stopped: ['off', 'text-tx3'],
 }
 
 export function TunnelList({ serverId }: { serverId: string }) {
@@ -57,8 +65,10 @@ export function TunnelList({ serverId }: { serverId: string }) {
         <div className="overflow-hidden rounded-[10px] border border-line">
           {list.map((f) => {
             const status = statusById[f.id]
-            const running = status?.state === 'running'
-            const failed = status?.state === 'error'
+            const state = rowState(status?.state)
+            const on = wanted(state)
+            const failed = state === 'failed'
+            const [text, tone] = STATE_TEXT[state]
             return (
               <div key={f.id} className="flex items-center gap-[10px] border-t border-line px-[11px] py-[9px] first:border-t-0">
                 <button type="button" aria-label={`Icon and colour for ${f.name}`} onClick={() => setStyling(f)} className="rounded-[6px]">
@@ -76,10 +86,10 @@ export function TunnelList({ serverId }: { serverId: string }) {
                   <span className="truncate font-mono text-[11px] text-tx3">{route(f)}</span>
                   {failed && status?.detail && <span className="text-[11px] text-bad-tx">{status.detail}</span>}
                 </div>
-                <span className={`shrink-0 text-[11px] ${running ? 'text-ok-tx' : failed ? 'text-bad-tx' : 'text-tx3'}`}>
-                  {running ? 'on' : failed ? 'failed' : 'off'}
+                <span className={`shrink-0 text-[11px] ${tone}`} title={state === 'retrying' ? status?.detail : undefined}>
+                  {text}
                 </span>
-                <Switch checked={running} onChange={() => void toggle(f, running)} label={`${running ? 'Stop' : 'Start'} ${f.name}`} />
+                <Switch checked={on} onChange={() => void toggle(f, on)} label={`${on ? 'Stop' : 'Start'} ${f.name}`} />
               </div>
             )
           })}
@@ -98,7 +108,7 @@ export function TunnelList({ serverId }: { serverId: string }) {
       )}
 
       {(adding || editing) && (
-        <AddForwardModal
+        <TunnelSheet
           serverId={serverId}
           initial={editing}
           onClose={() => {

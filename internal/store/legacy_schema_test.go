@@ -84,6 +84,9 @@ func TestOpenLegacyDatabaseKeepsSettingsAndServersWorking(t *testing.T) {
 	if !s.StartAtLogin || s.KeepRunningInTray || s.ConfirmOnQuit || s.ConnectTimeoutSecs != 25 || !s.TourSeen || s.LockIdleMinutes != 7 {
 		t.Fatalf("legacy settings row not read back: %+v", s)
 	}
+	if s.GrantDefault != domain.GrantFor15Min || !s.GrantNeverProd {
+		t.Fatalf("approval columns did not take their defaults: %+v", s)
+	}
 	s.ConnectTimeoutSecs = 30
 	s.LockEnabled = true
 	if err := settings.Save(s); err != nil {
@@ -204,5 +207,186 @@ func TestOpenLegacyDatabaseSeedsSettingsRow(t *testing.T) {
 	}
 	if v := scalar[string](t, db, "SELECT terminal_mode FROM settings WHERE id = 1"); v != "blocks" {
 		t.Errorf("legacy terminal_mode = %q, want its column default", v)
+	}
+}
+
+// AutoStart and Reconnect are added to a 1.5 database off: an upgrade never
+// starts a tunnel on its own, and the flags take writes afterwards.
+func TestOpenLegacyDatabaseAddsTunnelRuntimeColumns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	writeLegacyDB(t, path,
+		"INSERT INTO servers (id, name, host, port, user, auth_type, created_at, updated_at) "+
+			"VALUES ('srv-1', 'web', 'web.example.com', 22, 'deploy', 'agent', '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+		"INSERT INTO port_forwards (id, server_id, name, type, bind_addr, bind_port, dest_host, dest_port, created_at, updated_at) "+
+			"VALUES ('fwd-1', 'srv-1', 'pg', 'L', '127.0.0.1', 5432, 'localhost', 5432, '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+	)
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open legacy database: %v", err)
+	}
+	forwards := NewForwardRepo(db)
+	fwd, err := forwards.Get("fwd-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fwd.AutoStart || fwd.Reconnect {
+		t.Fatalf("legacy forward came back with runtime flags on: %+v", fwd)
+	}
+
+	fwd.AutoStart, fwd.Reconnect = true, true
+	if err := forwards.Update(fwd); err != nil {
+		t.Fatalf("Update against legacy port_forwards table: %v", err)
+	}
+	all, err := forwards.ListAll()
+	if err != nil || len(all) != 1 {
+		t.Fatalf("ListAll = %d forwards, %v; want 1", len(all), err)
+	}
+	if !all[0].AutoStart || !all[0].Reconnect {
+		t.Fatalf("runtime flags not persisted: %+v", all[0])
+	}
+
+	fwd.AutoStart = false
+	if err := forwards.Update(fwd); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := forwards.Get("fwd-1"); got.AutoStart || !got.Reconnect {
+		t.Fatalf("clearing AutoStart did not persist alone: %+v", got)
+	}
+}
+
+// The Security settings arrive on an existing row with their defaults, and a
+// zero reminder ("never") survives a save instead of snapping back to 365.
+func TestOpenLegacyDatabaseAddsSecuritySettings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	writeLegacyDB(t, path, "INSERT INTO settings (id, lock_enabled) VALUES (1, true)")
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open legacy database: %v", err)
+	}
+	repo := NewSettingsRepo(db)
+	s, err := repo.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.LockEnabled || s.RotateReminderDays != 365 || s.SecurityIgnored != "" {
+		t.Fatalf("legacy row = lock %v, reminder %d, ignored %q", s.LockEnabled, s.RotateReminderDays, s.SecurityIgnored)
+	}
+	s.RotateReminderDays, s.SecurityIgnored = 0, domain.CheckKeyAge
+	if err := repo.Save(s); err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RotateReminderDays != 0 || got.SecurityIgnored != domain.CheckKeyAge {
+		t.Fatalf("saved = reminder %d, ignored %q", got.RotateReminderDays, got.SecurityIgnored)
+	}
+}
+
+// A database from before stacks gains both tables, and their steps cascade
+// from the servers and forwards that were already there.
+func TestOpenLegacyDatabaseAddsStacks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	writeLegacyDB(t, path,
+		"INSERT INTO servers (id, name, host, port, user, auth_type, created_at, updated_at) "+
+			"VALUES ('srv-1', 'web', 'web.example.com', 22, 'deploy', 'agent', '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+		"INSERT INTO port_forwards (id, server_id, name, type, bind_addr, bind_port, dest_host, dest_port, created_at, updated_at) "+
+			"VALUES ('fwd-1', 'srv-1', 'pg', 'L', '127.0.0.1', 5432, 'localhost', 5432, '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+	)
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open legacy database: %v", err)
+	}
+	stacks := NewStackRepo(db)
+	srv, fwd := "srv-1", "fwd-1"
+	err = stacks.Create(&domain.Stack{ID: "stk-1", Name: "Deploy", Steps: []domain.StackStep{
+		{Kind: domain.StepTunnel, ForwardID: &fwd},
+		{Kind: domain.StepServer, ServerID: &srv, Placement: domain.PlaceTab},
+	}})
+	if err != nil {
+		t.Fatalf("Create stack on a legacy database: %v", err)
+	}
+	if err := NewServerRepo(db).Delete("srv-1"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := stacks.Get("stk-1")
+	if err != nil || len(got.Steps) != 0 {
+		t.Fatalf("steps after deleting their server = %+v, %v", got, err)
+	}
+}
+
+// The launcher shortcut arrives on an existing row as ⌥Space, and turning it
+// off ("") survives a save instead of snapping back to the column default.
+func TestOpenLegacyDatabaseAddsLauncherHotkey(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	writeLegacyDB(t, path, "INSERT INTO settings (id, lock_enabled) VALUES (1, true)")
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open legacy database: %v", err)
+	}
+	repo := NewSettingsRepo(db)
+	s, err := repo.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.LauncherHotkey != domain.DefaultLauncherShortcut {
+		t.Fatalf("legacy row launcher hot key = %q", s.LauncherHotkey)
+	}
+	s.LauncherHotkey = ""
+	if err := repo.Save(s); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := repo.Get(); err != nil || got.LauncherHotkey != "" {
+		t.Fatalf("saved = %q, %v", got.LauncherHotkey, err)
+	}
+}
+
+// The Phase 8 settings arrive on an existing row with their defaults, and the
+// switches that default on can be turned off: false survives a save.
+func TestOpenLegacyDatabaseAddsAppearanceLockAndTunnelSettings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	writeLegacyDB(t, path, "INSERT INTO settings (id, lock_enabled) VALUES (1, true)")
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open legacy database: %v", err)
+	}
+	repo := NewSettingsRepo(db)
+	s, err := repo.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	def := domain.DefaultSettings()
+	if !s.LockEnabled || s.Theme != def.Theme || s.Density != def.Density || s.IconStyle != def.IconStyle ||
+		s.ColorBy != def.ColorBy || s.OpenAgain != def.OpenAgain {
+		t.Fatalf("legacy row choices = %+v", s)
+	}
+	if !s.MenuIcons || !s.LockOnSleep || !s.TunnelsAutoStart || !s.TunnelsReconnect ||
+		!s.TunnelsKeepWhileLocked || !s.TunnelsNotify || !s.TunnelsSuggestPort {
+		t.Fatalf("legacy row switches = %+v", s)
+	}
+
+	s.MenuIcons, s.LockOnSleep, s.TunnelsAutoStart, s.TunnelsReconnect = false, false, false, false
+	s.TunnelsKeepWhileLocked, s.TunnelsNotify, s.TunnelsSuggestPort = false, false, false
+	s.Theme, s.Density, s.IconStyle = domain.ThemeAuto, domain.DensityCompact, domain.IconStyleLetters
+	s.ColorBy, s.OpenAgain = domain.ColorByNone, domain.OpenAgainNew
+	if err := repo.Save(s); err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.MenuIcons || got.LockOnSleep || got.TunnelsAutoStart || got.TunnelsReconnect ||
+		got.TunnelsKeepWhileLocked || got.TunnelsNotify || got.TunnelsSuggestPort {
+		t.Fatalf("saved switches = %+v", got)
+	}
+	if got.Theme != domain.ThemeAuto || got.Density != domain.DensityCompact || got.IconStyle != domain.IconStyleLetters ||
+		got.ColorBy != domain.ColorByNone || got.OpenAgain != domain.OpenAgainNew {
+		t.Fatalf("saved choices = %+v", got)
 	}
 }

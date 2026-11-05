@@ -19,7 +19,7 @@ const sizeClasses: Record<6 | 7 | 8, string> = {
 
 // UI-11: the one place the status circle is drawn — filled for connected /
 // connecting / failed, outline for disc / unknown (see status.ts for why
-// stFailed is filled). `connecting` additionally renders a pulse: a solid
+// failed is filled). `connecting` additionally renders a pulse: a solid
 // dot plus an absolutely-positioned ring that expands and fades via the
 // `ssh-pulse` keyframe (tokens.css).
 //

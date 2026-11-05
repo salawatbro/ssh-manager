@@ -26,6 +26,10 @@ func TestExecRunner(t *testing.T) {
 	if err == nil || time.Since(start) > 3*time.Second {
 		t.Fatalf("slow: %v after %v", err, time.Since(start))
 	}
+	start = time.Now()
+	if err := r.Run(Attempt{Argv: []string{writeExe(t, dir, "forks", "sleep 5 &\nexit 0\n")}, Wait: 4 * time.Second}); err != nil || time.Since(start) > 3*time.Second {
+		t.Fatalf("a child holding the output: %v after %v", err, time.Since(start))
+	}
 	if err := r.Run(Attempt{Argv: []string{writeExe(t, dir, "gui", "sleep 1\n")}, Wait: 100 * time.Millisecond, KeepRunning: true}); err != nil {
 		t.Fatalf("keep running: %v", err)
 	}

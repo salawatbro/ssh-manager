@@ -33,7 +33,8 @@ static void zishSetFullscreenTitlebar(bool fullscreen) {
 */
 import "C"
 
-// fullscreenTitlebarChanged keeps the fullscreen title-bar reveal dark and slim (macOS only).
+// fullscreenTitlebarChanged paints the fullscreen title-bar reveal with the
+// window colour, which follows the theme, and keeps it slim (macOS only).
 func fullscreenTitlebarChanged(fullscreen bool) {
 	C.zishSetFullscreenTitlebar(C.bool(fullscreen))
 }

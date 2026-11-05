@@ -37,7 +37,7 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
             aria-checked={on}
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(o.value)}
-            className={`h-[26px] flex-1 rounded-[6px] px-[10px] text-[12px] transition-colors ${
+            className={`h-[26px] flex-1 whitespace-nowrap rounded-[6px] px-[10px] text-[12px] transition-colors ${
               on ? 'bg-s1 text-tx shadow-[0_1px_2px_rgb(0_0_0/0.25)]' : 'text-tx2 hover:text-tx'
             }`}
           >

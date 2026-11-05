@@ -6,5 +6,7 @@ export {
 } from "./models.js";
 
 export type {
-    Status
+    Status,
+    Traffic,
+    TrafficReport
 } from "./models.js";

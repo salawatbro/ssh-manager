@@ -8,18 +8,24 @@ package main
 */
 import "C"
 
-// goGlobalHotkeyFired is invoked from the Carbon hot-key handler (C) on every
-// ⌘⇧S press, anywhere. It runs the toggle in a goroutine so it neither blocks
-// the Carbon handler nor calls a Wails window method inline on the run-loop
-// thread (Wails marshals window calls to the main thread itself).
+// goHotkeyFired is invoked from the Carbon hot-key handler (C) on every press
+// of a registered hot key, anywhere. The work runs in a goroutine so it never
+// blocks the Carbon handler or calls a Wails window method inline on the
+// run-loop thread.
 //
-//export goGlobalHotkeyFired
-func goGlobalHotkeyFired() {
-	if onGlobalHotkey != nil {
-		go onGlobalHotkey()
-	}
+//export goHotkeyFired
+func goHotkeyFired(id C.int) {
+	go hotkeyFired(int(id))
 }
 
 // registerGlobalHotkey installs the ⌘⇧S system-wide hot key (macOS). Call after
-// NSApp exists (the ApplicationStarted hook), like forceDarkAppearance.
+// NSApp exists (the ApplicationStarted hook), like applyTheme.
 func registerGlobalHotkey() { C.sshmgrRegisterGlobalHotkey() }
+
+// registerHotkey installs a system-wide hot key under id; false when Carbon
+// refused it (usually another app holds the combination). Main thread only.
+func registerHotkey(id int, key, mods uint32) bool {
+	return C.sshmgrRegisterHotkey(C.int(id), C.int(key), C.int(mods)) == 0
+}
+
+func unregisterHotkey(id int) { C.sshmgrUnregisterHotkey(C.int(id)) }

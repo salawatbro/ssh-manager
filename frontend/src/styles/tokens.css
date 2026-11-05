@@ -1,10 +1,12 @@
 @import "tailwindcss";
+@import "./day.css";
 
 /* `static` emits every variable even when no utility names it: icon tints and
    env fills are also read at runtime through inline `var(--color-…)` styles. */
 @theme static {
-  /* Night palette — docs/superpowers/new-design-plan.md. Brand pink is the only
-     accent; green/amber/red mean status (a circle), ember/violet/sky mean
+  /* Night palette, the default; Day overrides it below
+     (docs/superpowers/new-design-plan.md). Brand pink is the only accent;
+     green/amber/red mean status (a circle), ember/violet/sky mean
      environment (a labelled square). */
   --color-bg: #0c0d10;
   --color-side: #111217;
@@ -26,6 +28,7 @@
 
   --color-ok: #2fd27f;
   --color-ok-tx: #4ade94;
+  --color-ok-soft: rgb(47 210 127 / 0.12);
   --color-warn: #f5b73b;
   --color-warn-tx: #f7c560;
   --color-warn-soft: rgb(245 183 59 / 0.12);
@@ -67,40 +70,23 @@
   --color-t-fuchsia: #ef93ff;
   --color-t-fuchsia-bg: rgb(225 110 255 / 0.16);
 
-  /* Old names, kept so every existing screen re-skins at once. Removed in
-     Phase 9 once no component uses them. */
-  --color-bg0: var(--color-bg);
-  --color-bg1: var(--color-side);
-  --color-bg1b: var(--color-s1);
-  --color-bg2: var(--color-s2);
-  --color-bgSel: var(--color-s3);
-  --color-border: var(--color-line);
-  --color-borderStrong: var(--color-line2);
-  --color-text: var(--color-tx);
-  --color-textMuted: var(--color-tx2);
-  --color-textDim: var(--color-tx3);
-  --color-accent: var(--color-acc);
-  --color-accentDim: var(--color-acc-soft);
-  --color-accentFg: var(--color-acc-tx);
-  --color-onAccent: var(--color-acc-on);
-  --color-envProd: var(--color-prod);
-  --color-envStaging: var(--color-stg);
-  --color-envDev: var(--color-dev);
-  --color-stConnected: var(--color-ok);
-  --color-stConnecting: var(--color-warn);
-  --color-stFailed: var(--color-bad);
-  --color-stDisc: var(--color-idle);
-  --color-stUnknown: var(--color-line2);
-
   --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
 
-  --shadow-sheet: 0 24px 64px rgb(0 0 0 / 0.55);
-  --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.45);
+  /* Tailwind inlines a shadow's value into the utility, so the colour must be
+     a variable for Day to change it. */
+  --shadow-sheet: 0 24px 64px var(--sheet-shadow);
+  --shadow-pop: 0 12px 32px var(--pop-shadow);
 
   /* UI-11: the environment marker is a square at exactly this radius. Status is
      always a circle (rounded-full). The two axes must never share a shape. */
   --radius-env: 2px;
+}
+
+:root {
+  color-scheme: dark;
+  --sheet-shadow: rgb(0 0 0 / 0.55);
+  --pop-shadow: rgb(0 0 0 / 0.45);
 }
 
 /* Everything below participates in the normal cascade via @layer base, so that

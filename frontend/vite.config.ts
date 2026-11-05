@@ -39,4 +39,15 @@ export default defineConfig({
       "@bindings": path.resolve(__dirname, "bindings"),
     },
   },
+  // approval.html is the agent's approval window (approval_window_darwin.go),
+  // launcher.html the ⌥Space launcher (launcher_main.go).
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        approval: path.resolve(__dirname, "approval.html"),
+        launcher: path.resolve(__dirname, "launcher.html"),
+      },
+    },
+  },
 });

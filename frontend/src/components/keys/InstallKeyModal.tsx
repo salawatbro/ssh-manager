@@ -24,7 +24,7 @@ export function InstallKeyModal({ k, onClose }: { k: AgentKey; onClose: () => vo
     setBusy(true)
     setError(null)
     try {
-      await AgentService.InstallPublicKey(k.id, srv.id)
+      await AgentService.InstallPublicKey(k.id, srv.id, '')
       if (switchAfter) {
         const err = await save(srv.id, serverInputWithKey(srv, k.id))
         if (err) throw new Error(`The key was added, but switching the server failed: ${err}`)
@@ -52,7 +52,7 @@ export function InstallKeyModal({ k, onClose }: { k: AgentKey; onClose: () => vo
       }
     >
       {candidates.length === 0 ? (
-        <div className="text-[12.5px] text-textMuted">No other servers to install this key on.</div>
+        <div className="text-[12.5px] text-tx2">No other servers to install this key on.</div>
       ) : (
         <div className="flex flex-col gap-[12px]">
           <div className="flex flex-col gap-[5px]">
@@ -64,15 +64,15 @@ export function InstallKeyModal({ k, onClose }: { k: AgentKey; onClose: () => vo
               onChange={setServerId}
             />
           </div>
-          <label className="flex items-center gap-[8px] text-[12.5px] text-text">
+          <label className="flex items-center gap-[8px] text-[12.5px] text-tx">
             <input type="checkbox" checked={switchAfter} onChange={(e) => setSwitchAfter(e.target.checked)} />
             Switch this server to use the key
           </label>
-          <div className="text-[11px] leading-[1.45] text-textDim">
+          <div className="text-[11px] leading-[1.45] text-tx3">
             Zish connects with the server’s current sign-in and appends the public key to
             ~/.ssh/authorized_keys. The server needs a POSIX shell.
           </div>
-          {error && <div className="text-[12px] text-stFailed">{error}</div>}
+          {error && <div className="text-[12px] text-bad">{error}</div>}
         </div>
       )}
     </KeyModal>

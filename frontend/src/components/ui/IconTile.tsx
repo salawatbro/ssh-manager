@@ -1,11 +1,12 @@
 import { markOf, resolveTint, tintVars } from '../../lib/look'
 
-export type IconTileSize = 18 | 22 | 32 | 34 | 42 | 52
+export type IconTileSize = 18 | 22 | 26 | 32 | 34 | 42 | 52
 
 // Literal class strings per size: Tailwind only emits classes it can read.
 const SIZE: Record<IconTileSize, { box: string; text: string; icon: number; stroke: number }> = {
   18: { box: 'h-[18px] w-[18px] rounded-[5px]', text: 'text-[8px]', icon: 11, stroke: 2.2 },
   22: { box: 'h-[22px] w-[22px] rounded-[6px]', text: 'text-[9px]', icon: 12, stroke: 2.1 },
+  26: { box: 'h-[26px] w-[26px] rounded-[7px]', text: 'text-[10px]', icon: 14, stroke: 2 },
   32: { box: 'h-[32px] w-[32px] rounded-[9px]', text: 'text-[11.5px]', icon: 16, stroke: 1.9 },
   34: { box: 'h-[34px] w-[34px] rounded-[10px]', text: 'text-[12px]', icon: 16, stroke: 1.9 },
   42: { box: 'h-[42px] w-[42px] rounded-[12px]', text: 'text-[14px]', icon: 20, stroke: 1.8 },
@@ -20,11 +21,27 @@ interface Props {
   color?: string
   group?: string
   size?: IconTileSize
-  // A status badge on the tile's corner (e.g. a running tunnel).
-  dot?: { tone: 'ok' | 'bad'; label: string }
+  // A status badge on the tile's corner (e.g. a running tunnel); `idle` is a
+  // hollow ring. `halo` matches the surface the tile sits on.
+  dot?: { tone: DotTone; label: string }
+  halo?: 'bg' | 's1'
 }
 
-export function IconTile({ name, icon = '', color = '', group = '', size = 32, dot }: Props) {
+export type DotTone = 'ok' | 'bad' | 'warn' | 'idle'
+
+// Literal class strings: Tailwind only emits classes it can read.
+const DOT: Record<DotTone, string> = {
+  ok: 'bg-ok',
+  bad: 'bg-bad',
+  warn: 'bg-warn',
+  idle: 'bg-transparent',
+}
+const HALO: Record<'bg' | 's1', { solid: string; idle: string }> = {
+  bg: { solid: 'shadow-[0_0_0_2px_var(--color-bg)]', idle: 'shadow-[inset_0_0_0_1.5px_var(--color-idle),0_0_0_2px_var(--color-bg)]' },
+  s1: { solid: 'shadow-[0_0_0_2px_var(--color-s1)]', idle: 'shadow-[inset_0_0_0_1.5px_var(--color-idle),0_0_0_2px_var(--color-s1)]' },
+}
+
+export function IconTile({ name, icon = '', color = '', group = '', size = 32, dot, halo = 'bg' }: Props) {
   const s = SIZE[size]
   const mark = markOf(icon, name)
   const { fg, bg } = tintVars(resolveTint(color, group))
@@ -54,8 +71,8 @@ export function IconTile({ name, icon = '', color = '', group = '', size = 32, d
         <span
           role="img"
           aria-label={dot.label}
-          className={`absolute -bottom-[3px] -right-[3px] h-[10px] w-[10px] rounded-full shadow-[0_0_0_2px_var(--color-bg)] ${
-            dot.tone === 'ok' ? 'bg-ok' : 'bg-bad'
+          className={`absolute -bottom-[3px] -right-[3px] h-[10px] w-[10px] rounded-full ${DOT[dot.tone]} ${
+            dot.tone === 'idle' ? HALO[halo].idle : HALO[halo].solid
           }`}
         />
       )}

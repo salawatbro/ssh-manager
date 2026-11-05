@@ -51,6 +51,9 @@ type Launch struct {
 	Dir      string // LaunchDir/<launchID>, removed after the launch expires
 	Title    string
 	AutoFill bool
+	// OnRedeem gets the pid of the connect helper that redeemed the token,
+	// before it execs ssh under the same pid.
+	OnRedeem func(pid int)
 }
 
 // Redeemed is what the connect helper receives for a valid launch token.
@@ -148,9 +151,20 @@ func (b *Broker) Revoke(launchToken string) {
 }
 
 // Redeem trades a launch token for the ssh argv and environment, once.
-func (b *Broker) Redeem(launchToken string) (Redeemed, error) {
+func (b *Broker) Redeem(launchToken string) (Redeemed, error) { return b.RedeemFrom(launchToken, 0) }
+
+// RedeemFrom is Redeem for a helper whose pid the control socket read.
+func (b *Broker) RedeemFrom(launchToken string, pid int) (Redeemed, error) {
+	r, onRedeem, err := b.redeem(launchToken)
+	if err == nil && onRedeem != nil && pid > 0 {
+		onRedeem(pid)
+	}
+	return r, err
+}
+
+func (b *Broker) redeem(launchToken string) (Redeemed, func(int), error) {
 	if !ValidToken(launchToken) {
-		return Redeemed{}, ErrTokenUnknown
+		return Redeemed{}, nil, ErrTokenUnknown
 	}
 	key := sha256.Sum256([]byte(launchToken))
 	now := b.cfg.Now()
@@ -159,11 +173,11 @@ func (b *Broker) Redeem(launchToken string) (Redeemed, error) {
 	rec, ok := b.launches[key]
 	switch {
 	case !ok:
-		return Redeemed{}, ErrTokenUnknown
+		return Redeemed{}, nil, ErrTokenUnknown
 	case rec.redeemed:
-		return Redeemed{}, ErrTokenUsed
+		return Redeemed{}, nil, ErrTokenUsed
 	case rec.revoked || !now.Before(rec.issued.Add(LaunchTTL)):
-		return Redeemed{}, ErrTokenExpired
+		return Redeemed{}, nil, ErrTokenExpired
 	}
 	rec.redeemed = true
 	rec.dirUntil = now.Add(AskTTL)
@@ -176,7 +190,7 @@ func (b *Broker) Redeem(launchToken string) (Redeemed, error) {
 	if rec.launch.AutoFill && hasAnySlot(rec.launch.Hops) {
 		tok, askKey, err := newToken()
 		if err != nil {
-			return Redeemed{}, err
+			return Redeemed{}, nil, err
 		}
 		b.asks[askKey] = &askRec{
 			hops:    append([]Hop(nil), rec.launch.Hops...),
@@ -188,7 +202,7 @@ func (b *Broker) Redeem(launchToken string) (Redeemed, error) {
 		out.Env[EnvToken] = tok
 		out.Env[EnvControlSocket] = b.cfg.SocketPath
 	}
-	return out, nil
+	return out, rec.launch.OnRedeem, nil
 }
 
 func hasAnySlot(hops []Hop) bool {

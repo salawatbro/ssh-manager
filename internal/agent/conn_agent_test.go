@@ -241,7 +241,9 @@ func sessionBindPayload(t *testing.T, host ssh.Signer, sid []byte, forwarding bo
 
 type mapResolver map[string]string
 
-func (m mapResolver) Resolve(k ssh.PublicKey) string { return m[ssh.FingerprintSHA256(k)] }
+func (m mapResolver) Resolve(k ssh.PublicKey) Host { return Host{Name: m[ssh.FingerprintSHA256(k)]} }
+
+func (m mapResolver) KeyOnProd(string) bool { return false }
 
 func TestProtocolExtensions(t *testing.T) {
 	f := newFixture(t)

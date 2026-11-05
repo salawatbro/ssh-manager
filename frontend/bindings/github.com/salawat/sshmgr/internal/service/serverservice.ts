@@ -75,10 +75,11 @@ export function Groups(): $CancellablePromise<string[] | null> {
 }
 
 /**
- * ImportJSON reads a server-JSON file, validates every entry (SEC-07), skips
- * duplicates (same host/port/user) — both against servers already in the
- * database and against ones created earlier in this same import — and
- * creates the rest. Returns the count created.
+ * ImportJSON reads an export file, validates every entry (SEC-07), skips
+ * duplicate servers (same host/port/user) — both against servers already in
+ * the database and against ones created earlier in this same import — and
+ * creates the rest, then the file's tunnels and stacks on them. Returns the
+ * count of servers created.
  */
 export function ImportJSON(path: string): $CancellablePromise<number> {
     return $Call.ByID(3445467517, path);

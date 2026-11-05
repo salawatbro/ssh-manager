@@ -25,9 +25,11 @@ type AgentKey struct {
 const (
 	SignAllowed   = "allowed"
 	SignConfirmed = "confirmed"
-	SignDenied    = "denied"
-	SignLocked    = "locked"
-	SignError     = "error"
+	// SignGranted: an open approval for the app and key covered it.
+	SignGranted = "granted"
+	SignDenied  = "denied"
+	SignLocked  = "locked"
+	SignError   = "error"
 )
 
 // AgentSignEvent records one agent signing decision. It never holds the

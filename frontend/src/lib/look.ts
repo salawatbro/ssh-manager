@@ -121,3 +121,14 @@ export function markOf(icon: string, name: string): LookMark {
   if (def) return { kind: 'icon', d: def.d, label: def.label }
   return { kind: 'letters', text: customLetters(icon) ?? defaultLetters(name) }
 }
+
+// newServerLook is the icon and colour a new server starts with, from
+// Settings › Appearance. Mirrors domain.Settings.NewServerLook.
+export const NEW_SERVER_ICON = 'server'
+
+export function newServerLook(s: { iconStyle: string; colorBy: string } | null | undefined): { icon: string; color: string } {
+  return {
+    icon: s?.iconStyle === 'letters' ? '' : NEW_SERVER_ICON,
+    color: s?.colorBy === 'none' ? 'gray' : '',
+  }
+}

@@ -26,7 +26,7 @@ export function useLockBoot() {
     if (!settings?.lockEnabled || !settings.lockIdleEnabled) return
     const timer = createIdleTimer({
       timeoutMs: settings.lockIdleMinutes * 60_000,
-      onIdle: () => useLock.getState().lock(),
+      onIdle: () => useLock.getState().lock('idle'),
     })
     const onActivity = () => {
       if (!useLock.getState().locked) timer.notifyActivity()

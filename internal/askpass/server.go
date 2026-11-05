@@ -15,7 +15,8 @@ import (
 
 // Handler is what the control socket dispatches to; *Broker implements it.
 type Handler interface {
-	Redeem(launchToken string) (Redeemed, error)
+	// RedeemFrom gets the peer's pid (0 if unknown) for Launch.OnRedeem.
+	RedeemFrom(launchToken string, pid int) (Redeemed, error)
 	Answer(askToken, prompt, hint string) Reply
 }
 
@@ -24,6 +25,7 @@ type Handler interface {
 type Server struct {
 	h              Handler
 	peerUID        func(*net.UnixConn) (int, error)
+	peerPID        func(*net.UnixConn) int
 	uid            int
 	requestTimeout time.Duration
 	totalTimeout   time.Duration
@@ -35,7 +37,7 @@ type Server struct {
 
 // NewServer returns a stopped server.
 func NewServer(h Handler) *Server {
-	return &Server{h: h, peerUID: peerUID, uid: os.Getuid(), requestTimeout: requestTimeout, totalTimeout: totalTimeout}
+	return &Server{h: h, peerUID: peerUID, peerPID: peerPID, uid: os.Getuid(), requestTimeout: requestTimeout, totalTimeout: totalTimeout}
 }
 
 // Start listens on path. A stale socket of ours is replaced; anything else at
@@ -119,7 +121,7 @@ func (s *Server) handle(c *net.UnixConn) {
 	}
 	switch req.Op {
 	case OpRedeem:
-		r, err := s.h.Redeem(req.Token)
+		r, err := s.h.RedeemFrom(req.Token, s.peerPID(c))
 		if err != nil {
 			_ = writeJSON(c, RedeemReply{Code: CodeExpired, Message: err.Error()})
 			return

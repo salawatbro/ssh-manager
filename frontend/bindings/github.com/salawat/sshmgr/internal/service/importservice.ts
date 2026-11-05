@@ -24,6 +24,14 @@ export function Confirm(aliases: string[] | null): $CancellablePromise<number> {
 }
 
 /**
+ * ConfirmGroups is Confirm with a group for each host (first run guesses
+ * them).
+ */
+export function ConfirmGroups(picks: $models.ImportPick[] | null): $CancellablePromise<number> {
+    return $Call.ByID(3538097784, picks);
+}
+
+/**
  * Preview parses the config and classifies each host: keep, or skip (wildcard /
  * duplicate / invalid). A missing config file is an empty preview, not an
  * error.

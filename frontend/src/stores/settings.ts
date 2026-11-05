@@ -3,15 +3,26 @@ import { SettingsService } from '@bindings/github.com/salawat/sshmgr/internal/se
 import type { Settings } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { toastError } from './toasts'
 
-export type SettingsSection = 'general' | 'connect' | 'keys' | 'shortcuts' | 'data' | 'about'
+export type SettingsSection =
+  | 'general'
+  | 'connect'
+  | 'lock'
+  | 'agent'
+  | 'tunnels'
+  | 'appearance'
+  | 'shortcuts'
+  | 'data'
+  | 'about'
 
 interface SettingsState {
   settings: Settings | null
+  // The settings page replaces the sidebar and the main column while open;
+  // closing it shows whatever page was there before.
   open: boolean
   section: SettingsSection
   load: () => Promise<void>
   update: (patch: Partial<Settings>) => Promise<void>
-  show: () => void
+  show: (section?: SettingsSection) => void
   close: () => void
   setSection: (s: SettingsSection) => void
 }
@@ -25,7 +36,7 @@ export const useSettings = create<SettingsState>((set, get) => ({
     try {
       set({ settings: await SettingsService.Get() })
     } catch {
-      // leave null; the modal shows a loading state
+      // leave null; the page shows a loading state
     }
   },
 
@@ -47,9 +58,9 @@ export const useSettings = create<SettingsState>((set, get) => ({
     }
   },
 
-  show: () => {
+  show: (section) => {
     void get().load()
-    set({ open: true })
+    set({ open: true, section: section ?? get().section })
   },
   close: () => set({ open: false }),
   setSection: (section) => set({ section }),

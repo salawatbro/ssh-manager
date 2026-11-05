@@ -3,14 +3,14 @@ import { terminalSelectOptions } from '../../lib/terminalOptions'
 import { useSettings } from '../../stores/settings'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
-import type { ServerFormValues } from './ServerForm'
+import type { ServerFormValues } from '../../lib/serverDraft'
 
 interface Props {
   form: ServerFormValues
   setForm: (form: ServerFormValues) => void
 }
 
-const label = 'text-[11px] font-medium text-tx2'
+const label = 'text-[11.5px] text-tx3'
 
 // What happens when this server opens: which terminal app, and a command run
 // on the remote host before the login shell takes over.
@@ -21,17 +21,17 @@ export function ServerFormOnConnect({ form, setForm }: Props) {
   const choices = terminalSelectOptions(terminals, form.terminal)
 
   return (
-    <div className="grid grid-cols-2 gap-4">
-      <div className="flex flex-col gap-[5px]">
-        <span className={label}>Terminal</span>
+    <div className="grid grid-cols-2 gap-[12px]">
+      <div className="flex flex-col gap-[6px]">
+        <span className={label}>Terminal app</span>
         <Select
-          ariaLabel="Terminal"
+          ariaLabel="Terminal app"
           value={form.terminal}
           onChange={(v) => setForm({ ...form, terminal: v })}
           options={[{ value: '', label: `Default (${fallbackName})` }, ...choices]}
         />
       </div>
-      <div className="flex flex-col gap-[5px]">
+      <div className="flex flex-col gap-[6px]">
         <span className={label}>Run after connect</span>
         <Input
           className="font-mono text-[12.5px]"

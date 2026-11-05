@@ -195,7 +195,7 @@ func TestInvalidateDropsTempKeys(t *testing.T) {
 func TestInProcessSigner(t *testing.T) {
 	f := newFixture(t)
 	f.keys.add(t, "k-rsa", "deploy", newRSA(t), true)
-	s, err := f.core.Signer("k-rsa", ClientInfo{Purpose: "test connection", Destination: "prod-db"})
+	s, err := f.core.Signer("k-rsa", ClientInfo{Purpose: "test connection", Target: Host{Name: "prod-db"}})
 	if err != nil {
 		t.Fatal(err)
 	}

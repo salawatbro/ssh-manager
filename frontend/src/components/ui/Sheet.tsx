@@ -1,4 +1,4 @@
-import { useEffect, useId, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 
 interface Props {
@@ -8,23 +8,50 @@ interface Props {
   // Extra header buttons, placed left of the close button.
   actions?: ReactNode
   footer?: ReactNode
+  // ⌘↵ runs it, the way the footer's primary button promises.
+  onSubmit?: () => void
   children: ReactNode
 }
 
+// Open sheets, oldest first. Escape closes only the newest, so a picker sheet
+// over a form sheet never takes the form down with it.
+const openSheets: object[] = []
+
+// A page shortcut such as ⌘↵ stays quiet while any sheet is up.
+export const sheetOpen = () => openSheets.length > 0
+
 // A sheet drops from the top of the window over a scrim. A click on the scrim
 // does not close it: a stray click must never throw away a half-filled form.
-export function Sheet({ title, onClose, width = 640, actions, footer, children }: Props) {
+export function Sheet({ title, onClose, width = 640, actions, footer, onSubmit, children }: Props) {
   const titleId = useId()
-
-  // Bubble phase on purpose: an open Select catches Escape in the capture
-  // phase and stops it, so Escape closes the popover first, the sheet second.
+  const closeRef = useRef(onClose)
+  const submitRef = useRef(onSubmit)
   useEffect(() => {
+    closeRef.current = onClose
+    submitRef.current = onSubmit
+  }, [onClose, onSubmit])
+
+  // Registered once per mount: re-registering on a new onClose would move an
+  // older sheet above a newer one. Bubble phase on purpose: an open Select
+  // catches Escape in the capture phase and stops it, so Escape closes the
+  // popover first, the sheet second.
+  useEffect(() => {
+    const me = {}
+    openSheets.push(me)
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !e.isComposing) onClose()
+      if (e.isComposing || openSheets[openSheets.length - 1] !== me) return
+      if (e.key === 'Escape') closeRef.current()
+      else if (e.key === 'Enter' && e.metaKey && submitRef.current) {
+        e.preventDefault()
+        submitRef.current()
+      }
     }
     document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      openSheets.splice(openSheets.indexOf(me), 1)
+    }
+  }, [])
 
   return (
     // Centred by flex, never by translate: a transformed ancestor becomes the

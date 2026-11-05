@@ -83,6 +83,23 @@ const iTermScript = `on run argv
 	end tell
 end run`
 
+// iTermStackScript opens one stack step: item 2 of argv is "window", "tab" or
+// "split" (beside the current pane). Like iTermScript, nothing is spliced in.
+const iTermStackScript = `on run argv
+	set p to item 1 of argv
+	set zishPlace to item 2 of argv
+	tell application id "com.googlecode.iterm2"
+		activate
+		if (count of windows) is 0 or zishPlace is "window" then
+			create window with default profile command p
+		else if zishPlace is "split" then
+			tell current session of current window to split vertically with default profile command p
+		else
+			tell current window to create tab with default profile command p
+		end if
+	end tell
+end run`
+
 const ghosttyScript = `on run argv
 	set p to item 1 of argv
 	tell application id "com.mitchellh.ghostty"
@@ -166,4 +183,32 @@ func TabSupported(t Terminal, app AppInfo) bool {
 		return versionAtLeast(app.Version, 1, 3)
 	}
 	return t.SupportsTab
+}
+
+// StepMode is how a stack step opens: "window", "tab" or "split". A split
+// needs iTerm2 and a pane opened earlier by the same stack; tabs need an app
+// that has them. Everything else falls back to a tab, then a window.
+func StepMode(termID string, tabs bool, placement domain.Placement, first bool) string {
+	switch {
+	case placement == domain.PlaceWindow:
+		return "window"
+	case placement == domain.PlaceSplit && termID == domain.TerminalITerm2 && !first:
+		return "split"
+	case tabs:
+		return "tab"
+	}
+	return "window"
+}
+
+// StackCommands is OpenCommands for a stack step, mode from StepMode. iTerm2
+// gets the stack script, which can split; if Automation is refused it opens a
+// window like any other launch.
+func StackCommands(id string, app AppInfo, script, mode string) ([]Attempt, error) {
+	if id != domain.TerminalITerm2 {
+		return OpenCommands(id, app, script, mode != "window")
+	}
+	return []Attempt{
+		{Argv: []string{osaPath, "-e", iTermStackScript, script, mode}, Wait: openWait},
+		{Argv: []string{openPath, "-b", "com.googlecode.iterm2", script}, Wait: openWait},
+	}, nil
 }

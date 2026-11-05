@@ -61,7 +61,7 @@ export function GenerateKeyModal({ onClose, onDone, raised }: Props) {
         <div className="flex flex-col gap-[5px]">
           <span className={fieldLabel}>Type</span>
           <Select ariaLabel="Key type" value={kind} options={KEY_KINDS.map((k) => ({ ...k }))} onChange={setKind} />
-          {kind === 'rsa-4096' && <span className="text-[11px] text-textDim">RSA keys take a few seconds to generate.</span>}
+          {kind === 'rsa-4096' && <span className="text-[11px] text-tx3">RSA keys take a few seconds to generate.</span>}
         </div>
         <label className="flex flex-col gap-[5px]">
           <span className={fieldLabel}>Comment</span>
@@ -74,17 +74,17 @@ export function GenerateKeyModal({ onClose, onDone, raised }: Props) {
         </label>
         <div className="flex items-start gap-[10px]">
           <div className="min-w-0 flex-1">
-            <div className="text-[12.5px] text-text">Confirm every use</div>
-            <div className="mt-[2px] text-[11px] leading-[1.45] text-textDim">
+            <div className="text-[12.5px] text-tx">Confirm every use</div>
+            <div className="mt-[2px] text-[11px] leading-[1.45] text-tx3">
               Touch ID or your Mac password before each signature.
             </div>
           </div>
-          <Toggle on={confirm} onChange={setConfirm} />
+          <Toggle on={confirm} onChange={setConfirm} label="Confirm every use" />
         </div>
-        <div className="text-[11px] leading-[1.45] text-textDim">
+        <div className="text-[11px] leading-[1.45] text-tx3">
           Keys created in Zish stay in Zish. To have a backup, generate the key with ssh-keygen and import it.
         </div>
-        {(error || (name && invalid)) && <div className="text-[12px] text-stFailed">{error ?? invalid}</div>}
+        {(error || (name && invalid)) && <div className="text-[12px] text-bad">{error ?? invalid}</div>}
       </div>
     </KeyModal>
   )

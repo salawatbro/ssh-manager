@@ -94,6 +94,16 @@ func (v *Verifier) Matches(hostport string, key ssh.PublicKey) bool {
 	return cb(hostport, hostPortAddr(hostport), key) == nil
 }
 
+// Known reports whether known_hosts holds any key for hostport, re-reading
+// the file like Matches. It never prompts and never writes.
+func (v *Verifier) Known(hostport string) bool {
+	cb, err := v.fresh()
+	if err != nil {
+		return false
+	}
+	return len(cb.HostKeys(hostport)) > 0
+}
+
 // hostPortAddr is a net.Addr for knownhosts, which needs one only to split
 // it when no hostname is given.
 type hostPortAddr string

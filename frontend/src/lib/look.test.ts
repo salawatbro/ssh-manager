@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { ICONS, TINTS, autoColor, customLetters, defaultLetters, iconById, isTint, lettersIcon, markOf, resolveTint, tintVars } from './look'
+import {
+  ICONS,
+  NEW_SERVER_ICON,
+  TINTS,
+  autoColor,
+  customLetters,
+  defaultLetters,
+  iconById,
+  isTint,
+  lettersIcon,
+  markOf,
+  newServerLook,
+  resolveTint,
+  tintVars,
+} from './look'
 
 describe('icons', () => {
   it('has 24 icons with unique ids and path data', () => {
@@ -104,5 +118,14 @@ describe('custom letters', () => {
     expect(lettersIcon('   ')).toBe('')
     expect(customLetters('letters:')).toBeNull()
     expect(customLetters('rocket')).toBeNull()
+  })
+})
+
+describe('newServerLook', () => {
+  it('follows Settings › Appearance, defaulting to an icon and the group colour', () => {
+    expect(newServerLook(null)).toEqual({ icon: NEW_SERVER_ICON, color: '' })
+    expect(newServerLook({ iconStyle: 'icon', colorBy: 'group' })).toEqual({ icon: NEW_SERVER_ICON, color: '' })
+    expect(newServerLook({ iconStyle: 'letters', colorBy: 'none' })).toEqual({ icon: '', color: 'gray' })
+    expect(iconById(NEW_SERVER_ICON)).toBeDefined()
   })
 })

@@ -22,6 +22,13 @@ import * as forward$0 from "../forward/models.js";
 import * as $models from "./models.js";
 
 /**
+ * CheckPort tests 127.0.0.1:port the way a tunnel would bind it.
+ */
+export function CheckPort(port: number): $CancellablePromise<$models.PortCheck | null> {
+    return $Call.ByID(4294925067, port);
+}
+
+/**
  * Create validates the input and stores a new forward.
  */
 export function Create($in: $models.ForwardInput): $CancellablePromise<domain$0.PortForward | null> {
@@ -43,6 +50,14 @@ export function Delete(id: string): $CancellablePromise<void> {
  */
 export function List(serverID: string): $CancellablePromise<domain$0.PortForward[] | null> {
     return $Call.ByID(2919896880, serverID);
+}
+
+/**
+ * ListAll returns every saved tunnel with its server's name, status and
+ * traffic, for the Tunnels page.
+ */
+export function ListAll(): $CancellablePromise<$models.TunnelRow[] | null> {
+    return $Call.ByID(1410284259);
 }
 
 /**
@@ -85,11 +100,18 @@ export function Statuses(): $CancellablePromise<forward$0.Status[] | null> {
 }
 
 /**
- * Stop tears the tunnel down. Stopping an id that isn't running is a no-op
- * (forward.Manager.Stop's contract).
+ * Stop tears the tunnel down, or cancels its pending reconnect. Stopping an id
+ * that is neither is a no-op (forward.Manager.Stop's contract).
  */
 export function Stop(id: string): $CancellablePromise<void> {
     return $Call.ByID(1829380944, id);
+}
+
+/**
+ * StopAll stops every running tunnel and every pending reconnect.
+ */
+export function StopAll(): $CancellablePromise<void> {
+    return $Call.ByID(1133571779);
 }
 
 /**
@@ -97,4 +119,12 @@ export function Stop(id: string): $CancellablePromise<void> {
  */
 export function Update($in: $models.ForwardInput): $CancellablePromise<domain$0.PortForward | null> {
     return $Call.ByID(1750888361, $in);
+}
+
+/**
+ * UsePort moves a tunnel's listener on this Mac to port and starts it — the
+ * busy-port row's "Use N instead".
+ */
+export function UsePort(id: string, port: number): $CancellablePromise<void> {
+    return $Call.ByID(3148245412, id, port);
 }

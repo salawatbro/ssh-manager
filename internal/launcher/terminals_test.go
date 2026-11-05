@@ -63,7 +63,7 @@ func TestOpenCommands(t *testing.T) {
 // The AppleScript sources are constants: the script path only ever travels
 // as an osascript argument.
 func TestAppleScriptSourcesAreConstant(t *testing.T) {
-	for _, src := range []string{iTermScript, ghosttyScript} {
+	for _, src := range []string{iTermScript, iTermStackScript, ghosttyScript} {
 		if strings.Contains(src, scriptPath) || strings.Contains(src, "connect.command") || strings.Contains(src, "%") {
 			t.Fatalf("script source carries data:\n%s", src)
 		}
@@ -95,5 +95,57 @@ func TestVersionAtLeast(t *testing.T) {
 		if got := versionAtLeast(v, 1, 3); got != want {
 			t.Errorf("versionAtLeast(%q) = %v", v, got)
 		}
+	}
+}
+
+func TestStepMode(t *testing.T) {
+	cases := []struct {
+		term      string
+		tabs      bool
+		placement domain.Placement
+		first     bool
+		want      string
+	}{
+		{domain.TerminalITerm2, true, domain.PlaceSplit, false, "split"},
+		{domain.TerminalITerm2, true, domain.PlaceSplit, true, "tab"},
+		{domain.TerminalITerm2, true, domain.PlaceTab, true, "tab"},
+		{domain.TerminalITerm2, true, domain.PlaceWindow, false, "window"},
+		{domain.TerminalGhostty, true, domain.PlaceSplit, false, "tab"},
+		{domain.TerminalGhostty, false, domain.PlaceTab, false, "window"},
+		{domain.TerminalApple, false, domain.PlaceSplit, false, "window"},
+		{domain.TerminalWezTerm, true, domain.PlaceWindow, false, "window"},
+	}
+	for _, c := range cases {
+		if got := StepMode(c.term, c.tabs, c.placement, c.first); got != c.want {
+			t.Errorf("StepMode(%s, tabs=%v, %s, first=%v) = %s, want %s", c.term, c.tabs, c.placement, c.first, got, c.want)
+		}
+	}
+}
+
+// The split script is a constant: the launch script path and the placement
+// are osascript arguments, never part of the source.
+func TestStackCommands(t *testing.T) {
+	app := AppInfo{Path: "/Applications/iTerm.app", Version: "3.5"}
+	for _, mode := range []string{"window", "tab", "split"} {
+		got, err := StackCommands(domain.TerminalITerm2, app, scriptPath, mode)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := [][]string{{osaPath, "-e", iTermStackScript, scriptPath, mode}, {openPath, "-b", "com.googlecode.iterm2", scriptPath}}
+		if g := argvs(got); !slices.EqualFunc(g, want, slices.Equal[[]string]) {
+			t.Errorf("%s: %q", mode, g)
+		}
+	}
+	if strings.Contains(iTermStackScript, "connect.command") || !strings.Contains(iTermStackScript, "item 2 of argv") ||
+		!strings.Contains(iTermStackScript, "split vertically with default profile command p") {
+		t.Fatal("iTermStackScript must take its values from argv")
+	}
+	got, err := StackCommands(domain.TerminalGhostty, AppInfo{Version: "1.3"}, scriptPath, "tab")
+	if err != nil || len(got) != 2 || got[0].Argv[2] != ghosttyScript || got[0].Argv[4] != "tab" {
+		t.Fatalf("ghostty tab = %q, %v", argvs(got), err)
+	}
+	got, _ = StackCommands(domain.TerminalGhostty, AppInfo{Version: "1.3"}, scriptPath, "window")
+	if got[0].Argv[4] != "window" {
+		t.Fatalf("ghostty window = %q", argvs(got))
 	}
 }

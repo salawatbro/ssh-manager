@@ -3,7 +3,9 @@
 
 import * as BiometricService from "./biometricservice.js";
 import * as DataService from "./dataservice.js";
+import * as LauncherWindowService from "./launcherwindowservice.js";
 export {
     BiometricService,
-    DataService
+    DataService,
+    LauncherWindowService
 };

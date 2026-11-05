@@ -7,6 +7,9 @@ export interface SelectOption<T extends string | number> {
   // Optional leading node (e.g. an environment colour swatch), shown in the
   // trigger for the selected value and in every option row while choosing.
   adornment?: ReactNode
+  // Optional node after the label (e.g. an environment chip), in the trigger
+  // and in the option row.
+  trailing?: ReactNode
   // Shown but not choosable (e.g. a terminal app that isn't installed).
   disabled?: boolean
 }
@@ -77,6 +80,7 @@ export function Select<T extends string | number>({ value, options, onChange, ar
       >
         {selected?.adornment}
         <span className="min-w-0 flex-1 truncate text-left text-[13px]">{selected?.label ?? ''}</span>
+        {selected?.trailing}
         <ChevronDown size={14} className={`shrink-0 text-tx3 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -114,6 +118,7 @@ export function Select<T extends string | number>({ value, options, onChange, ar
                   >
                     {opt.adornment}
                     <span className="min-w-0 flex-1 truncate">{opt.label}</span>
+                    {opt.trailing}
                     {isSel && <Check size={13} strokeWidth={2.4} className="shrink-0 text-acc-tx" />}
                   </button>
                 </li>

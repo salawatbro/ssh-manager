@@ -8,8 +8,10 @@ import * as ImportService from "./importservice.js";
 import * as LauncherService from "./launcherservice.js";
 import * as LockService from "./lockservice.js";
 import * as SSHService from "./sshservice.js";
+import * as SecurityService from "./securityservice.js";
 import * as ServerService from "./serverservice.js";
 import * as SettingsService from "./settingsservice.js";
+import * as StackService from "./stackservice.js";
 import * as UninstallService from "./uninstallservice.js";
 export {
     AgentService,
@@ -19,14 +21,18 @@ export {
     LauncherService,
     LockService,
     SSHService,
+    SecurityService,
     ServerService,
     SettingsService,
+    StackService,
     UninstallService
 };
 
 export type {
     AgentSnippet,
     AgentStatus,
+    ApprovalHost,
+    ApprovalRequest,
     CodeRequest,
     CreateServerInput,
     ForwardInput,
@@ -34,12 +40,23 @@ export type {
     HostKeyRequest,
     ImportItem,
     ImportKeyInput,
+    ImportPick,
     ImportPreview,
     KeyFileInfo,
+    LockStatus,
     OpenResult,
     PlatformInfo,
+    PortCheck,
+    SecurityCheck,
+    SecurityItem,
+    SecurityReport,
+    StackInput,
+    StackLaunch,
+    StackLaunched,
+    StackStepInput,
     TempKeyView,
     TerminalOption,
     TestResult,
-    TrayConnect
+    TrayConnect,
+    TunnelRow
 } from "./models.js";

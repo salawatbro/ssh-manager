@@ -31,6 +31,16 @@ func (r *ForwardRepo) List(serverID string) ([]domain.PortForward, error) {
 	return forwards, nil
 }
 
+// ListAll returns every saved forward, oldest first.
+func (r *ForwardRepo) ListAll() ([]domain.PortForward, error) {
+	var forwards []domain.PortForward
+	if err := r.db.Order("created_at").Find(&forwards).Error; err != nil {
+		return nil, fmt.Errorf(
+			"cannot read forwards; check the database file is readable and not locked by another instance: %w", err)
+	}
+	return forwards, nil
+}
+
 // Get returns one forward by ID, or domain.ErrNotFound.
 func (r *ForwardRepo) Get(id string) (*domain.PortForward, error) {
 	var f domain.PortForward
@@ -64,7 +74,7 @@ func (r *ForwardRepo) Create(f *domain.PortForward) error {
 func (r *ForwardRepo) Update(f *domain.PortForward) error {
 	res := r.db.Model(&domain.PortForward{}).
 		Where("id = ?", f.ID).
-		Select("name", "type", "bind_addr", "bind_port", "dest_host", "dest_port", "icon", "color", "updated_at").
+		Select("name", "type", "bind_addr", "bind_port", "dest_host", "dest_port", "icon", "color", "auto_start", "reconnect", "updated_at").
 		Updates(f)
 	if res.Error != nil {
 		return fmt.Errorf(

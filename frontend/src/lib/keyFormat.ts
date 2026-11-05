@@ -50,8 +50,3 @@ export function keyCommentError(comment: string): string | null {
   if (CONTROL.test(comment)) return 'Key comment must not contain control characters.'
   return null
 }
-
-// keyOptionLabel is how a key reads in a picker: "work · Ed25519".
-export function keyOptionLabel(k: { name: string; type: string; bits: number }): string {
-  return `${k.name} · ${keyTypeLabel(k.type, k.bits)}`
-}

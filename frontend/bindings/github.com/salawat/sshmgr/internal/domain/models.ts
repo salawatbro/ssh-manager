@@ -131,8 +131,27 @@ export enum ForwardType {
 };
 
 /**
+ * Placement is where a server step opens relative to the step before it.
+ */
+export enum Placement {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * The placements. PlaceSplit needs iTerm2; other terminals open it as a tab.
+     */
+    PlaceTab = "tab",
+    PlaceSplit = "split",
+    PlaceWindow = "window",
+};
+
+/**
  * PortForward is a saved tunnel definition attached to a server. It carries no
- * secret (SEC-01) — it only names ports and hosts.
+ * secret (SEC-01) — it only names ports and hosts. AutoStart brings it up when
+ * Zish starts (after unlock when the App Lock is on); Reconnect brings it back
+ * after it drops on its own.
  */
 export interface PortForward {
     "id": string;
@@ -145,6 +164,8 @@ export interface PortForward {
     "destPort": number;
     "icon": string;
     "color": string;
+    "autoStart": boolean;
+    "reconnect": boolean;
     "createdAt": string;
     "updatedAt": string;
 }
@@ -273,4 +294,134 @@ export interface Settings {
      * signing (tunnels, Test connection) works either way.
      */
     "agentEnabled": boolean;
+
+    /**
+     * GrantDefault is the approval length the approval window picks first.
+     */
+    "grantDefault": string;
+
+    /**
+     * GrantNeverProd keeps production servers out of approvals: each signature
+     * for one asks again.
+     */
+    "grantNeverProd": boolean;
+
+    /**
+     * RotateReminderDays is the key age the Security check flags; 0 = never.
+     */
+    "rotateReminderDays": number;
+
+    /**
+     * SecurityIgnored lists the Security check ids the user chose to ignore,
+     * comma-separated.
+     */
+    "securityIgnored": string;
+
+    /**
+     * LauncherHotkey opens the launcher from any app, in canonical shortcut
+     * form ("alt+space"); "" turns it off.
+     */
+    "launcherHotkey": string;
+
+    /**
+     * LockOnSleep engages the App Lock when the Mac sleeps, its display
+     * sleeps or the screen locks. Only with Require unlock on and a PIN set.
+     */
+    "lockOnSleep": boolean;
+
+    /**
+     * Appearance. Theme drives the pages' palette and NSApp's appearance.
+     */
+    "theme": string;
+    "density": string;
+    "iconStyle": string;
+    "colorBy": string;
+
+    /**
+     * MenuIcons shows icon tiles in the launcher.
+     */
+    "menuIcons": boolean;
+
+    /**
+     * Tunnels. TunnelsReconnect is the master switch over every tunnel's
+     * own Reconnect; TunnelsKeepWhileLocked off stops every tunnel on lock.
+     */
+    "tunnelsAutoStart": boolean;
+    "tunnelsReconnect": boolean;
+    "tunnelsKeepWhileLocked": boolean;
+    "tunnelsNotify": boolean;
+    "tunnelsSuggestPort": boolean;
+
+    /**
+     * OpenAgain is what opening an already-open server should do.
+     */
+    "openAgain": string;
 }
+
+/**
+ * Stack opens several tunnels and servers in one go. Tunnels start first, then
+ * servers open in Position order. LastLaunchedAt and SortOrder are lifecycle
+ * fields: a form save never writes them.
+ */
+export interface Stack {
+    "id": string;
+    "name": string;
+    "description": string;
+    "icon": string;
+    "color": string;
+
+    /**
+     * Shortcut is a global hot key in canonical form ("alt+cmd+1"), or "".
+     */
+    "shortcut": string;
+    "inMenuBar": boolean;
+
+    /**
+     * OneApproval asks once at launch and covers the stack's own signatures
+     * for a short while (agent.LaunchWindow). The column default is false on
+     * purpose: GORM skips a zero bool on insert and would store a true default.
+     */
+    "oneApproval": boolean;
+    "sortOrder": number;
+    "lastLaunchedAt": string | null;
+    "steps": StackStep[] | null;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * StackStep is one tunnel or server of a stack. Its server or forward row
+ * cascades: deleting either removes the step, never leaving it dangling.
+ */
+export interface StackStep {
+    "id": string;
+    "stackId": string;
+    "position": number;
+    "kind": StepKind;
+    "serverId": string | null;
+    "forwardId": string | null;
+    "placement": Placement;
+
+    /**
+     * RunCommand replaces the server's own run-after-connect line for this
+     * step; "" keeps the server's.
+     */
+    "runCommand": string;
+}
+
+/**
+ * StepKind says what a stack step opens.
+ */
+export enum StepKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * The step kinds: a saved tunnel started inside Zish, or a server opened in
+     * the terminal app.
+     */
+    StepTunnel = "tunnel",
+    StepServer = "server",
+};

@@ -9,6 +9,11 @@ import type {} from "../github.com/wailsapp/wails/v3/internal/eventdata.js";
 import "../github.com/wailsapp/wails/v3/internal/eventcreate.js";
 
 /**
+ * Name of the custom event "agent:grants".
+ */
+export const AgentGrants = "agent:grants";
+
+/**
  * Name of the custom event "agent:sign".
  */
 export const AgentSign = "agent:sign";
@@ -19,9 +24,24 @@ export const AgentSign = "agent:sign";
 export const AgentStatus = "agent:status";
 
 /**
+ * Name of the custom event "approval:close".
+ */
+export const ApprovalClose = "approval:close";
+
+/**
+ * Name of the custom event "approval:request".
+ */
+export const ApprovalRequest = "approval:request";
+
+/**
  * Name of the custom event "code:request".
  */
 export const CodeRequest = "code:request";
+
+/**
+ * Name of the custom event "forward:stats".
+ */
+export const ForwardStats = "forward:stats";
 
 /**
  * Name of the custom event "forward:status".
@@ -32,6 +52,31 @@ export const ForwardStatus = "forward:status";
  * Name of the custom event "hostkey:request".
  */
 export const HostkeyRequest = "hostkey:request";
+
+/**
+ * Name of the custom event "launcher:show".
+ */
+export const LauncherShow = "launcher:show";
+
+/**
+ * Name of the custom event "lock:changed".
+ */
+export const LockChanged = "lock:changed";
+
+/**
+ * Name of the custom event "servers:changed".
+ */
+export const ServersChanged = "servers:changed";
+
+/**
+ * Name of the custom event "stack:launched".
+ */
+export const StackLaunched = "stack:launched";
+
+/**
+ * Name of the custom event "theme:changed".
+ */
+export const ThemeChanged = "theme:changed";
 
 /**
  * Name of the custom event "tray:connect".

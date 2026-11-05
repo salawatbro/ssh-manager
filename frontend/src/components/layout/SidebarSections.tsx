@@ -1,10 +1,14 @@
 import { useMemo, type ReactNode } from 'react'
-import { KeyRound, Server } from 'lucide-react'
+import { ArrowLeftRight, KeyRound, Layers, Server, ShieldCheck } from 'lucide-react'
 import { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useServers } from '../../stores/servers'
+import { useForwards } from '../../stores/forwards'
 import { useKeys } from '../../stores/keys'
+import { useSecurity } from '../../stores/security'
+import { useStacks } from '../../stores/stacks'
 import { useSidebar } from '../../stores/sidebar'
 import { useView } from '../../stores/view'
+import { openCount } from '../../lib/security'
 import { allTags } from '../../lib/sidebarFilter'
 import { groupSummaries, sameScope, type Scope } from '../../lib/serverList'
 
@@ -18,17 +22,36 @@ export function SidebarNav() {
   const allScope = useSidebar((s) => s.scope.kind === 'all')
   const serverCount = useServers((s) => s.servers.length)
   const keyCount = useKeys((s) => s.keys.length)
+  const stackCount = useStacks((s) => s.stacks.length)
+  const tunnelCount = useForwards((s) => s.rows.length)
+  const runningCount = useForwards((s) => s.rows.filter((r) => s.statusById[r.forward.id]?.state === 'running').length)
+  const securityLeft = useSecurity((s) => openCount(s.report))
   return (
     <nav aria-label="Library" className="flex flex-col gap-[1px]">
       <NavItem
         icon={<Server size={15} strokeWidth={1.8} />}
         label="Servers"
         count={serverCount}
-        active={section === 'servers' && allScope}
+        active={(section === 'servers' || section === 'welcome') && allScope}
         onClick={() => {
           useSidebar.getState().setScope({ kind: 'all' })
           useView.getState().showServers()
         }}
+      />
+      <NavItem
+        icon={<Layers size={15} strokeWidth={1.8} />}
+        label="Stacks"
+        count={stackCount}
+        active={section === 'stacks'}
+        onClick={() => useView.getState().showStacks()}
+      />
+      <NavItem
+        icon={<ArrowLeftRight size={15} strokeWidth={1.8} />}
+        label="Tunnels"
+        count={runningCount || tunnelCount}
+        dot={runningCount > 0}
+        active={section === 'tunnels'}
+        onClick={() => useView.getState().showTunnels()}
       />
       <NavItem
         icon={<KeyRound size={15} strokeWidth={1.8} />}
@@ -37,11 +60,28 @@ export function SidebarNav() {
         active={section === 'keys'}
         onClick={() => useView.getState().showKeys()}
       />
+      <NavItem
+        icon={<ShieldCheck size={15} strokeWidth={1.8} />}
+        label="Security"
+        badge={securityLeft}
+        active={section === 'security'}
+        onClick={() => useView.getState().showSecurity()}
+      />
     </nav>
   )
 }
 
-function NavItem(props: { icon: ReactNode; label: string; count: number; active: boolean; onClick: () => void }) {
+// dot: the count is of running things (the Tunnels item). badge: things to
+// fix, in amber, shown only when there are some (the Security item).
+function NavItem(props: {
+  icon: ReactNode
+  label: string
+  count?: number
+  dot?: boolean
+  badge?: number
+  active: boolean
+  onClick: () => void
+}) {
   return (
     <button
       type="button"
@@ -53,7 +93,20 @@ function NavItem(props: { icon: ReactNode; label: string; count: number; active:
     >
       {props.icon}
       <span className="flex-1 text-left">{props.label}</span>
-      <span className="text-[11.5px] font-normal text-tx2">{props.count}</span>
+      {props.count !== undefined && (
+        <span className="flex items-center gap-[5px] text-[11.5px] font-normal text-tx2">
+          {props.dot && <span aria-label="running" className="h-[6px] w-[6px] rounded-full bg-ok" />}
+          {props.count}
+        </span>
+      )}
+      {!!props.badge && (
+        <span
+          aria-label={`${props.badge} to fix`}
+          className="flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-warn px-[5px] text-[10.5px] font-bold text-[#1d1400]"
+        >
+          {props.badge}
+        </span>
+      )}
     </button>
   )
 }

@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -102,6 +103,9 @@ type ServerService struct {
 	// unchanged.
 	forwards *store.ForwardRepo
 	stopper  forwardStopper
+	// stacks is nil until SetStackDeps; the export then carries no stacks.
+	stacks           *store.StackRepo
+	onStacksImported func()
 
 	// onServersChanged, when set (SetOnServersChanged), fires after any change
 	// to the server set the menu-bar tray reflects: SetPinned, Update, Delete.
@@ -512,13 +516,13 @@ func (s *ServerService) DetectKeys() ([]sshx.KeyInfo, error) {
 // ExportJSON writes all servers as JSON to path (FR-12 Data). Secrets stay in
 // the keychain; only server profiles are written.
 func (s *ServerService) ExportJSON(path string) error {
-	servers, err := s.repo.List()
+	f, err := s.exportFile()
 	if err != nil {
 		return err
 	}
-	b, err := ExportServersJSON(servers)
+	b, err := json.MarshalIndent(f, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot serialise the export: %w", err)
 	}
 	if err := os.WriteFile(path, b, 0o600); err != nil {
 		return domain.NewError(domain.CodeValidation, "Cannot write the export file. Check the folder is writable.")
@@ -526,30 +530,36 @@ func (s *ServerService) ExportJSON(path string) error {
 	return nil
 }
 
-// ImportJSON reads a server-JSON file, validates every entry (SEC-07), skips
-// duplicates (same host/port/user) — both against servers already in the
-// database and against ones created earlier in this same import — and
-// creates the rest. Returns the count created.
+// ImportJSON reads an export file, validates every entry (SEC-07), skips
+// duplicate servers (same host/port/user) — both against servers already in
+// the database and against ones created earlier in this same import — and
+// creates the rest, then the file's tunnels and stacks on them. Returns the
+// count of servers created.
 func (s *ServerService) ImportJSON(path string) (int, error) {
 	b, err := os.ReadFile(path) //nolint:gosec // user-chosen path via native dialog
 	if err != nil {
 		return 0, domain.NewError(domain.CodeValidation, "Cannot read the file.")
 	}
-	incoming, err := ParseServersJSON(b)
+	file, err := ParseExportJSON(b)
 	if err != nil {
 		return 0, err
 	}
+	incoming := file.Servers
 	existing, err := s.repo.List()
 	if err != nil {
 		return 0, err
 	}
 	count := 0
+	ids := map[string]string{}
 	for i := range incoming {
 		srv := incoming[i]
-		if serversDuplicate(existing, srv) {
+		if dup := serversDuplicate(existing, srv); dup != "" {
+			ids[srv.ID] = dup
 			continue
 		}
+		old := srv.ID
 		srv.ID = uuid.NewString()
+		ids[old] = srv.ID
 		srv.JumpID = nil // imported JSON may reference ids that don't exist here
 		if err := s.repo.Create(&srv); err != nil {
 			return count, err
@@ -559,16 +569,29 @@ func (s *ServerService) ImportJSON(path string) (int, error) {
 		// SAME file is also skipped, not just ones already in the database.
 		existing = append(existing, srv)
 	}
+	delete(ids, "")
+	forwards, err := s.importForwards(file.Forwards, ids)
+	if err != nil {
+		return count, err
+	}
+	if err := s.importStacks(file.Stacks, ids, forwards); err != nil {
+		return count, err
+	}
+	if len(file.Stacks) > 0 && s.onStacksImported != nil {
+		s.onStacksImported()
+	}
 	return count, nil
 }
 
-func serversDuplicate(existing []domain.Server, s domain.Server) bool {
+// serversDuplicate returns the id of a server with the same host, port and
+// user, or "".
+func serversDuplicate(existing []domain.Server, s domain.Server) string {
 	for _, e := range existing {
 		if e.Host == s.Host && e.Port == s.Port && e.User == s.User {
-			return true
+			return e.ID
 		}
 	}
-	return false
+	return ""
 }
 
 // toServer maps the input onto a domain server, applying defaults.

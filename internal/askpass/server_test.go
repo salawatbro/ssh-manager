@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -18,10 +19,11 @@ type fakeHandler struct {
 	reply    Reply
 	gotToken string
 	gotHint  string
+	gotPID   int
 }
 
-func (f *fakeHandler) Redeem(tok string) (Redeemed, error) {
-	f.gotToken = tok
+func (f *fakeHandler) RedeemFrom(tok string, pid int) (Redeemed, error) {
+	f.gotToken, f.gotPID = tok, pid
 	return f.redeem, f.err
 }
 
@@ -84,6 +86,9 @@ func TestServerRoundTrip(t *testing.T) {
 	tok := strings.Repeat("a", 64)
 	if err := exchange(path, Request{V: 1, Op: OpRedeem, Token: tok}, &rr, time.Second); err != nil {
 		t.Fatal(err)
+	}
+	if (runtime.GOOS == "darwin" || runtime.GOOS == "linux") && h.gotPID != os.Getpid() {
+		t.Errorf("handler got pid %d, want the client's %d", h.gotPID, os.Getpid())
 	}
 	if !rr.OK || rr.Argv[2] != "h" || rr.Env[EnvToken] != "t" || h.gotToken != tok {
 		t.Fatalf("redeem reply = %+v", rr)
