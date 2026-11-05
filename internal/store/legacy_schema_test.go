@@ -11,7 +11,7 @@ import (
 	"github.com/salawat/sshmgr/internal/domain"
 )
 
-// v150Schema is the DDL store.Open produced in v1.5.0, the last release with
+// v150Schema is the DDL store.Open produced in the 1.5 release, the last with
 // the embedded terminal, dumped verbatim from a real database. It carries the
 // tables and settings columns of features that no longer exist.
 var v150Schema = []string{
@@ -29,7 +29,7 @@ var v150Schema = []string{
 	"CREATE INDEX `idx_session_logs_server_id` ON `session_logs`(`server_id`)",
 }
 
-// writeLegacyDB creates a v1.5.0-shaped database at path, runs the extra
+// writeLegacyDB creates a 1.5-release-shaped database at path, runs the extra
 // statements (seed rows) and closes it, so store.Open sees it cold.
 func writeLegacyDB(t *testing.T, path string, seed ...string) {
 	t.Helper()
