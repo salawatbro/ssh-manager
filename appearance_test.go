@@ -31,13 +31,11 @@ func TestThemeAppearance(t *testing.T) {
 	}
 }
 
-func TestWindowColoursMatchTokens(t *testing.T) {
-	main, panel := windowColours(true)
-	if main != application.NewRGB(0x0c, 0x0d, 0x10) || panel != application.NewRGB(0x15, 0x17, 0x1c) {
-		t.Errorf("night colours = %v %v", main, panel)
+func TestWindowColourMatchesTokens(t *testing.T) {
+	if c := windowColour(true); c != application.NewRGB(0x0c, 0x0d, 0x10) {
+		t.Errorf("night colour = %v", c)
 	}
-	main, panel = windowColours(false)
-	if main != application.NewRGB(0xf6, 0xf6, 0xf8) || panel != application.NewRGB(0xff, 0xff, 0xff) {
-		t.Errorf("day colours = %v %v", main, panel)
+	if c := windowColour(false); c != application.NewRGB(0xf6, 0xf6, 0xf8) {
+		t.Errorf("day colour = %v", c)
 	}
 }

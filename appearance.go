@@ -38,12 +38,12 @@ func themeIsDark(theme string, systemDark bool) bool {
 	}
 }
 
-// windowColours are tokens.css `bg` (the main window) and `s1` (the launcher
-// and approval panels): a window shows this colour until its page paints, and
-// the fullscreen title band is painted with it.
-func windowColours(dark bool) (main, panel application.RGBA) {
+// windowColour is tokens.css `bg`: the main window shows it until its page
+// paints, and the fullscreen title band is painted with it. The launcher and
+// approval panels are transparent instead, so their pages draw the corners.
+func windowColour(dark bool) application.RGBA {
 	if dark {
-		return application.NewRGB(0x0c, 0x0d, 0x10), application.NewRGB(0x15, 0x17, 0x1c)
+		return application.NewRGB(0x0c, 0x0d, 0x10)
 	}
-	return application.NewRGB(0xf6, 0xf6, 0xf8), application.NewRGB(0xff, 0xff, 0xff)
+	return application.NewRGB(0xf6, 0xf6, 0xf8)
 }

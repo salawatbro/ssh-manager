@@ -95,7 +95,7 @@ export function LauncherApp() {
   }, [rows, current, lock.locked, act, hide])
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-[14px] border border-line2 bg-s1 text-tx">
+    <div className="flex h-full flex-col overflow-hidden rounded-[18px] border border-line2 bg-s1 text-tx">
       <div className="flex h-[52px] shrink-0 items-center gap-[10px] border-b border-line px-[16px]">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="shrink-0 text-acc">
           <path d="M13 2 4 14h7l-1 8 9-12h-7z" />

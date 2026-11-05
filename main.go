@@ -289,7 +289,7 @@ func main() {
 	if s, err := settingsService.Get(); err == nil {
 		startTheme = s.Theme
 	}
-	mainColour, panelColour := windowColours(themeIsDark(startTheme, systemIsDark()))
+	mainColour := windowColour(themeIsDark(startTheme, systemIsDark()))
 
 	// The theme reaches NSApp once it exists; Match macOS repaints the
 	// windows when the system appearance flips.
@@ -354,8 +354,8 @@ func main() {
 
 	// The approval panel is created hidden now so its page is loaded by the
 	// time the agent first asks; the launcher likewise for its first ⌥Space.
-	createApprovalWindow(app, panelColour)
-	createLauncherWindow(app, panelColour)
+	createApprovalWindow(app)
+	createLauncherWindow(app)
 
 	// Remap the red close button to hide-to-tray. Done on WindowShow — it fires
 	// once the native window and its traffic-light buttons exist (Application-

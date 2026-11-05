@@ -35,24 +35,25 @@ import (
 // main window over the terminal that asked.
 var approvalWindow atomic.Pointer[application.WebviewWindow]
 
-func createApprovalWindow(app *application.App, background application.RGBA) {
+func createApprovalWindow(app *application.App) {
 	w := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:             "approval",
-		Title:            "Zish approval",
-		Width:            380,
-		Height:           420,
-		Hidden:           true,
-		Frameless:        true,
-		DisableResize:    true,
-		AlwaysOnTop:      true,
-		InitialPosition:  application.WindowCentered,
-		BackgroundColour: background,
-		URL:              "/approval.html",
+		Name:            "approval",
+		Title:           "Zish approval",
+		Width:           380,
+		Height:          420,
+		Hidden:          true,
+		Frameless:       true,
+		DisableResize:   true,
+		AlwaysOnTop:     true,
+		InitialPosition: application.WindowCentered,
+		URL:             "/approval.html",
 		Mac: application.MacWindow{
 			WindowClass:      application.MacWindowClassPanel,
 			PanelPreferences: application.MacPanelPreferences{FloatingPanel: true, NonActivating: true},
 			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces |
 				application.MacWindowCollectionBehaviorFullScreenAuxiliary,
+			// An opaque window would fill the rounded corners back in.
+			Backdrop:     application.MacBackdropTransparent,
 			CornerRadius: 16,
 		},
 	})

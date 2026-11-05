@@ -13,25 +13,26 @@ import (
 const (
 	launcherWidth  = 560
 	launcherHeight = 364
+	// Matches the page's rounded-[18px] frame.
+	launcherRadius = 18
 )
 
 // launcherWindow is the ⌥Space window. It is created hidden at start so its
 // page is loaded by the first press.
 var launcherWindow atomic.Pointer[application.WebviewWindow]
 
-func createLauncherWindow(app *application.App, background application.RGBA) {
+func createLauncherWindow(app *application.App) {
 	w := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:             "launcher",
-		Title:            "Zish launcher",
-		Width:            launcherWidth,
-		Height:           launcherHeight,
-		Hidden:           true,
-		Frameless:        true,
-		DisableResize:    true,
-		AlwaysOnTop:      true,
-		InitialPosition:  application.WindowCentered,
-		BackgroundColour: background,
-		URL:              "/launcher.html",
+		Name:            "launcher",
+		Title:           "Zish launcher",
+		Width:           launcherWidth,
+		Height:          launcherHeight,
+		Hidden:          true,
+		Frameless:       true,
+		DisableResize:   true,
+		AlwaysOnTop:     true,
+		InitialPosition: application.WindowCentered,
+		URL:             "/launcher.html",
 		Mac: application.MacWindow{
 			// Non-activating, like the approval panel: it takes the keyboard
 			// without bringing the main window over the app in front.
@@ -39,7 +40,9 @@ func createLauncherWindow(app *application.App, background application.RGBA) {
 			PanelPreferences: application.MacPanelPreferences{FloatingPanel: true, NonActivating: true},
 			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces |
 				application.MacWindowCollectionBehaviorFullScreenAuxiliary,
-			CornerRadius: 14,
+			// An opaque window would fill the rounded corners back in.
+			Backdrop:     application.MacBackdropTransparent,
+			CornerRadius: launcherRadius,
 		},
 	})
 	launcherWindow.Store(w)

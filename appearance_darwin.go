@@ -65,18 +65,13 @@ func systemAppearanceChanged() {
 
 func repaintWindows() {
 	theme, _ := appliedTheme.Load().(string)
-	main, panel := windowColours(themeIsDark(theme, systemIsDark()))
+	main := windowColour(themeIsDark(theme, systemIsDark()))
 	application.InvokeAsync(func() {
 		if mainWindow != nil {
 			mainWindow.SetBackgroundColour(main)
 			// The fullscreen band was painted with the old window colour.
 			if mainWindow.IsFullscreen() {
 				fullscreenTitlebarChanged(true)
-			}
-		}
-		for _, w := range []*application.WebviewWindow{launcherWindow.Load(), approvalWindow.Load()} {
-			if w != nil {
-				w.SetBackgroundColour(panel)
 			}
 		}
 	})
