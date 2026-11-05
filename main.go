@@ -310,6 +310,13 @@ func main() {
 		interceptCloseButton()
 	})
 
+	mainWindow.OnWindowEvent(events.Mac.WindowDidEnterFullScreen, func(*application.WindowEvent) {
+		fullscreenTitlebarChanged(true)
+	})
+	mainWindow.OnWindowEvent(events.Mac.WindowWillExitFullScreen, func(*application.WindowEvent) {
+		fullscreenTitlebarChanged(false)
+	})
+
 	// Tray-lite: a menu-bar presence so the app is reachable while its window is
 	// hidden (by ⌘⇧S or the close button). A text label (not an icon) is the
 	// v0.4 identity — a proper template icon is v0.5 polish (docs/v0.5-notes.md).

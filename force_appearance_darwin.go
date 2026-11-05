@@ -14,11 +14,13 @@ static void forceDarkAppearance(void) {
 	// dialogs, scrollbars — dark, to match the graphite UI (UI-02: the app is
 	// dark). Wails only sets the *window* appearance (MacWindow.Appearance);
 	// the menu bar and fullscreen reveal follow NSApp's appearance, which
-	// there is no Wails option for — hence this native set. Runs on
-	// ApplicationStarted, after NSApp exists.
-	if (NSApp != nil) {
-		NSApp.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
-	}
+	// there is no Wails option for — hence this native set. Wails runs event
+	// listeners on goroutines, and AppKit only honours this on the main thread.
+	dispatch_async(dispatch_get_main_queue(), ^{
+		if (NSApp != nil) {
+			NSApp.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+		}
+	});
 }
 */
 import "C"
