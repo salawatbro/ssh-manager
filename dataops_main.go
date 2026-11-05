@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+
 	"gorm.io/gorm"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -52,6 +55,23 @@ func (d *DataService) BackupDatabase() error {
 	return service.BackupDatabase(d.db, path)
 }
 
+// PickKeyFile asks for a private key file to import into the Zish agent,
+// starting in ~/.ssh. It returns "" when cancelled.
+func (d *DataService) PickKeyFile() (string, error) {
+	dlg := application.Get().Dialog.OpenFile().
+		SetTitle("Import a private key").
+		CanChooseFiles(true).
+		ShowHiddenFiles(true)
+	if home, err := os.UserHomeDir(); err == nil {
+		dlg.SetDirectory(filepath.Join(home, ".ssh"))
+	}
+	path, err := dlg.PromptForSingleSelection()
+	if err != nil {
+		return "", nil // cancelled
+	}
+	return path, nil
+}
+
 // RevealDataFolder opens the app's data folder in the OS file manager.
 func (d *DataService) RevealDataFolder() error {
 	dir, err := platform.DataDir()
@@ -59,11 +79,4 @@ func (d *DataService) RevealDataFolder() error {
 		return err
 	}
 	return platform.RevealInFileManager(dir)
-}
-
-// OpenExternalURL opens an http/https URL (a link clicked in block-terminal
-// output) in the user's default browser. Scheme validation lives in
-// platform.OpenExternalURL — the URL comes from untrusted terminal output.
-func (d *DataService) OpenExternalURL(url string) error {
-	return platform.OpenExternalURL(url)
 }

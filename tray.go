@@ -10,7 +10,7 @@ import (
 // servers (each connects on click), then Quit. pinned is already filtered and
 // capped by service.PinnedForTray. connect is called with a server id when a
 // pinned entry is clicked; the wiring in main.go shows the window and asks the
-// frontend to open or focus that server. When nothing is pinned the middle
+// frontend to connect to that server. When nothing is pinned the middle
 // section (and its separators) is omitted, leaving the original Show/Quit menu.
 func buildTrayMenu(app *application.App, pinned []domain.Server, connect func(id string)) *application.Menu {
 	menu := app.NewMenu()

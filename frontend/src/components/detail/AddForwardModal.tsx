@@ -24,8 +24,8 @@ interface Props {
 export function AddForwardModal({ serverId, initial, onClose }: Props) {
   const server = useServers((s) => s.servers.find((x) => x.id === serverId))
 
-  // Esc closes, matching every other overlay in the app (ConfirmModal,
-  // PromptModal, GuardModal). Capture phase for the same reason UninstallModal
+  // Esc closes, matching every other overlay in the app. Capture phase for the
+  // same reason UninstallModal
   // uses it: the form's inputs must not swallow the key first.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {

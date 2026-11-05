@@ -37,3 +37,17 @@ func TestErrorUnwrapsThroughFmtErrorf(t *testing.T) {
 		t.Fatalf("errors.As failed to recover the code: %+v", de)
 	}
 }
+
+func TestLaunchErrorCodes(t *testing.T) {
+	for code, want := range map[string]string{
+		CodeTerminalNotFound: "ERR_TERMINAL_NOT_FOUND",
+		CodeTerminalLaunch:   "ERR_TERMINAL_LAUNCH",
+		CodeAutomationDenied: "ERR_AUTOMATION_DENIED",
+		CodeLaunchUnsafe:     "ERR_LAUNCH_UNSAFE",
+		CodeLauncherBusy:     "ERR_LAUNCHER_BUSY",
+	} {
+		if code != want {
+			t.Errorf("code = %q, want %q", code, want)
+		}
+	}
+}

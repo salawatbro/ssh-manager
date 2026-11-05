@@ -19,11 +19,6 @@
   --color-accentFg: #7fe6ef;
   --color-onAccent: #04252a;
 
-  --color-termFg: #cfd6de;
-  --color-termGreen: #6cc06c;
-  --color-termBlue: #5aa9d6;
-  --color-termGood: #5ac47a;
-
   /* Semantic — these do not change with the theme (TZ 12.1).
      Environment is always a square, status is always a circle (UI-11).
      Never reuse an env colour to mean anything but that environment. */
@@ -44,58 +39,6 @@
      always a circle (rounded-full). The two axes must never share a shape. */
   --radius-env: 2px;
 }
-
-/* Terminal "Graphite" ANSI theme (dizayn manbasi: TerminalPalette.dc.html).
-   Read at runtime by lib/termTheme.ts into xterm's ITheme — this is the single
-   source, so keep it in sync with the design brief, not with a second copy in
-   TS. Kept OUT of @theme on purpose: these are not Tailwind utilities. */
-:root {
-  --term-bg: #13161b;
-  --term-fg: #cfd6de;
-  --term-cursor: #35c9d6;
-  --term-cursor-accent: #04252a;
-  --term-selection: rgba(53, 201, 214, 0.28);
-
-  /* addon-search decorations. The addon requires #RRGGBB with no alpha, so
-     the match pair below is pre-blended against --term-bg rather than reusing
-     --term-selection (which carries alpha). The two ruler colours are
-     mandatory options, not optional like the backgrounds. The active-match
-     pair reuses the existing cursor/bright-cyan values via var() rather than
-     repeating the literals, so they can't drift from the palette. */
-  --term-find-match: #1f4a52;
-  --term-find-match-ruler: #2a7c86;
-  --term-find-active: var(--term-cursor);
-  --term-find-active-ruler: var(--term-bright-cyan);
-
-  --term-black: #2a313b;   --term-bright-black: #69727f;
-  --term-red: #e5544b;     --term-bright-red: #ff6f66;
-  --term-green: #6cc06c;   --term-bright-green: #86d986;
-  --term-yellow: #e0a92e;  --term-bright-yellow: #f2c65a;
-  --term-blue: #5aa9d6;    --term-bright-blue: #7fc0e8;
-  --term-magenta: #cf6bc9; --term-bright-magenta: #e08bd9;
-  --term-cyan: #35c9d6;    --term-bright-cyan: #7fe6ef;
-  --term-white: #98a3b2;   --term-bright-white: #dfe4ea;
-
-  /* Command-block decorations (OSC 133 gutter overlay) — additive to the ANSI
-     palette above, never a replacement for it. */
-  --term-block: #4b5563;   /* neutral command-block gutter bar */
-  --term-fail: #f2555a;    /* failed command bar + ✗ */
-  --term-dim: #6b7480;     /* duration text */
-}
-
-/* Block-terminal segment classes (emitted by lib/blockTerminal/ansi.ts). */
-.tc-fg  { color: var(--term-fg) }
-.tc-dim { color: var(--term-dim) }
-.tc-grn { color: var(--term-green) }
-.tc-yel { color: var(--term-yellow) }
-.tc-blu { color: var(--term-blue) }
-.tc-err { color: var(--term-fail) }
-.tc-mag { color: var(--term-magenta) }
-.tc-cyn { color: var(--term-cyan) }
-.tc-bold { font-weight: 600 }
-.tc-ul  { text-decoration: underline; text-underline-offset: 2px }
-.tc-lnk { color: var(--term-blue); cursor: pointer; text-decoration: underline dotted }
-.tc-lnk:hover { text-decoration-style: solid }
 
 /* Everything below participates in the normal cascade via @layer base, so that
    Tailwind utilities (which Tailwind itself emits into @layer utilities) can
@@ -208,21 +151,5 @@
   100% {
     opacity: 0;
     transform: scale(1.5);
-  }
-}
-
-/* TerminalPreview's caret in the Settings > Terminal live preview (dizayn
-   manbasi: Settings.dc.html). Referenced via Tailwind's arbitrary
-   `animate-[ssh-blink_1.1s_step-end_infinite]` utility, only when the
-   blink-cursor setting is on — a step-end blink, not a fade, to read as a
-   terminal caret rather than a pulsing dot. */
-@keyframes ssh-blink {
-  0%,
-  49% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0;
   }
 }

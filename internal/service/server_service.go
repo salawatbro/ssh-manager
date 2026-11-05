@@ -8,12 +8,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
-	"golang.org/x/crypto/ssh"
 
 	"github.com/salawat/sshmgr/internal/domain"
+	"github.com/salawat/sshmgr/internal/launcher"
 	"github.com/salawat/sshmgr/internal/secret"
 	"github.com/salawat/sshmgr/internal/sshx"
 	"github.com/salawat/sshmgr/internal/store"
@@ -27,6 +26,8 @@ type CreateServerInput struct {
 	User     string          `json:"user"`
 	AuthType domain.AuthType `json:"authType"`
 	KeyPath  string          `json:"keyPath"`
+	// AgentKeyID is the Zish agent key for AuthZishKey; ignored otherwise.
+	AgentKeyID *string `json:"agentKeyId"`
 	// Password and Passphrase go to the OS keychain and NEVER into the
 	// database (SEC-01). toServer() does not read them, so they cannot leak
 	// into a domain.Server. An empty value means "do not write / leave
@@ -69,7 +70,6 @@ type TestResult struct {
 // codes, the keychain rollback on Create).
 type Dialer interface {
 	Test(ctx context.Context, srv domain.Server, creds sshx.Credentials) (sshx.DialResult, error)
-	Dial(ctx context.Context, srv domain.Server, creds sshx.Credentials) (*ssh.Client, error)
 	DialChain(ctx context.Context, chain []sshx.Hop) (*sshx.Conn, error)
 }
 
@@ -102,6 +102,9 @@ type ServerService struct {
 	// to the server set the menu-bar tray reflects: SetPinned, Update, Delete.
 	// nil for every non-tray caller (all tests) — then notify is a no-op.
 	onServersChanged func()
+
+	// agent signs for Zish-key servers; nil until SetSignerSource.
+	agent *AgentService
 }
 
 // NewServerService wires the service to its repository, the keychain and
@@ -424,79 +427,16 @@ func (s *ServerService) SSHCommand(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	var jump *domain.Server
-	if srv.JumpID != nil {
-		j, err := s.repo.Get(*srv.JumpID)
-		if err != nil {
-			// jump_id is a RESTRICT foreign key with foreign_keys enforcement
-			// on, so domain.ErrNotFound here cannot happen through normal
-			// use — this fallback is cheap insurance in case that ever
-			// changes, not a real scenario today. Anything else reaching
-			// this point is a genuine infra fault (a locked or corrupt
-			// database) and must surface, not be silently swallowed into a
-			// command that's missing the -J the user actually needs.
-			if !errors.Is(err, domain.ErrNotFound) {
-				return "", err
-			}
-		} else {
-			jump = j
-		}
+	chain, err := resolveServers(s.repo, srv)
+	if err != nil {
+		return "", err
 	}
-	return SSHCommand(*srv, jump), nil
+	return launcher.RenderCommand(chain, s.agent.paths())
 }
 
 // Groups returns the distinct group names in use, for the sidebar headers.
 func (s *ServerService) Groups() ([]string, error) {
 	return s.repo.Groups()
-}
-
-// TOTPCodeView is one server's current verification code for the authenticator
-// panel. It carries the DERIVED code only — never the secret (SEC-01).
-type TOTPCodeView struct {
-	ServerID   string `json:"serverId"`
-	ServerName string `json:"serverName"`
-	Code       string `json:"code"`      // 6 digits
-	ExpiresIn  int    `json:"expiresIn"` // seconds until the 30s window rolls (1..30)
-}
-
-// TOTPCodes returns the current TOTP code for every server that has 2FA enabled
-// and a stored secret. Secrets stay in the keychain — only the derived codes are
-// returned (SEC-01). It is best-effort: a server whose secret is missing or
-// unreadable, or whose code fails to compute, is skipped rather than failing the
-// whole list.
-func (s *ServerService) TOTPCodes() ([]TOTPCodeView, error) {
-	servers, err := s.repo.List()
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now()
-	expiresIn := 30 - int(now.Unix()%30)
-	out := []TOTPCodeView{}
-	for i := range servers {
-		srv := servers[i]
-		if !srv.TwoFactor {
-			continue
-		}
-		secret, err := s.secret.GetTOTPSecret(srv.ID)
-		if err != nil {
-			continue // ErrNotStored or a keychain fault — skip (best-effort)
-		}
-		// secret is a local read only by TOTPCode and never retained past this
-		// iteration (Go can't scrub an immutable string's bytes anyway); it goes
-		// out of scope here and is GC'd — no copy is kept.
-		code, err := domain.TOTPCode(secret, now)
-		if err != nil {
-			continue
-		}
-		out = append(out, TOTPCodeView{
-			ServerID:   srv.ID,
-			ServerName: srv.Name,
-			Code:       code,
-			ExpiresIn:  expiresIn,
-		})
-	}
-	return out, nil
 }
 
 // TestConnection opens a connection to verify the server works (FR-04),
@@ -515,7 +455,7 @@ func (s *ServerService) TestConnection(id string) (*TestResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	creds, err := credsFor(s.secret, srv)
+	creds, err := credsFor(s.secret, s.agent.signers(), srv, "test connection")
 	if err != nil {
 		return failResult(err), nil
 	}
@@ -523,8 +463,8 @@ func (s *ServerService) TestConnection(id string) (*TestResult, error) {
 	res, dialErr := s.dialer.Test(context.Background(), *srv, creds)
 	// SEC-10: do not keep the plaintext secrets around after use. TOTPSecret
 	// too — credsFor attaches it for a 2FA server, and it is the longest-lived
-	// of the three seeds (mirrors zeroChainCreds on the Open path).
-	creds.Password, creds.Passphrase, creds.TOTPSecret = "", "", ""
+	// of the three seeds (mirrors zeroChainCreds on the tunnel path).
+	creds.Password, creds.Passphrase, creds.TOTPSecret, creds.AgentSigner = "", "", "", nil
 	if dialErr != nil {
 		return failResult(dialErr), nil
 	}
@@ -622,6 +562,11 @@ func (in CreateServerInput) toServer() *domain.Server {
 	if auth == "" {
 		auth = domain.AuthPassword
 	}
+	var agentKeyID *string
+	if auth == domain.AuthZishKey && in.AgentKeyID != nil {
+		id := strings.TrimSpace(*in.AgentKeyID)
+		agentKeyID = &id
+	}
 
 	return &domain.Server{
 		Name:        strings.TrimSpace(in.Name),
@@ -630,6 +575,7 @@ func (in CreateServerInput) toServer() *domain.Server {
 		User:        strings.TrimSpace(in.User),
 		AuthType:    auth,
 		KeyPath:     strings.TrimSpace(in.KeyPath),
+		AgentKeyID:  agentKeyID,
 		TwoFactor:   in.TwoFactor,
 		JumpID:      in.JumpID,
 		GroupName:   strings.TrimSpace(in.Group),

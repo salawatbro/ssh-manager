@@ -2,11 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { usePalette, type PaletteRowData } from '../../stores/palette'
 import { useServers } from '../../stores/servers'
-import { useSessions } from '../../stores/sessions'
-import { usePanes } from '../../stores/panes'
-import type { Status } from '../../lib/status'
-import { tabStatus } from '../../lib/tabStatus'
 import { searchServers } from '../../lib/fuzzy'
+import { openServer } from '../../lib/launch'
 import { PaletteRow } from './PaletteRow'
 import { paletteCommands } from './commands'
 import { ServerService } from '@bindings/github.com/salawat/sshmgr/internal/service'
@@ -15,39 +12,20 @@ import { toastError } from '../../stores/toasts'
 
 // The ⌘K command palette (FR-08). A quick-connect row when the input parses
 // as user@host[:port] (spec 2026-07-20), then servers (fuzzy / recency),
-// then app commands (v0.4: New server). Enter connects or runs the command;
-// ↑↓ move; Esc / backdrop close.
-export function CommandPalette({
-  onNewServer,
-}: {
-  onNewServer: () => void
-  // TunnelsPanel is per-server (dizayn manbasi: MainWindow.dc.html
-  // panel=tunnels), so the palette can only offer it for the currently
-  // selected server — see the `selectedId` filter below.
-}) {
+// then app commands. Enter connects or runs the command; ↑↓ move; Esc /
+// backdrop close.
+export function CommandPalette({ onNewServer }: { onNewServer: () => void }) {
   const open = usePalette((s) => s.open)
   const hide = usePalette((s) => s.hide)
   const servers = useServers((s) => s.servers)
   const selectedId = useServers((s) => s.selectedId)
-  // Both are the store's own array/record references (never a selector-built
-  // `.filter`/`.map` copy), so they stay identity-stable across renders per
-  // the Zustand v5 selector rule — only real state changes retrigger the
-  // `rows` memo below.
-  const tabs = useSessions((s) => s.tabs)
-  const paneStatus = usePanes((s) => s.paneStatus)
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
 
   const rows = useMemo<PaletteRowData[]>(() => {
-    // UI-11 status circle: a server with an open tab shows that tab's live
-    // status; otherwise it reads as disconnected, same as the sidebar.
-    const serverRows: PaletteRowData[] = searchServers(servers, q).map((server) => {
-      const tab = tabs.find((t) => t.serverId === server.id)
-      const status: Status = tab ? tabStatus(tab, paneStatus) : 'disc'
-      return { kind: 'server', server, status }
-    })
+    const serverRows: PaletteRowData[] = searchServers(servers, q).map((server) => ({ kind: 'server', server }))
     const ql = q.trim().toLowerCase()
-    const commands: PaletteRowData[] = paletteCommands({ onNewServer, selectedId, servers }).filter(
+    const commands: PaletteRowData[] = paletteCommands({ onNewServer, selectedId }).filter(
       (c) => !ql || c.label.toLowerCase().includes(ql),
     )
     // Quick connect is always row 0 when the input parses — Enter connects
@@ -57,7 +35,7 @@ export function CommandPalette({
       ? [{ kind: 'quick-connect', target, existingName: findExistingServer(servers, target)?.name }]
       : []
     return [...quickRows, ...serverRows, ...commands]
-  }, [servers, q, onNewServer, selectedId, tabs, paneStatus])
+  }, [servers, q, onNewServer, selectedId])
 
   useEffect(() => {
     setI(0)
@@ -77,21 +55,14 @@ export function CommandPalette({
     hide()
     setQ('')
     if (row.kind === 'server') {
-      useServers.getState().select(null)
-      useSessions.getState().open(row.server)
+      openServer(row.server.id)
     } else if (row.kind === 'command') {
-      // Same reasoning as the server branch above and runQuickConnect(): a
-      // command (e.g. "Local terminal") opens a tab in the content area, and
-      // a selected server's open ServerForm (392px) would otherwise cover it.
-      useServers.getState().select(null)
       row.run()
     } else {
       void runQuickConnect(row.target, {
         servers,
-        select: useServers.getState().select,
         create: ServerService.Create,
-        open: useSessions.getState().open,
-        openOrFocus: useSessions.getState().openOrFocus,
+        open: openServer,
         reload: useServers.getState().load,
         onError: toastError,
       })

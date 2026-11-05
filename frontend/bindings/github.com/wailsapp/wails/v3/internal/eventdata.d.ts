@@ -7,23 +7,22 @@ import type { Events } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import type * as domain$0 from "../../../../salawat/sshmgr/internal/domain/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import type * as forward$0 from "../../../../salawat/sshmgr/internal/forward/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import type * as service$0 from "../../../../salawat/sshmgr/internal/service/models.js";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import type * as term$0 from "../../../../salawat/sshmgr/internal/term/models.js";
 
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "agent:sign": domain$0.AgentSignEvent;
+            "agent:status": service$0.AgentStatus;
             "code:request": service$0.CodeRequest;
             "forward:status": forward$0.Status;
             "hostkey:request": service$0.HostKeyRequest;
-            "session:state": term$0.State;
-            "sftp:progress": service$0.SftpProgress;
-            "term:data": term$0.Output;
             "tray:connect": service$0.TrayConnect;
         }
     }

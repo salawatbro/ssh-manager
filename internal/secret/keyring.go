@@ -32,6 +32,10 @@ const totpSuffix = ":totp"
 // with a :passphrase / :totp suffix), so this reserved word cannot collide.
 const appLockAccount = "app-lock"
 
+// agentKeyPrefix prefixes the account of an agent private key ("agentkey:<id>").
+// It cannot collide with server UUID accounts or app-lock.
+const agentKeyPrefix = "agentkey:"
+
 // maxSecretBytes caps a stored secret. macOS allows ~2982 bytes for our
 // service/account lengths; Windows Credential Manager caps the blob at
 // 2560. Use the smaller so a secret that saves on macOS also saves on
@@ -62,11 +66,25 @@ type Store interface {
 	SetAppLockHash(hash string) error
 	GetAppLockHash() (string, error)
 	DeleteAppLockHash() error
+	// Agent private keys, as PKCS#8 DER.
+	SetAgentKey(keyID string, pkcs8 []byte) error
+	GetAgentKey(keyID string) ([]byte, error)
+	DeleteAgentKey(keyID string) error
 }
 
 func checkSize(secret string) error {
 	if len(secret) > maxSecretBytes {
 		return domain.NewError(domain.CodeValidation, "Secret is too long to store in the keychain.")
+	}
+	return nil
+}
+
+// ErrAgentKeyTooLarge rejects a private key that does not fit the Keychain item.
+var ErrAgentKeyTooLarge = domain.NewError(domain.CodeKeyImport, "Key is too large for the Keychain (RSA keys up to 4096 bits).")
+
+func checkAgentKeySize(pkcs8 []byte) error {
+	if len(pkcs8) == 0 || len(pkcs8) > maxSecretBytes {
+		return ErrAgentKeyTooLarge
 	}
 	return nil
 }
@@ -138,6 +156,29 @@ func (keyringStore) GetAppLockHash() (string, error) {
 // DeleteAppLockHash removes the app-lock hash (PIN removed / factory reset).
 func (keyringStore) DeleteAppLockHash() error {
 	return deleteIfPresent(appLockAccount)
+}
+
+// SetAgentKey stores an agent private key. go-keyring base64-encodes the
+// value on macOS, so raw DER bytes are safe.
+func (keyringStore) SetAgentKey(keyID string, pkcs8 []byte) error {
+	if err := checkAgentKeySize(pkcs8); err != nil {
+		return err
+	}
+	return mapSetErr(keyring.Set(Service, agentKeyPrefix+keyID, string(pkcs8)))
+}
+
+// GetAgentKey returns an agent private key, or ErrNotStored.
+func (keyringStore) GetAgentKey(keyID string) ([]byte, error) {
+	v, err := getWithTimeout(agentKeyPrefix + keyID)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(v), nil
+}
+
+// DeleteAgentKey removes an agent private key; a missing item is not an error.
+func (keyringStore) DeleteAgentKey(keyID string) error {
+	return deleteIfPresent(agentKeyPrefix + keyID)
 }
 
 func deleteIfPresent(account string) error {

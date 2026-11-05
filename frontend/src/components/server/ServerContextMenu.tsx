@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useServers } from '../../stores/servers'
-import { useSessions } from '../../stores/sessions'
-import { useSftp } from '../../stores/sftp'
+import { openServer } from '../../lib/launch'
 import { moveWithinGroup } from '../../lib/serverOrder'
 import { ContextMenu, type MenuEntry } from '../ui/ContextMenu'
 
@@ -27,7 +26,6 @@ export function ServerContextMenu({ server, x, y, onClose, onEdit, onTunnels, fi
   const copySSHCommand = useServers((s) => s.copySSHCommand)
   const remove = useServers((s) => s.remove)
   const setPinned = useServers((s) => s.setPinned)
-  const openSession = useSessions((s) => s.open)
   const servers = useServers((s) => s.servers)
   const setGroupOrder = useServers((s) => s.setGroupOrder)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -37,8 +35,7 @@ export function ServerContextMenu({ server, x, y, onClose, onEdit, onTunnels, fi
   const down = filtering ? null : moveWithinGroup(servers, server.group, server.id, 'down')
 
   const items: MenuEntry[] = [
-    { label: 'Open terminal', run: () => openSession(server) },
-    { label: 'Browse files (SFTP)', run: () => void useSftp.getState().openFor(server) },
+    { label: 'Connect', run: () => openServer(server.id) },
     { label: server.pinned ? 'Unpin from tray' : 'Pin to tray', run: () => void setPinned(server.id, !server.pinned) },
     // moveWithinGroup returns null (already at that edge of the group) or a non-empty reordered
     // list — never []. This `run` guard is a null guard, redundant with `disabled` only as

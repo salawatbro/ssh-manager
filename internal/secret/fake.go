@@ -1,5 +1,7 @@
 package secret
 
+import "sync"
+
 // Fake is an in-memory Store for tests. It is deliberately NOT the zalando
 // library's keyring.MockInit(): that swaps a package-level global and races
 // under -race across t.Parallel() tests (verified). A per-instance struct
@@ -9,12 +11,14 @@ type Fake struct {
 	phrase  map[string]string
 	totp    map[string]string
 	fail    error
-	appLock *string // nil means unset
+	appLock *string    // nil means unset
+	agentMu sync.Mutex // the agent reads keys from its own goroutines
+	agent   map[string][]byte
 }
 
 // NewFake returns an empty in-memory Store.
 func NewFake() *Fake {
-	return &Fake{pw: map[string]string{}, phrase: map[string]string{}, totp: map[string]string{}}
+	return &Fake{pw: map[string]string{}, phrase: map[string]string{}, totp: map[string]string{}, agent: map[string][]byte{}}
 }
 
 // FailWith makes every subsequent operation return err — used to exercise
@@ -131,4 +135,50 @@ func (f *Fake) DeleteAppLockHash() error {
 	}
 	f.appLock = nil
 	return nil
+}
+
+// SetAgentKey stores an agent private key in the fake.
+func (f *Fake) SetAgentKey(keyID string, pkcs8 []byte) error {
+	if f.fail != nil {
+		return f.fail
+	}
+	if err := checkAgentKeySize(pkcs8); err != nil {
+		return err
+	}
+	f.agentMu.Lock()
+	defer f.agentMu.Unlock()
+	f.agent[keyID] = append([]byte(nil), pkcs8...)
+	return nil
+}
+
+// GetAgentKey returns a stored agent private key, or ErrNotStored.
+func (f *Fake) GetAgentKey(keyID string) ([]byte, error) {
+	if f.fail != nil {
+		return nil, f.fail
+	}
+	f.agentMu.Lock()
+	defer f.agentMu.Unlock()
+	v, ok := f.agent[keyID]
+	if !ok {
+		return nil, ErrNotStored
+	}
+	return append([]byte(nil), v...), nil
+}
+
+// DeleteAgentKey removes a stored agent private key.
+func (f *Fake) DeleteAgentKey(keyID string) error {
+	if f.fail != nil {
+		return f.fail
+	}
+	f.agentMu.Lock()
+	defer f.agentMu.Unlock()
+	delete(f.agent, keyID)
+	return nil
+}
+
+// AgentKeyCount reports how many agent keys the fake holds.
+func (f *Fake) AgentKeyCount() int {
+	f.agentMu.Lock()
+	defer f.agentMu.Unlock()
+	return len(f.agent)
 }

@@ -167,3 +167,49 @@ func TestFakeAppLockHash(t *testing.T) {
 		t.Fatalf("GetAppLockHash after delete = %v, want ErrNotStored", err)
 	}
 }
+
+func TestFakeAgentKeyRoundTrip(t *testing.T) {
+	t.Parallel()
+	s := NewFake()
+	der := []byte{0x30, 0x00, 0xff, 0x0a, 0x00}
+	if err := s.SetAgentKey("k1", der); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetAgentKey("k1")
+	if err != nil || string(got) != string(der) {
+		t.Fatalf("GetAgentKey = %x, %v", got, err)
+	}
+	// Agent keys are separate from the server secrets of the same id.
+	if _, err := s.GetPassword("k1"); !errors.Is(err, ErrNotStored) {
+		t.Fatalf("password leaked: %v", err)
+	}
+	if err := s.DeleteAgentKey("k1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetAgentKey("k1"); !errors.Is(err, ErrNotStored) {
+		t.Fatalf("after delete: %v", err)
+	}
+}
+
+// An RSA-4096 PKCS#8 key is ~2.37 KB; anything past the 2560-byte item cap is
+// refused before it reaches the Keychain.
+func TestAgentKeySizeLimit(t *testing.T) {
+	t.Parallel()
+	if err := checkAgentKeySize(make([]byte, 2400)); err != nil {
+		t.Fatalf("2400 bytes refused: %v", err)
+	}
+	var de *domain.Error
+	if err := checkAgentKeySize(make([]byte, maxSecretBytes+1)); !errors.As(err, &de) || de.Code != domain.CodeKeyImport {
+		t.Fatalf("oversized: %v", err)
+	}
+	if err := checkAgentKeySize(nil); err == nil {
+		t.Fatal("empty key accepted")
+	}
+}
+
+func TestAgentKeyAccountPrefix(t *testing.T) {
+	t.Parallel()
+	if !strings.HasPrefix(agentKeyPrefix+"x", "agentkey:") || agentKeyPrefix+"x" == appLockAccount {
+		t.Fatal("agent key account must be agentkey:<id>")
+	}
+}

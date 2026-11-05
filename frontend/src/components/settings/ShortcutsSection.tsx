@@ -49,7 +49,7 @@ export function ShortcutsSection() {
       {rows.length === 0 && <div className="py-[13px] text-[12.5px] text-textDim">No shortcuts match “{filter}”.</div>}
 
       <div className="mt-[12px] text-[11.5px] text-textDim">
-        Shortcuts work while the terminal has focus and are never sent to the host. Rebinding arrives in a later version.
+        Shortcuts work while Zish has focus, except the system-wide one. Rebinding arrives in a later version.
       </div>
     </div>
   )

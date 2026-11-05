@@ -1,37 +1,37 @@
 import { useState } from 'react'
 import { useServers } from '../../stores/servers'
-import { useSessions } from '../../stores/sessions'
-import { useSftp } from '../../stores/sftp'
 import { useView } from '../../stores/view'
 import { useServerForm } from '../../stores/serverForm'
+import { useForwards } from '../../stores/forwards'
 import { parseTags } from '../../lib/sidebarFilter'
-import { detailFields, sshCommand, statusLabel, statusTextClass } from '../../lib/serverDetail'
+import { openServer } from '../../lib/launch'
+import { detailFields, statusLabel, statusTextClass } from '../../lib/serverDetail'
+import { useSSHCommand } from '../../hooks/useSSHCommand'
 import { envClassOf } from '../../lib/env'
 import { StatusDot } from '../server/StatusDot'
 import { ConnectionCard, DetailCard } from './ConnectionCard'
-import { HealthCard } from './HealthCard'
-import { RecentSessionsCard } from './RecentSessionsCard'
 import { TunnelCards } from './TunnelCards'
 
-// The server detail page (dizayn manbasi: Zish.dc.html `isDetail`) — the view a
-// single click on a sidebar row now opens. Everything on it is real model data;
-// the HEALTH and RECENT SESSIONS cards the design also shows need backend that
-// does not exist yet and land with it (docs/superpowers/redesign-plan.md §3).
+// The server detail page (dizayn manbasi: Zish.dc.html `isDetail`) — the main
+// view, opened by a single click on a sidebar row. Everything on it is real
+// model data.
 export function ServerDetail() {
   const detailId = useView((s) => s.detailId)
   const servers = useServers((s) => s.servers)
-  const tabs = useSessions((s) => s.tabs)
+  const forwards = useForwards((s) => (detailId ? s.byServer[detailId] : undefined))
+  const statusById = useForwards((s) => s.statusById)
   const [copied, setCopied] = useState(false)
 
   const server = servers.find((s) => s.id === detailId)
+  const cmd = useSSHCommand(server)
   if (!server) return <div className="flex-1 bg-bg0" />
 
-  // A live tab for this server is the only status the frontend can state
-  // truthfully today — the same signal the tab strip reads.
-  const status = tabs.some((t) => t.serverId === server.id) ? 'connected' : 'disc'
+  // A terminal session runs outside the app, so the only connection Zish can
+  // state truthfully is its own: a running tunnel.
+  const tunnelUp = (forwards ?? []).some((f) => statusById[f.id]?.state === 'running')
+  const status = tunnelUp ? 'connected' : 'disc'
   const jump = server.jumpId ? servers.find((s) => s.id === server.jumpId) : null
   const jumpName = jump ? `${jump.name} (${jump.user}@${jump.host})` : null
-  const cmd = sshCommand(server)
   const tags = parseTags(server.tags)
 
   function copyCmd() {
@@ -54,17 +54,10 @@ export function ServerDetail() {
           <div className="flex-1" />
           <button
             type="button"
-            onClick={() => useSessions.getState().open(server)}
+            onClick={() => openServer(server.id)}
             className="h-[28px] rounded-[6px] bg-accent px-[13px] text-[12px] font-medium text-onAccent"
           >
             Connect
-          </button>
-          <button
-            type="button"
-            onClick={() => void useSftp.getState().openFor(server)}
-            className="h-[28px] rounded-[6px] border border-borderStrong px-[11px] text-[12px] text-textMuted hover:text-text"
-          >
-            Open SFTP
           </button>
           <button
             type="button"
@@ -96,7 +89,12 @@ export function ServerDetail() {
             worth copying rather than reading. */}
         <div className="mt-[16px] flex h-[34px] items-center gap-[10px] rounded-[6px] border border-border bg-bg1 px-[11px]">
           <span className="shrink-0 text-[11px] text-textDim">$</span>
-          <span className="selectable min-w-0 flex-1 truncate font-mono text-[12px] text-text">{cmd}</span>
+          <span
+            className="selectable min-w-0 flex-1 truncate font-mono text-[12px] text-text"
+            title={server.jumpId ? 'Jump hosts use your ssh-agent or ~/.ssh/config for their keys.' : cmd}
+          >
+            {cmd}
+          </span>
           <button
             type="button"
             onClick={copyCmd}
@@ -114,8 +112,6 @@ export function ServerDetail() {
             <TunnelCards serverId={server.id} />
           </div>
           <div className="col-span-1 flex flex-col gap-4">
-            <HealthCard serverId={server.id} />
-            <RecentSessionsCard serverId={server.id} />
             <DetailCard title="Notes">
               <div className="px-[13px] py-[10px] text-[12.5px] leading-[1.5] text-textMuted">
                 {server.notes || 'No notes for this host.'}

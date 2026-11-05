@@ -9,12 +9,14 @@ interface LockState {
   refresh: () => Promise<void>
   lock: () => void
   unlock: () => void
+  unlockWithBiometrics: (reason: string) => Promise<boolean>
   setLocked: (v: boolean) => void
 }
 
-// Lock state for the whole app. `locked` drives the LockOverlay; `hasPin` and
-// `biometricsAvailable` are read from the backend at boot (and after the PIN is
-// set/removed) so the settings UI and the overlay show the right affordances.
+// Lock state for the whole app. The backend owns the truth (LockService's gate:
+// locking it also revokes every terminal auto-fill); `locked` mirrors it for
+// the LockOverlay. `hasPin` and `biometricsAvailable` are read at boot and
+// after the PIN is set/removed.
 export const useLock = create<LockState>((set, get) => ({
   locked: false,
   hasPin: false,
@@ -29,13 +31,22 @@ export const useLock = create<LockState>((set, get) => ({
   },
 
   // Engaging the lock only makes sense with a PIN set — otherwise there is no
-  // way back in. Callers (⌘L, idle, boot) rely on this guard.
+  // way back in. Callers (⌘L, idle) rely on this guard.
   lock() {
-    if (get().hasPin) set({ locked: true })
+    if (!get().hasPin) return
+    set({ locked: true })
+    void LockService.Lock().catch(() => {})
   },
 
+  // Only after the backend accepted the PIN (VerifyPin unlocks its gate).
   unlock() {
     set({ locked: false })
+  },
+
+  async unlockWithBiometrics(reason) {
+    const ok = await LockService.UnlockWithBiometrics(reason)
+    if (ok) set({ locked: false })
+    return ok
   },
 
   setLocked(v) {

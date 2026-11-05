@@ -4,14 +4,13 @@
 export {
     AuthType,
     Environment,
-    ForwardType,
-    SnippetScope
+    ForwardType
 } from "./models.js";
 
 export type {
+    AgentKey,
+    AgentSignEvent,
     PortForward,
     Server,
-    SessionLog,
-    Settings,
-    Snippet
+    Settings
 } from "./models.js";

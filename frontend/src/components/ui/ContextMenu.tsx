@@ -24,8 +24,8 @@ const SEP_H = 9
 
 // Reusable right-click menu: a full-screen backdrop that closes on any outside
 // click (and swallows an outside right-click so the browser menu never pops),
-// plus a positioned list of items. Extracted from ServerContextMenu so the
-// sidebar, terminal and SFTP panes share one implementation. Esc closes it;
+// plus a positioned list of items. Extracted from ServerContextMenu so every
+// right-click menu shares one implementation. Esc closes it;
 // the position is clamped so the menu never spills past the screen edge.
 export function ContextMenu({ x, y, items, onClose }: Props) {
   useEffect(() => {

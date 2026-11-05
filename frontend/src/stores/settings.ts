@@ -3,7 +3,7 @@ import { SettingsService } from '@bindings/github.com/salawat/sshmgr/internal/se
 import type { Settings } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { toastError } from './toasts'
 
-export type SettingsSection = 'general' | 'terminal' | 'shortcuts' | 'data' | 'snippets' | 'about'
+export type SettingsSection = 'general' | 'connect' | 'keys' | 'shortcuts' | 'data' | 'about'
 
 interface SettingsState {
   settings: Settings | null

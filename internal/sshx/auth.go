@@ -23,6 +23,9 @@ type Credentials struct {
 	// only by buildKIChallenge's keyboard-interactive answering (client.go),
 	// not by AuthMethods below.
 	TOTPSecret string
+	// AgentSigner signs for an AuthZishKey server through Zish's agent
+	// policy (confirmation, App Lock, sign log).
+	AgentSigner ssh.Signer
 }
 
 // AuthMethods builds the ordered auth methods for a server. The secrets
@@ -44,6 +47,11 @@ func AuthMethods(srv domain.Server, creds Credentials) ([]ssh.AuthMethod, error)
 			return nil, err
 		}
 		return []ssh.AuthMethod{m}, nil
+	case domain.AuthZishKey:
+		if creds.AgentSigner == nil {
+			return nil, domain.NewError(domain.CodeAgentKeyMissing, "This server's Zish key is missing. Choose another key for it.")
+		}
+		return []ssh.AuthMethod{ssh.PublicKeys(creds.AgentSigner)}, nil
 	default:
 		return nil, domain.NewError(domain.CodeValidation, "Unknown auth method.")
 	}

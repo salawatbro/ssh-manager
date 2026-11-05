@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Plus, Search, Settings, X } from 'lucide-react'
 import { ServerList } from '../server/ServerList'
+import { SectionSwitch } from './SectionSwitch'
 import { useSettings } from '../../stores/settings'
 import { useSidebar } from '../../stores/sidebar'
 import { useServers } from '../../stores/servers'
@@ -40,6 +41,9 @@ export function Sidebar({ onAdd }: Props) {
           empty; with text it yields to the × clear button. Esc and × both clear
           text AND selected tags in one gesture. */}
       <div className="shrink-0 border-b border-border px-[10px] pt-[10px] pb-3">
+        <div className="mb-[10px]">
+          <SectionSwitch />
+        </div>
         <div className="no-drag flex h-[28px] w-full items-center gap-[7px] rounded-[5px] border border-border bg-bg0 px-[9px] focus-within:border-borderStrong">
           <Search size={12} strokeWidth={2.2} className="shrink-0 text-textDim" />
           <input

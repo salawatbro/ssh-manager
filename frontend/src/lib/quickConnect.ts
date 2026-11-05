@@ -47,10 +47,8 @@ export function findExistingServer(servers: Server[], target: QuickConnectTarget
 
 export interface QuickConnectDeps {
   servers: Server[]
-  select: (id: string | null) => void
   create: (input: CreateServerInput) => Promise<Server | null>
-  open: (s: Server) => void
-  openOrFocus: (s: Server) => void
+  open: (serverId: string) => void
   reload: () => Promise<void>
   onError: (message: string) => void
 }
@@ -59,12 +57,9 @@ export interface QuickConnectDeps {
 // imported so the flow is exercised directly in tests; the component is left
 // with the call.
 export async function runQuickConnect(target: QuickConnectTarget, deps: QuickConnectDeps): Promise<void> {
-  // Close any open edit form so the terminal is visible, same as the server
-  // branch of the palette's choose().
-  deps.select(null)
   const existing = findExistingServer(deps.servers, target)
   if (existing) {
-    deps.openOrFocus(existing)
+    deps.open(existing.id)
     return
   }
   try {
@@ -75,6 +70,7 @@ export async function runQuickConnect(target: QuickConnectTarget, deps: QuickCon
       user: target.user,
       authType: AuthType.AuthAgent,
       keyPath: '',
+      agentKeyId: null,
       // Empty string = "do not write" (SEC-01) -- an agent server has no secret.
       password: '',
       passphrase: '',
@@ -87,7 +83,7 @@ export async function runQuickConnect(target: QuickConnectTarget, deps: QuickCon
       notes: '',
     })
     if (!created) return
-    deps.open(created)
+    deps.open(created.id)
     // Reload so the sidebar shows the new "Quick connects" row right away.
     await deps.reload()
   } catch (e) {

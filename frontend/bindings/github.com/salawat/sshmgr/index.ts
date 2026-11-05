@@ -3,9 +3,7 @@
 
 import * as BiometricService from "./biometricservice.js";
 import * as DataService from "./dataservice.js";
-import * as EditService from "./editservice.js";
 export {
     BiometricService,
-    DataService,
-    EditService
+    DataService
 };

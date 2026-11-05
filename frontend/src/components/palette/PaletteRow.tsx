@@ -42,9 +42,10 @@ export function PaletteRow({
       {row.kind === 'server' ? (
         <>
           {/* UI-11: env stays a square, status stays a circle — never the
-              same shape, even here where they sit side by side. */}
+              same shape, even here where they sit side by side. Like the
+              sidebar row, there is no live per-server status to show. */}
           <span className={`h-[8px] w-[8px] shrink-0 rounded-env ${envClassOf(row.server.environment)}`} />
-          <StatusDot status={row.status} size={7} />
+          <StatusDot status="disc" size={7} />
           <span className="min-w-0 flex-1 truncate text-[13.5px] text-text">{row.server.name || row.server.host}</span>
           <span className="shrink-0 truncate font-mono text-[11.5px] text-textDim">
             {row.server.user}@{row.server.host}

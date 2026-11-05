@@ -17,8 +17,8 @@ export function Toasts() {
   if (toasts.length === 0) return null
   return (
     // bottom = 6px root inset + 26px status bar + 12px gap. z-[70]: feedback
-    // sits above every overlay incl. the z-[60] guard modal — it hugs the
-    // corner, so it can never paint over a centered confirmation.
+    // sits above every overlay — it hugs the corner, so it can never paint
+    // over a centered confirmation.
     <div className="pointer-events-none fixed bottom-[44px] right-[12px] z-[70] flex flex-col items-end gap-[8px]">
       {toasts.map((t) => (
         <ToastCard key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />

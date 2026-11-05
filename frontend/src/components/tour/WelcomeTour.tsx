@@ -16,28 +16,28 @@ interface Slide {
 const slides: Slide[] = [
   {
     title: 'Welcome to Zish',
-    body: 'Store a host once, connect with one key press. Everything stays on this machine — no account, no telemetry. Passwords and keys live in the macOS Keychain.',
+    body: 'Keep every SSH server in one place and open it in the terminal you already use. Everything stays on this machine — no account, no telemetry. Passwords, passphrases and 2FA secrets live in the macOS Keychain.',
   },
   {
     title: 'The basics',
-    body: 'Add a server, then double-click it (or press Enter) to connect. Work across tabs (⌘1–9), split panes, and broadcast the same input to several sessions at once.',
+    body: 'Add a server, then double-click it (or select it and press Enter) to connect. Click once to see its details, copy its ssh command, or manage its tunnels.',
   },
   {
     title: 'Power features',
-    body: 'There is a lot under the hood:',
+    body: 'There is more under the hood:',
     bullets: [
-      '⌘K command palette — jump to any server or action',
-      'Right-click menus everywhere (terminal, files, sidebar)',
-      'SFTP file browser — drag files to and from the server',
+      '⌘K command palette — jump to any server, or type user@host to connect',
+      'Groups, tags and drag-to-reorder in the sidebar',
       'Port-forwarding tunnels (-L / -R / -D)',
-      '2FA / TOTP auto-fill · pin servers to the menu-bar tray',
+      'Pin servers to the menu-bar tray',
+      'Import from ~/.ssh/config · lock Zish with a PIN or Touch ID',
     ],
   },
 ]
 
 // First-run welcome tour: a 3-slide modal shown once (Settings.tourSeen) and
 // reopenable from ⌘K. Self-guards on the store's open flag so App mounts it
-// unconditionally (AuthenticatorPanel pattern). Esc/backdrop/Skip = finish.
+// unconditionally. Esc/backdrop/Skip = finish.
 export function WelcomeTour({ onAddServer }: Props) {
   const open = useTour((s) => s.open)
   const close = useTour((s) => s.close)

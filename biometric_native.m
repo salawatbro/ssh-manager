@@ -29,3 +29,29 @@ int sshmgrBiometricAuthenticate(const char *reason) {
   dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
   return result ? 1 : 0;
 }
+
+int sshmgrDeviceOwnerAuthenticate(const char *reason, int timeoutSecs) {
+  LAContext *ctx = [[LAContext alloc] init];
+  NSError *err = nil;
+  if (![ctx canEvaluatePolicy:LAPolicyDeviceOwnerAuthentication error:&err]) {
+    return -1;
+  }
+  dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+  __block BOOL result = NO;
+  NSString *r = [NSString stringWithUTF8String:reason];
+  [ctx evaluatePolicy:LAPolicyDeviceOwnerAuthentication
+      localizedReason:r
+                reply:^(BOOL success, NSError *replyErr) {
+                  result = success;
+                  dispatch_semaphore_signal(sem);
+                }];
+  dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW, (int64_t)timeoutSecs * NSEC_PER_SEC);
+  if (dispatch_semaphore_wait(sem, deadline) != 0) {
+    // Timed out: dismiss the prompt, then wait for its (failed) reply so the
+    // block never outlives this frame's state.
+    [ctx invalidate];
+    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+    return 0;
+  }
+  return result ? 1 : 0;
+}

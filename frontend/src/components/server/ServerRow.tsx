@@ -1,7 +1,7 @@
 import { Pin } from 'lucide-react'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { StatusDot } from './StatusDot'
-import { useSessions } from '../../stores/sessions'
+import { openServer } from '../../lib/launch'
 import type { RowDrag } from '../../hooks/useServerDrag'
 
 interface Props {
@@ -16,12 +16,10 @@ interface Props {
 }
 
 // One sidebar row (redesign: Zish.dc.html sidebar). 26px, single line: status
-// circle, name, then the target right-aligned in mono. The old 38px two-line
-// row carried a hover cluster with connect and tunnels buttons; both are gone —
-// a single click now opens the server's detail page, which has Connect, Open
-// SFTP and Edit as full buttons, and the right-click menu still has all three.
-// The row is quiet on purpose: at 26px an icon cluster crowds the target text,
-// and every action it held now has a better home.
+// circle, name, then the target right-aligned in mono. A single click opens the
+// server's detail page; double-click or Enter connects. The row is quiet on
+// purpose: at 26px an icon cluster crowds the target text, and every action it
+// could hold lives on the detail page and in the right-click menu.
 export function ServerRow({ server, selected, onSelect, onContextMenu, drag }: Props) {
   const target = `${server.user}@${server.host}${server.port === 22 ? '' : `:${server.port}`}`
 
@@ -45,7 +43,15 @@ export function ServerRow({ server, selected, onSelect, onContextMenu, drag }: P
       <button
         type="button"
         onClick={onSelect}
-        onDoubleClick={() => useSessions.getState().open(server)}
+        onDoubleClick={() => openServer(server.id)}
+        onKeyDown={(e) => {
+          // Enter connects; without preventDefault the button would also fire
+          // its click (select) for the same key press.
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            openServer(server.id)
+          }
+        }}
         onContextMenu={(e) => {
           e.preventDefault()
           onContextMenu(e.clientX, e.clientY)

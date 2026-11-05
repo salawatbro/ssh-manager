@@ -1,65 +1,32 @@
 import { useServers } from '../../stores/servers'
-import { useSessions } from '../../stores/sessions'
-import { useSftp } from '../../stores/sftp'
 import { useView } from '../../stores/view'
-import { pickMainView } from '../../lib/mainView'
 import { EmptyState } from '../EmptyState'
 import { ServerDetail } from '../detail/ServerDetail'
-import { FileEditor } from '../editor/FileEditor'
-import SftpView from '../sftp/SftpView'
-import { TerminalArea } from '../terminal/TerminalArea'
+import { KeysView } from '../keys/KeysView'
 
 interface Props {
-  formOpen: boolean
   onAdd: () => void
 }
 
-// Owns the content-area selection that used to be App.tsx's inline ternary.
-// SFTP and the terminal area are both kept MOUNTED and swapped with a `hidden`
-// class — the same trick TerminalArea uses for its inactive tabs, and for the
-// same reason: unmounting a terminal runs useTerminalSession's cleanup, which
-// calls SSHService.Close and drops the scrollback. Returning SftpView *instead
-// of* TerminalArea (as this did before) therefore killed every live session the
-// moment the user opened SFTP, and left the terminal tabs unreachable — the tab
-// strip changed selection with nothing happening on screen. Which one is in
-// front is decided by lib/mainView.ts (unit-tested).
-//
-// The detail page returns early like the empty hero does: it holds no session,
-// so unmounting it costs nothing, and it is opened/closed explicitly
-// (stores/view.ts).
-export function MainContent({ formOpen, onAdd }: Props) {
+// The content area: the Keys page, the first-run hero with no servers, the
+// selected server's detail page, or a quiet prompt to pick one.
+export function MainContent({ onAdd }: Props) {
   const serverCount = useServers((s) => s.servers.length)
-  const sftpOpen = useSftp((s) => s.open)
-  const sftpActive = useSftp((s) => s.active)
-  const terminalTabCount = useSessions((s) => s.tabs.length)
-  const detailOpen = useView((s) => s.detailId !== null)
-  const editorOpen = useView((s) => s.editor !== null)
+  const detailId = useView((s) => s.detailId)
+  const detailExists = useServers((s) => s.servers.some((srv) => srv.id === detailId))
+  const section = useView((s) => s.section)
 
-  const view = pickMainView({
-    serverCount,
-    formOpen,
-    sftpOpen,
-    sftpActive,
-    terminalTabCount,
-    detailOpen,
-    editorOpen,
-  })
-  if (view === 'empty') return <EmptyState onAdd={onAdd} />
-  if (view === 'detail') return <ServerDetail />
-  // Unmounting SftpView costs nothing — the session lives in the store, so
-  // closing the editor brings the panes back exactly as they were.
-  if (view === 'editor') return <FileEditor />
-
+  if (section === 'keys') return <KeysView />
+  if (serverCount === 0) return <EmptyState onAdd={onAdd} />
+  if (detailExists) return <ServerDetail />
   return (
-    <>
-      {sftpOpen && (
-        <div className={view === 'sftp' ? 'flex min-h-0 min-w-0 flex-1' : 'hidden'}>
-          <SftpView />
+    <div className="flex flex-1 items-center justify-center bg-bg0">
+      <div className="flex w-[360px] flex-col items-center text-center">
+        <div className="text-[15px] font-semibold text-text">No server selected</div>
+        <div className="mt-[6px] text-[12.5px] leading-[1.55] text-textMuted">
+          Pick a server in the sidebar to see its connection details and tunnels, or press ⌘K to jump to one.
         </div>
-      )}
-      <div className={view === 'terminal' ? 'flex min-h-0 min-w-0 flex-1' : 'hidden'}>
-        <TerminalArea />
       </div>
-    </>
+    </div>
   )
 }

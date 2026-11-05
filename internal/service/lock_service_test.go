@@ -10,7 +10,7 @@ import (
 
 func newPinSvc() (*LockService, *secret.Fake) {
 	f := secret.NewFake()
-	return NewLockService(f, nil, nil, nil, nil, nil), f
+	return NewLockService(f, nil, nil, nil, nil), f
 }
 
 func TestSetAndVerifyPin(t *testing.T) {
@@ -81,9 +81,6 @@ func TestResetAll(t *testing.T) {
 		t.Fatal(err)
 	}
 	servers := store.NewServerRepo(db)
-	snippets := store.NewSnippetRepo(db)
-	sessions := store.NewSessionStateRepo(db)
-	logs := store.NewSessionLogRepo(db)
 	settingsRepo := store.NewSettingsRepo(db)
 	f := secret.NewFake()
 
@@ -98,7 +95,7 @@ func TestResetAll(t *testing.T) {
 	_ = f.SetPassword(srv.ID, "secret")
 	_ = f.SetAppLockHash("some-hash")
 
-	svc := NewLockService(f, servers, snippets, sessions, logs, settingsRepo)
+	svc := NewLockService(f, servers, settingsRepo, nil, nil)
 	if err := svc.ResetAll(); err != nil {
 		t.Fatalf("ResetAll: %v", err)
 	}
@@ -115,5 +112,71 @@ func TestResetAll(t *testing.T) {
 	got, _ := settingsRepo.Get()
 	if got.LockEnabled {
 		t.Error("settings not reset to default (LockEnabled still true)")
+	}
+}
+
+type fakeBio struct{ ok bool }
+
+func (f fakeBio) Available() bool          { return true }
+func (f fakeBio) Authenticate(string) bool { return f.ok }
+
+func TestLockGateRunsListenersAndToggles(t *testing.T) {
+	g := NewLockGate(false)
+	fired := 0
+	g.OnLock(func() { fired++ })
+	g.Lock()
+	g.Lock()
+	if !g.Locked() || fired != 2 {
+		t.Fatalf("locked=%v fired=%d", g.Locked(), fired)
+	}
+	g.Unlock()
+	if g.Locked() {
+		t.Fatal("still locked")
+	}
+	if !NewLockGate(true).Locked() {
+		t.Fatal("NewLockGate(true) starts unlocked")
+	}
+}
+
+func TestLockServiceLocksOnlyWithAPin(t *testing.T) {
+	f := secret.NewFake()
+	gate := NewLockGate(false)
+	revoked := 0
+	gate.OnLock(func() { revoked++ })
+	svc := NewLockService(f, nil, nil, gate, nil)
+	svc.Lock()
+	if svc.IsLocked() || revoked != 0 {
+		t.Fatal("locked without a PIN")
+	}
+	if err := svc.SetPin("123456"); err != nil {
+		t.Fatal(err)
+	}
+	svc.Lock()
+	if !svc.IsLocked() || revoked != 1 {
+		t.Fatalf("locked=%v revoked=%d", svc.IsLocked(), revoked)
+	}
+	if ok, _ := svc.VerifyPin("000000"); ok || !svc.IsLocked() {
+		t.Fatal("wrong PIN unlocked the gate")
+	}
+	if ok, _ := svc.VerifyPin("123456"); !ok || svc.IsLocked() {
+		t.Fatal("right PIN did not unlock the gate")
+	}
+}
+
+func TestLockServiceBootLockedAndBiometrics(t *testing.T) {
+	gate := NewLockGate(true)
+	svc := NewLockService(secret.NewFake(), nil, nil, gate, fakeBio{ok: false})
+	if !svc.IsLocked() {
+		t.Fatal("boot lock lost")
+	}
+	if svc.UnlockWithBiometrics("Unlock Zish") || !svc.IsLocked() {
+		t.Fatal("failed Touch ID unlocked")
+	}
+	svc = NewLockService(secret.NewFake(), nil, nil, gate, fakeBio{ok: true})
+	if !svc.UnlockWithBiometrics("Unlock Zish") || svc.IsLocked() {
+		t.Fatal("Touch ID did not unlock")
+	}
+	if NewLockService(secret.NewFake(), nil, nil, NewLockGate(true), nil).UnlockWithBiometrics("x") {
+		t.Fatal("unlocked without biometrics")
 	}
 }

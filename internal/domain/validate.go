@@ -65,12 +65,20 @@ func (s *Server) Validate() error {
 	}
 
 	switch s.AuthType {
-	case AuthPassword, AuthKey, AuthAgent:
+	case AuthPassword, AuthKey, AuthAgent, AuthZishKey:
 	default:
-		return validationError("Auth method must be password, key, or agent.")
+		return validationError("Auth method must be password, key, agent, or a Zish key.")
 	}
 	if s.AuthType == AuthKey && s.KeyPath == "" {
 		return validationError("Key file is required when the auth method is key.")
+	}
+	if s.AuthType == AuthZishKey && (s.AgentKeyID == nil || strings.TrimSpace(*s.AgentKeyID) == "") {
+		return validationError("Choose a Zish key for this server.")
+	}
+	// A stray key id (e.g. a hand-edited JSON import) would make the key look
+	// in use by a server that never signs with it.
+	if s.AuthType != AuthZishKey {
+		s.AgentKeyID = nil
 	}
 
 	switch s.Environment {

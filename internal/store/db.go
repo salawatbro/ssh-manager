@@ -131,7 +131,11 @@ func Open(dbPath string) (*gorm.DB, error) {
 			"cannot set 0600 on %s-shm; check that you own it: %w", dbPath, err)
 	}
 
-	if err := db.AutoMigrate(&domain.Server{}, &domain.Settings{}, &domain.PortForward{}, &domain.Snippet{}, &domain.SessionLog{}, &domain.SessionState{}); err != nil {
+	// Tables and columns left behind by removed features (snippets,
+	// session_logs, session_states, terminal settings) are never dropped:
+	// AutoMigrate only adds, so an existing database keeps opening.
+	if err := db.AutoMigrate(&domain.Server{}, &domain.Settings{}, &domain.PortForward{},
+		&domain.AgentKey{}, &domain.AgentSignEvent{}); err != nil {
 		return nil, fmt.Errorf("cannot migrate the schema: %w", err)
 	}
 

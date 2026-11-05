@@ -107,23 +107,20 @@ describe('runQuickConnect', () => {
     // `vi.fn()`.
     const base = {
       servers: [] as Server[],
-      select: vi.fn(),
       create: vi.fn<(input: CreateServerInput) => Promise<Server | null>>(async () => server({ id: 'new' })),
       open: vi.fn(),
-      openOrFocus: vi.fn(),
       reload: vi.fn(async () => {}),
       onError: vi.fn(),
     }
     return Object.assign(base, over)
   }
 
-  it('focuses the existing server and creates nothing', async () => {
+  it('opens the existing server and creates nothing', async () => {
     const existing = server({ id: 'existing' })
     const d = deps({ servers: [existing] })
     await runQuickConnect(target, d)
-    expect(d.openOrFocus).toHaveBeenCalledWith(existing)
+    expect(d.open).toHaveBeenCalledWith('existing')
     expect(d.create).not.toHaveBeenCalled()
-    expect(d.open).not.toHaveBeenCalled()
   })
 
   it('creates an agent-auth server in Quick connects, opens it, then reloads', async () => {
@@ -140,7 +137,7 @@ describe('runQuickConnect', () => {
     // SEC-01: empty string means "do not write" -- an agent server has no secret.
     expect(payload.password).toBe('')
     expect(payload.passphrase).toBe('')
-    expect(d.open).toHaveBeenCalled()
+    expect(d.open).toHaveBeenCalledWith('new')
     expect(d.reload).toHaveBeenCalled()
   })
 
@@ -149,11 +146,5 @@ describe('runQuickConnect', () => {
     await runQuickConnect(target, d)
     expect(d.onError).toHaveBeenCalledWith('host already exists')
     expect(d.open).not.toHaveBeenCalled()
-  })
-
-  it('closes any open edit form first so the terminal is visible', async () => {
-    const d = deps()
-    await runQuickConnect(target, d)
-    expect(d.select).toHaveBeenCalledWith(null)
   })
 })

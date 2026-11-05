@@ -14,10 +14,12 @@ const (
 	AuthPassword AuthType = "password"
 	AuthKey      AuthType = "key"
 	AuthAgent    AuthType = "agent"
+	// AuthZishKey authenticates with a key held by Zish's built-in agent.
+	AuthZishKey AuthType = "zishkey"
 )
 
 // Environment tags a server with the blast radius of getting it wrong. It
-// drives the UI-11 marker and, from v1, the production guard (FR-14).
+// drives the UI-11 marker.
 type Environment string
 
 // The environments a server can be tagged with. EnvNone is the default:
@@ -42,6 +44,9 @@ type Server struct {
 
 	AuthType AuthType `gorm:"not null;default:'password'" json:"authType"`
 	KeyPath  string   `json:"keyPath"`
+	// AgentKeyID names the Zish agent key for AuthZishKey; nil otherwise.
+	// There is no FK: AgentService.Delete enforces the reference.
+	AgentKeyID *string `gorm:"index" json:"agentKeyId"`
 
 	JumpID *string `gorm:"index" json:"jumpId"`
 	Jump   *Server `gorm:"foreignKey:JumpID"  json:"-"`

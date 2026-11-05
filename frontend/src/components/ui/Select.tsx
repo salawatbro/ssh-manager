@@ -6,6 +6,8 @@ export interface SelectOption<T extends string | number> {
   // Optional leading node (e.g. an environment colour swatch), shown in the
   // trigger for the selected value and in every option row while choosing.
   adornment?: ReactNode
+  // Shown but not choosable (e.g. a terminal app that isn't installed).
+  disabled?: boolean
 }
 
 interface Props<T extends string | number> {
@@ -97,15 +99,16 @@ export function Select<T extends string | number>({ value, options, onChange, ar
             {options.map((opt) => {
               const isSel = opt.value === value
               return (
-                <li key={String(opt.value)} role="option" aria-selected={isSel}>
+                <li key={String(opt.value)} role="option" aria-selected={isSel} aria-disabled={opt.disabled}>
                   <button
                     type="button"
+                    disabled={opt.disabled}
                     onClick={() => {
                       onChange(opt.value)
                       setOpen(false)
                     }}
-                    className={`flex h-[30px] w-full items-center gap-[8px] px-[10px] text-left text-[13px] hover:bg-bgSel ${
-                      isSel ? 'text-text' : 'text-textMuted'
+                    className={`flex h-[30px] w-full items-center gap-[8px] px-[10px] text-left text-[13px] ${
+                      opt.disabled ? 'cursor-default text-textDim' : isSel ? 'text-text hover:bg-bgSel' : 'text-textMuted hover:bg-bgSel'
                     }`}
                   >
                     {opt.adornment}

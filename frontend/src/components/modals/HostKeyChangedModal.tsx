@@ -13,8 +13,8 @@ interface Props {
 // click-again.
 //
 // Cancel stays the accent-filled primary (an earlier user decision), which the
-// design does not do: a modal a user meets while their attention is on the
-// terminal should have the safe button under the cursor. The checkbox is added
+// design does not do: a modal a user meets while their attention is elsewhere
+// should have the safe button under the cursor. The checkbox is added
 // on top of that, not instead of it.
 export function HostKeyChangedModal({ request, onConfirm }: Props) {
   // step 0: the danger is stated. step 1: the verification is being claimed.

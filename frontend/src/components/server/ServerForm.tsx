@@ -35,6 +35,7 @@ function emptyForm() {
     // v0.1 has no keychain, so agent is the only auth method that can work.
     authType: AuthType.AuthAgent as AuthType,
     keyPath: '',
+    agentKeyId: null as string | null,
     // '' = do not write / leave unchanged (SEC-01) — password/passphrase/totpSecret alike.
     password: '',
     passphrase: '',
@@ -85,6 +86,7 @@ export function ServerForm({ serverId, onClose }: Props) {
             user: existing.user,
             authType: existing.authType,
             keyPath: existing.keyPath,
+            agentKeyId: existing.agentKeyId,
             // Secrets never come back (SEC-01) — empty means "leave unchanged".
             password: '',
             passphrase: '',
@@ -134,8 +136,7 @@ export function ServerForm({ serverId, onClose }: Props) {
   return (
     // The redesign moves the form off the 392px right-hand slot and into a
     // centered 620px modal (dizayn manbasi: Zish.dc.html `formOpen`), so the
-    // content area keeps the session or the detail page behind it instead of
-    // being squeezed. Same state, same validation, same save path.
+    // content area keeps the detail page behind it instead of being squeezed. Same state, same validation, same save path.
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
       <div
         className="flex w-[620px] flex-col overflow-hidden rounded-[9px] border border-borderStrong bg-bg2 shadow-[0_16px_48px_rgba(0,0,0,.5)]"

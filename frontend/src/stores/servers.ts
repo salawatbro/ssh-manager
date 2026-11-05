@@ -4,7 +4,7 @@ import { ServerService } from '@bindings/github.com/salawat/sshmgr/internal/serv
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { CreateServerInput, TestResult } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import type { KeyInfo } from '@bindings/github.com/salawat/sshmgr/internal/sshx'
-import { toastError } from './toasts'
+import { toastError, toastSuccess } from './toasts'
 
 interface ServersState {
   servers: Server[]
@@ -127,6 +127,7 @@ export const useServers = create<ServersState>((set, get) => ({
     try {
       const cmd = await ServerService.SSHCommand(id)
       await navigator.clipboard.writeText(cmd)
+      toastSuccess('SSH command copied.')
     } catch {
       // silent — copy is best-effort
     }

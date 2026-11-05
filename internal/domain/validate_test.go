@@ -149,6 +149,20 @@ func TestValidateNormalizesInPlace(t *testing.T) {
 	}
 }
 
+func TestValidateDropsAgentKeyIDUnlessZishKey(t *testing.T) {
+	id := "key-1"
+	s := valid()
+	s.AgentKeyID = &id
+	if err := s.Validate(); err != nil || s.AgentKeyID != nil {
+		t.Fatalf("agent server kept AgentKeyID %v (err %v)", s.AgentKeyID, err)
+	}
+	s.AuthType = AuthZishKey
+	s.AgentKeyID = &id
+	if err := s.Validate(); err != nil || s.AgentKeyID == nil || *s.AgentKeyID != id {
+		t.Fatalf("zishkey server lost AgentKeyID (err %v)", err)
+	}
+}
+
 func asDomainError(err error, target **Error) bool {
 	de, ok := err.(*Error)
 	if ok {

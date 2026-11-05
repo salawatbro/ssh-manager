@@ -5,6 +5,7 @@ import { AuthType } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { KeyInfo } from '@bindings/github.com/salawat/sshmgr/internal/sshx'
 import type { ServerFormValues } from './ServerForm'
 import { ServerFormKey } from './ServerFormKey'
+import { ServerFormAgentKey } from './ServerFormAgentKey'
 
 interface Props {
   form: ServerFormValues
@@ -18,11 +19,12 @@ const label = 'text-[11px] font-medium text-textMuted'
 const field =
   'h-[30px] rounded-[5px] border border-border bg-bg0 px-[9px] text-text outline-none focus:border-accent'
 
-// TZ 7.1 auth values, in the design's order and labels.
+// TZ 7.1 auth values, in the design's order, plus a key held by Zish's agent.
 const methods: { value: AuthType; label: string }[] = [
   { value: AuthType.AuthPassword, label: 'Password' },
-  { value: AuthType.AuthKey, label: 'SSH key' },
-  { value: AuthType.AuthAgent, label: 'Agent' },
+  { value: AuthType.AuthKey, label: 'Key file' },
+  { value: AuthType.AuthAgent, label: 'System ssh-agent' },
+  { value: AuthType.AuthZishKey, label: 'Key from Zish' },
 ]
 
 export function ServerFormAuth({ form, setForm, detectedKeys }: Props) {
@@ -60,6 +62,7 @@ export function ServerFormAuth({ form, setForm, detectedKeys }: Props) {
           Uses your running ssh-agent. No password is stored.
         </span>
       )}
+      {form.authType === AuthType.AuthZishKey && <ServerFormAgentKey form={form} setForm={setForm} />}
     </div>
   )
 }

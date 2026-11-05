@@ -36,7 +36,7 @@ export const useToasts = create<ToastsState>((set, get) => ({
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }))
 
-// Store-to-store convenience: the zustand stores (servers, sftp, settings)
+// Store-to-store convenience: the zustand stores (servers, settings)
 // report failures through these without going through the hook form.
 export const toastError = (message: string) => useToasts.getState().push('error', message)
 export const toastSuccess = (message: string) => useToasts.getState().push('success', message)

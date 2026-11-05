@@ -1,20 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { LockService } from '@bindings/github.com/salawat/sshmgr/internal/service'
-import { BiometricService } from '@bindings/github.com/salawat/sshmgr'
 import { useLock } from '../../stores/lock'
-import { useSessions } from '../../stores/sessions'
 import { useForwards } from '../../stores/forwards'
 import { useSettings } from '../../stores/settings'
 import { PinPad } from './PinPad'
 
-// Full-window lock. Rendered over a blurred UI; live sessions/tunnels keep
-// running underneath (the footer says so). Touch ID is offered when available
+// Full-window lock. Rendered over a blurred UI; running tunnels keep going
+// underneath (the footer says so). Touch ID is offered when available
 // and enabled; the PIN is always the fallback. "Forgot passcode?" opens the
 // reset flow, wired via onForgot.
 export function LockOverlay({ onForgot }: { onForgot: () => void }) {
   const locked = useLock((s) => s.locked)
   const biometricsAvailable = useLock((s) => s.biometricsAvailable)
   const unlock = useLock((s) => s.unlock)
+  const unlockWithBiometrics = useLock((s) => s.unlockWithBiometrics)
   const useBiometricsPref = useSettings((s) => s.settings?.lockUseBiometrics ?? false)
   const biometricsOn = biometricsAvailable && useBiometricsPref
   const [error, setError] = useState('')
@@ -22,7 +21,6 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
   const [attempt, setAttempt] = useState(0)
   const [useTouch, setUseTouch] = useState(biometricsOn)
 
-  const sessionCount = useSessions((s) => s.tabs.length)
   const tunnelCount = useForwards(
     (s) => Object.values(s.statusById).filter((st) => st.state === 'running').length,
   )
@@ -48,9 +46,8 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
     setScanning(true)
     setError('')
     try {
-      const ok = await BiometricService.Authenticate('Unlock Zish')
-      if (ok) unlock()
-      else setError('Touch ID did not match — enter your PIN.')
+      const ok = await unlockWithBiometrics('Unlock Zish')
+      if (!ok) setError('Touch ID did not match — enter your PIN.')
     } catch {
       setError('Touch ID was cancelled — enter your PIN.')
     } finally {
@@ -109,7 +106,7 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
         {error && <div className="mt-3 text-[12px] text-stFailed">{error}</div>}
 
         <div className="mt-6 w-full border-t border-border pt-4 text-center font-mono text-[11px] text-textDim">
-          {sessionCount} sessions · {tunnelCount} tunnels stay connected
+          {tunnelCount} tunnels stay connected
         </div>
         <button type="button" onClick={onForgot} className="mt-4 text-[12px] text-textDim hover:text-text">
           Forgot passcode?

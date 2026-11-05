@@ -34,108 +34,13 @@ func TestSettingsServiceUpdateSanitises(t *testing.T) {
 	svc := newSettingsService(t)
 	in := domain.DefaultSettings()
 	in.ConnectTimeoutSecs = 9999
-	in.TermFontSize = 2
-	in.TermCursor = "spiral"
+	in.LockIdleMinutes = 0
 	out, err := svc.Update(in)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.ConnectTimeoutSecs != 10 || out.TermFontSize != 13 || out.TermCursor != "block" {
+	if out.ConnectTimeoutSecs != 10 || out.LockIdleMinutes != 10 {
 		t.Fatalf("not sanitised: %+v", out)
-	}
-}
-
-// Get backfills GuardPatterns for an install upgraded from before the v0.7
-// guard: AutoMigrate seeds new installs via DefaultSettings(), but an
-// existing row on an upgraded DB keeps the empty gorm column default. Without
-// a backfill, the guard would be enabled but match nothing.
-func TestSettingsServiceGetBackfillsEmptyGuardPatterns(t *testing.T) {
-	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repo := store.NewSettingsRepo(db)
-	svc := NewSettingsService(repo, nil)
-
-	// Simulate an upgraded install: a row exists but GuardPatterns is still
-	// empty (the pre-v0.7 shape / the raw gorm column default).
-	seed := domain.DefaultSettings()
-	seed.GuardPatterns = ""
-	if err := repo.Save(&seed); err != nil {
-		t.Fatal(err)
-	}
-
-	want := domain.DefaultSettings().GuardPatterns
-	got, err := svc.Get()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.GuardPatterns != want {
-		t.Fatalf("expected backfilled guard patterns, got %q", got.GuardPatterns)
-	}
-
-	// Persisted: a fresh read straight from the repo (bypassing the service)
-	// sees the same non-empty patterns, not just an in-memory patch.
-	again, err := repo.Get()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if again.GuardPatterns != want {
-		t.Fatalf("backfill was not persisted, got %q", again.GuardPatterns)
-	}
-}
-
-// Get must not clobber a row that already has custom (non-empty) guard
-// patterns — the backfill only applies to the empty/degenerate case.
-func TestSettingsServiceGetDoesNotClobberCustomGuardPatterns(t *testing.T) {
-	svc := newSettingsService(t)
-	custom := "my-custom-pattern\nanother-one\n"
-
-	in := domain.DefaultSettings()
-	in.GuardPatterns = custom
-	if _, err := svc.Update(in); err != nil {
-		t.Fatal(err)
-	}
-
-	got, err := svc.Get()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.GuardPatterns != custom {
-		t.Fatalf("custom guard patterns were clobbered: got %q", got.GuardPatterns)
-	}
-}
-
-// Same backfill as GuardPatterns, added with the local terminal tab: an
-// upgraded row carries "" for the new column and would guard nothing locally.
-func TestSettingsServiceGetBackfillsEmptyLocalGuardPatterns(t *testing.T) {
-	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	repo := store.NewSettingsRepo(db)
-	svc := NewSettingsService(repo, nil)
-
-	seed := domain.DefaultSettings()
-	seed.GuardPatternsLocal = ""
-	if err := repo.Save(&seed); err != nil {
-		t.Fatal(err)
-	}
-
-	got, err := svc.Get()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.GuardPatternsLocal != domain.DefaultSettings().GuardPatternsLocal {
-		t.Fatalf("expected backfilled local guard patterns, got %q", got.GuardPatternsLocal)
-	}
-	// Persisted, not just patched in memory for this call.
-	again, err := repo.Get()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if again.GuardPatternsLocal == "" {
-		t.Error("backfill was not saved")
 	}
 }
 

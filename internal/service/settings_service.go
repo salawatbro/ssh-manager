@@ -15,8 +15,16 @@ type LoginAgent interface {
 
 // SettingsService is bound to the frontend as SettingsService.
 type SettingsService struct {
-	repo  *store.SettingsRepo
-	login LoginAgent
+	repo    *store.SettingsRepo
+	login   LoginAgent
+	onSaved func(prev, next domain.Settings)
+}
+
+// SetOnSettingsSaved registers fn to run after every successful Update, e.g.
+// to start or stop the agent socket. Package-level so it never becomes a
+// frontend binding.
+func SetOnSettingsSaved(s *SettingsService, fn func(prev, next domain.Settings)) {
+	s.onSaved = fn
 }
 
 // NewSettingsService wires the service to the settings repo and (optionally) a
@@ -30,25 +38,6 @@ func (s *SettingsService) Get() (*domain.Settings, error) {
 	cur, err := s.repo.Get()
 	if err != nil {
 		return nil, err
-	}
-	// Backfill the guard pattern lists for installs upgraded from before they
-	// existed: AutoMigrate added guard_patterns / guard_patterns_local with an
-	// empty DB default, so an existing row carries "" and the guard would
-	// match nothing for that list. Seed the defaults once (persisted) so an
-	// upgraded install gets a working guard. (A user who later clears either
-	// list sees it restored next load — an accepted resolution of the
-	// degenerate "guard on, no patterns" state.)
-	needsSave := false
-	if cur.GuardPatterns == "" {
-		cur.GuardPatterns = domain.DefaultSettings().GuardPatterns
-		needsSave = true
-	}
-	if cur.GuardPatternsLocal == "" {
-		cur.GuardPatternsLocal = domain.DefaultSettings().GuardPatternsLocal
-		needsSave = true
-	}
-	if needsSave {
-		_ = s.repo.Save(cur) // best-effort: a save failure still returns usable defaults in-memory this session
 	}
 	cur.Sanitise()
 	return cur, nil
@@ -65,6 +54,9 @@ func (s *SettingsService) Update(in domain.Settings) (*domain.Settings, error) {
 	in.Sanitise()
 	if err := s.repo.Save(&in); err != nil {
 		return nil, err
+	}
+	if s.onSaved != nil {
+		s.onSaved(*prev, in)
 	}
 	if s.login != nil && in.StartAtLogin != prev.StartAtLogin {
 		if err := s.login.Set(in.StartAtLogin); err != nil {

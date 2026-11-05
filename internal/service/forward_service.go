@@ -49,6 +49,7 @@ type ForwardService struct {
 	secret  secret.Store
 	dialer  Dialer
 	mgr     tunnelManager
+	agent   *AgentService
 }
 
 // NewForwardService wires the service to its repositories, the keychain,
@@ -129,7 +130,7 @@ func (s *ForwardService) Start(id string) error {
 	if err != nil {
 		return err
 	}
-	chain, err := resolveChain(s.servers, s.secret, srv)
+	chain, err := resolveChain(s.servers, s.secret, s.agent.signers(), srv, "tunnel "+fwd.Name)
 	if err != nil {
 		return err
 	}

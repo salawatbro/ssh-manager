@@ -14,13 +14,13 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
+	"github.com/salawat/sshmgr/internal/domain"
 	"github.com/salawat/sshmgr/internal/forward"
 	"github.com/salawat/sshmgr/internal/platform"
 	"github.com/salawat/sshmgr/internal/secret"
 	"github.com/salawat/sshmgr/internal/service"
 	"github.com/salawat/sshmgr/internal/sshx"
 	"github.com/salawat/sshmgr/internal/store"
-	"github.com/salawat/sshmgr/internal/term"
 )
 
 //go:embed all:frontend/dist
@@ -40,6 +40,9 @@ var (
 )
 
 func main() {
+	if code, ok := runHelperIfRequested(os.Args); ok {
+		os.Exit(code)
+	}
 	dbPath, err := platform.DBPath()
 	if err != nil {
 		fatalStartup("cannot resolve the database path", err)
@@ -77,7 +80,7 @@ func main() {
 	// (see the init func near the hostkey:request registration) so the
 	// binding generator gives the frontend typed TypeScript for it; the
 	// prompter itself is wired into both the dialer and SSHService here —
-	// a nil codePrompter on the dialer would make any 2FA connect needing
+	// a nil codePrompter on the dialer would make any 2FA dial needing
 	// the interactive fallback fail outright.
 	codePrompter := service.NewCodePrompter(appEmitter{})
 	verifier, err := sshx.NewVerifier(knownHostsPath, prompter)
@@ -91,58 +94,66 @@ func main() {
 	dialer := sshx.NewDialer(verifier, 10*time.Second, 75*time.Second)
 	dialer.SetCodePrompter(codePrompter)
 
-	// term.Manager runs the PTY pump. 16ms flush caps term:data at ~60/s (no
-	// backpressure); 30s keep-alive detects a dead peer (dizayn manbasi).
-	// It emits through the same appEmitter the host-key prompter uses.
-	termMgr := term.NewManager(appEmitter{}, 16*time.Millisecond, 30*time.Second)
-
 	repo := store.NewServerRepo(db)
 	kr := secret.NewKeyring()
 	serverService := service.NewServerService(repo, kr, dialer)
 	settingsRepo := store.NewSettingsRepo(db)
-	// Session history: SSHService records start/end, HistoryService reads it back
-	// for the detail page's "Recent sessions" card. One repo, two ends.
-	sessionLogRepo := store.NewSessionLogRepo(db)
-	sshService := service.NewSSHService(prompter, repo, settingsRepo, kr, dialer, termMgr, codePrompter, sessionLogRepo)
-	// connect:stage events for the "Connecting…" overlay, through the same
-	// emitter the host-key prompter and term manager use.
-	sshService.SetEmitter(appEmitter{})
-	historyService := service.NewHistoryService(sessionLogRepo)
-	// The Health card dials its own short-lived connection per probe (never the
-	// terminal's), so it needs the same repo/keychain/dialer SftpService does.
-	healthService := service.NewHealthService(repo, kr, dialer)
-	// "Restore sessions on launch": the frontend saves the open-tab list as tabs
-	// change and reopens it at startup.
-	sessionStateService := service.NewSessionStateService(store.NewSessionStateRepo(db))
+	sshService := service.NewSSHService(prompter, codePrompter)
 	settingsService := service.NewSettingsService(settingsRepo, platform.NewLoginAgent())
 	importService, err := service.NewImportService(repo)
 	if err != nil {
 		fatalStartup("cannot resolve the ssh config path", err)
 	}
 	dataService := &DataService{servers: serverService, db: db}
-	snippetRepo := store.NewSnippetRepo(db)
-	snippetService := service.NewSnippetService(snippetRepo)
 
 	// forwardMgr's emit closure only runs at runtime, on a state transition
 	// well after app start (see appEmitter's comment above for why
 	// application.Get() is safe there but not at construction time) — the
-	// same deferred-lookup pattern termMgr uses via appEmitter.
+	// same deferred-lookup pattern the prompters use via appEmitter.
 	forwardRepo := store.NewForwardRepo(db)
 	forwardMgr := forward.NewManager(func(st forward.Status) {
 		_ = application.Get().Event.Emit("forward:status", st)
 	})
 	forwardService := service.NewForwardService(forwardRepo, repo, kr, dialer, forwardMgr)
-	sftpService := service.NewSftpService(repo, kr, dialer, appEmitter{})
-	localService := service.NewLocalService(termMgr)
 
 	uninstallDataDir, _ := platform.DataDir()
 	uninstallLogDir, _ := platform.LogDir()
-	uninstallService := service.NewUninstallService(repo, kr, platform.NewLoginAgent(), uninstallDataDir, uninstallLogDir, platform.RunningFromAppBundle())
+	uninstallCacheDir, _ := platform.CacheDir()
+	uninstallService := service.NewUninstallService(repo, kr, platform.NewLoginAgent(), uninstallDataDir, uninstallLogDir, uninstallCacheDir, platform.RunningFromAppBundle())
 	appInfoService := service.NewAppInfoService()
 
-	// App lock (PIN). ResetAll needs the repos the app already wired; the
-	// session-state repo has no stored var, so construct one here.
-	lockService := service.NewLockService(kr, repo, snippetRepo, store.NewSessionStateRepo(db), sessionLogRepo, settingsRepo)
+	// App lock (PIN). ResetAll needs the repos the app already wired. The gate
+	// is the backend's lock state; locking it revokes every askpass token.
+	gate := service.NewLockGate(bootLocked(settingsRepo, kr))
+	biometricService := NewBiometricService()
+	lockService := service.NewLockService(kr, repo, settingsRepo, gate, biometricService)
+
+	// One Zish per user owns the sockets; the lock dies with the process.
+	releaseInstance, instanceErr := platform.LockInstance()
+	if releaseInstance == nil {
+		releaseInstance = func() {}
+	}
+
+	// External terminal launch: control socket, askpass broker, launch folders.
+	launcherService := service.NewLauncherService(repo, settingsRepo)
+	launchDeps, stopLaunchRuntime := startLaunchRuntime(kr, gate, instanceErr)
+	service.SetLauncherDeps(launcherService, launchDeps)
+
+	// Built-in ssh-agent: keys in the Keychain, signing through one policy for
+	// the socket, tunnels and Test connection.
+	agentKeys := store.NewAgentKeyRepo(db)
+	signLog := store.NewSignLogRepo(db)
+	agentService := service.NewAgentService(agentKeys, signLog, repo, kr, pubKeyDir())
+	startAgent(agentService, agentKeys, signLog, repo, kr, gate, verifier, dialer, instanceErr)
+	service.SetSignerSource(agentService, serverService, forwardService)
+	service.SetLauncherAgent(launcherService, agentService)
+	service.SetLockAgent(lockService, agentService)
+	service.SetUninstallAgent(uninstallService, agentService)
+	service.SetOnSettingsSaved(settingsService, func(prev, next domain.Settings) {
+		if prev.AgentEnabled != next.AgentEnabled {
+			service.ApplyAgentEnabled(agentService, next.AgentEnabled)
+		}
+	})
 
 	// Wires forwardRepo + forwardMgr into serverService so Delete tears down a
 	// server's live tunnels first (Task 4's deviation: a package-level func,
@@ -163,16 +174,6 @@ func main() {
 		return 10 * time.Second
 	})
 
-	// "Keep the terminal awake" drives the keep-alive probe live, same as the
-	// dial timeout above. Falls back to enabled if the store read fails, matching
-	// the KeepAwake default and the pre-setting always-probe behaviour.
-	termMgr.SetKeepAliveEnabled(func() bool {
-		if s, err := settingsService.Get(); err == nil {
-			return s.KeepAwake
-		}
-		return true
-	})
-
 	app := application.New(application.Options{
 		Name:        "Zish",
 		Description: "Local SSH connection manager",
@@ -186,17 +187,12 @@ func main() {
 			application.NewService(importService),
 			application.NewService(dataService),
 			application.NewService(forwardService),
-			application.NewService(snippetService),
-			application.NewService(sftpService),
-			application.NewService(localService),
 			application.NewService(uninstallService),
-			application.NewService(NewEditService()),
 			application.NewService(appInfoService),
-			application.NewService(historyService),
-			application.NewService(healthService),
-			application.NewService(sessionStateService),
 			application.NewService(lockService),
-			application.NewService(NewBiometricService()),
+			application.NewService(biometricService),
+			application.NewService(launcherService),
+			application.NewService(agentService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -209,9 +205,9 @@ func main() {
 			// ⌘Q or the tray's Quit.
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
-		// FR-12 General: confirm before quitting when sessions are open. Wails
-		// calls ShouldQuit on every quit attempt (⌘Q, tray Quit, ✕-when-keep-off);
-		// returning false cancels it. No cgo needed.
+		// FR-12 General: confirm before quitting while tunnels are running —
+		// quitting stops them. Wails calls ShouldQuit on every quit attempt (⌘Q,
+		// tray Quit, ✕-when-keep-off); returning false cancels it. No cgo needed.
 		//
 		// Dialog.Question().Show() is safe to call synchronously right here even
 		// though ShouldQuit itself runs on the main thread (AppKit invokes
@@ -229,7 +225,8 @@ func main() {
 		// a return value.
 		ShouldQuit: func() bool {
 			s, err := settingsService.Get()
-			if err != nil || !s.ConfirmOnQuit || termMgr.SessionCount() == 0 {
+			running := len(forwardMgr.Running())
+			if err != nil || !s.ConfirmOnQuit || running == 0 {
 				// Real quit, no confirmation needed: best-effort tear down any
 				// live tunnels before the process goes away. forwardMgr.StopAll
 				// closes each tunnel's listener/conn and waits for its own
@@ -242,7 +239,7 @@ func main() {
 			quit := false
 			dialog := application.Get().Dialog.Question().
 				SetTitle("Quit Zish?").
-				SetMessage(fmt.Sprintf("%d terminal session(s) are still open. Quit and close them?", termMgr.SessionCount()))
+				SetMessage(fmt.Sprintf("%d tunnel(s) are still running. Quit and stop them?", running))
 			dialog.AddButton("Quit").OnClick(func() { quit = true; forwardMgr.StopAll() })
 			dialog.AddButton("Cancel")
 			dialog.Show()
@@ -262,7 +259,7 @@ func main() {
 		registerGlobalHotkey()
 
 		// The red ✕ asks Go what to do (via the close-guard). Keep-in-tray on
-		// (default) hides the window — sessions survive; off makes ✕ a real quit,
+		// (default) hides the window — tunnels survive; off makes ✕ a real quit,
 		// which still routes through ShouldQuit's confirmation.
 		onCloseRequested = func() {
 			if s, err := settingsService.Get(); err == nil && !s.KeepRunningInTray {
@@ -271,6 +268,14 @@ func main() {
 			}
 			mainWindow.Hide()
 		}
+
+		// The agent socket follows the setting; started here so its status
+		// event has an app to go through.
+		enabled := domain.DefaultSettings().AgentEnabled
+		if s, err := settingsService.Get(); err == nil {
+			enabled = s.AgentEnabled
+		}
+		go service.ApplyAgentEnabled(agentService, enabled)
 	})
 
 	mainWindow = app.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -361,7 +366,9 @@ func main() {
 	// ordering fix) was never checkpointed away by *any* code path, not even
 	// occasionally.
 	app.OnShutdown(func() {
-		termMgr.CloseAll()
+		service.StopAgent(agentService)
+		stopLaunchRuntime()
+		releaseInstance()
 		if err := sqlDB.Close(); err != nil {
 			logStartupFailure(fmt.Sprintf("cannot close the database cleanly: %v", err))
 		}
@@ -374,8 +381,8 @@ func main() {
 }
 
 // toggleMainWindow hides the window if visible, otherwise shows and focuses it.
-// Hide keeps the window (and its React state + live PTY sessions) alive, so
-// ⌘⇧S is a hide-to-tray / summon, not a close.
+// Hide keeps the window (and its React state + live tunnels) alive, so ⌘⇧S is
+// a hide-to-tray / summon, not a close.
 func toggleMainWindow() {
 	if mainWindow == nil {
 		return
@@ -492,9 +499,8 @@ func (appEmitter) Emit(name string, data ...any) bool {
 func init() {
 	application.RegisterEvent[service.HostKeyRequest]("hostkey:request")
 	application.RegisterEvent[service.CodeRequest]("code:request")
-	application.RegisterEvent[term.Output]("term:data")
-	application.RegisterEvent[term.State]("session:state")
 	application.RegisterEvent[forward.Status]("forward:status")
 	application.RegisterEvent[service.TrayConnect]("tray:connect")
-	application.RegisterEvent[service.SftpProgress]("sftp:progress")
+	application.RegisterEvent[domain.AgentSignEvent]("agent:sign")
+	application.RegisterEvent[service.AgentStatus]("agent:status")
 }

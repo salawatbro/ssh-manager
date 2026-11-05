@@ -6,6 +6,31 @@
 import * as domain$0 from "../domain/models.js";
 
 /**
+ * AgentSnippet is the text the Keys view offers to paste.
+ */
+export interface AgentSnippet {
+    "sshConfig": string;
+    "shellExport": string;
+    "socketPath": string;
+}
+
+/**
+ * AgentStatus is the agent:status event payload and Status's result.
+ */
+export interface AgentStatus {
+    "enabled": boolean;
+    "running": boolean;
+    "socketPath": string;
+    "error": string;
+
+    /**
+     * ssh-add -x
+     */
+    "clientLocked": boolean;
+    "tempKeys": TempKeyView[] | null;
+}
+
+/**
  * CodeRequest is the code:request event payload (TZ 8 TOTP/2FA addendum).
  * It mirrors sshx.CodeRequest as a concrete named type so main.go's
  * application.RegisterEvent[CodeRequest] gives the binding generator a type
@@ -35,6 +60,11 @@ export interface CreateServerInput {
     "keyPath": string;
 
     /**
+     * AgentKeyID is the Zish agent key for AuthZishKey; ignored otherwise.
+     */
+    "agentKeyId": string | null;
+
+    /**
      * Password and Passphrase go to the OS keychain and NEVER into the
      * database (SEC-01). toServer() does not read them, so they cannot leak
      * into a domain.Server. An empty value means "do not write / leave
@@ -62,12 +92,6 @@ export interface CreateServerInput {
 }
 
 /**
- * Emitter is the slice of the Wails app the prompter needs. Narrowing it to
- * this interface keeps the prompter unit-testable with a fake.
- */
-export type Emitter = any;
-
-/**
  * ForwardInput is what the frontend sends to create or update a saved port
  * forward. It mirrors CreateServerInput's shape: a plain JSON-tagged struct
  * the service turns into a domain.PortForward and validates again (SEC-08).
@@ -84,15 +108,17 @@ export interface ForwardInput {
 }
 
 /**
- * HealthReport is the detail page's Health card. Every metric is best-effort: a
- * field a host does not expose (no /proc, an odd df) stays "" and the card shows
- * a dash.
+ * GenerateKeyInput is what the Generate key form sends.
  */
-export interface HealthReport {
-    "latency": string;
-    "uptime": string;
-    "load": string;
-    "disk": string;
+export interface GenerateKeyInput {
+    "name": string;
+
+    /**
+     * "ed25519" | "ecdsa-p256" | "rsa-4096"
+     */
+    "type": string;
+    "comment": string;
+    "requireConfirm": boolean;
 }
 
 /**
@@ -129,6 +155,20 @@ export interface ImportItem {
 }
 
 /**
+ * ImportKeyInput is what the Import key form sends.
+ */
+export interface ImportKeyInput {
+    "path": string;
+
+    /**
+     * used once, never stored
+     */
+    "passphrase": string;
+    "name": string;
+    "requireConfirm": boolean;
+}
+
+/**
  * ImportPreview is the whole preview: the source path and every host, keep and
  * skip alike.
  */
@@ -138,14 +178,26 @@ export interface ImportPreview {
 }
 
 /**
- * OpenResult is what both SSHService.Open and LocalService.Open hand the
- * frontend. Shell is the detected login shell ("bash"/"zsh"/"fish"), or "" when
- * it could not be classified — the frontend maps that to "inject nothing" and
- * reports it honestly in the status bar.
+ * KeyFileInfo describes a private key file before import.
+ */
+export interface KeyFileInfo {
+    "type": string;
+    "encrypted": boolean;
+    "comment": string;
+    "supported": boolean;
+
+    /**
+     * why unsupported
+     */
+    "reason": string;
+}
+
+/**
+ * OpenResult carries a non-error notice for a successful Open, e.g. that the
+ * chosen terminal was missing and Terminal opened instead.
  */
 export interface OpenResult {
-    "sessionID": string;
-    "shell": string;
+    "note": string;
 }
 
 /**
@@ -157,63 +209,26 @@ export interface PlatformInfo {
 }
 
 /**
- * SftpProgress is the sftp:progress event payload: one update for an in-flight
- * transfer (or its terminal Finished/Error state). Carries no secret (SEC-01).
+ * TempKeyView is a key added with ssh-add, shown read-only.
  */
-export interface SftpProgress {
-    "transferID": string;
-
-    /**
-     * "upload" | "download"
-     */
-    "direction": string;
-    "currentFile": string;
-    "done": number;
-    "total": number;
-
-    /**
-     * bytes/sec, smoothed; 0 until the first sample window elapses
-     */
-    "rate": number;
-    "finished": boolean;
-
-    /**
-     * non-empty on failure
-     */
-    "error": string;
+export interface TempKeyView {
+    "fingerprint": string;
+    "type": string;
+    "comment": string;
+    "requireConfirm": boolean;
+    "expiresAt": string | null;
 }
 
 /**
- * SnippetInput is what the frontend sends to create or update a saved
- * snippet. It mirrors ForwardInput's shape: a plain JSON-tagged struct the
- * service turns into a domain.Snippet and validates again (SEC-08).
+ * TerminalOption is one entry of the Settings terminal picker.
  */
-export interface SnippetInput {
+export interface TerminalOption {
     "id": string;
     "name": string;
-    "body": string;
-    "scope": domain$0.SnippetScope;
-    "scopeRef": string;
-    "slot": number;
-}
-
-/**
- * TOTPCodeView is one server's current verification code for the authenticator
- * panel. It carries the DERIVED code only — never the secret (SEC-01).
- */
-export interface TOTPCodeView {
-    "serverId": string;
-    "serverName": string;
-
-    /**
-     * 6 digits
-     */
-    "code": string;
-
-    /**
-     * seconds until the 30s window rolls (1..30)
-     */
-    "expiresIn": number;
+    "installed": boolean;
+    "supportsTab": boolean;
+    "needsAutomation": boolean;
+    "note": string;
 }
 
 /**
@@ -237,7 +252,7 @@ export interface TestResult {
 /**
  * TrayConnect is the tray:connect event payload: the id of the pinned server
  * whose menu-bar entry was clicked. main.go emits it (after showing the window)
- * and the frontend opens or focuses that server. Named here — like
+ * and the frontend connects to that server. Named here — like
  * HostKeyRequest/CodeRequest — so main.go's application.RegisterEvent[TrayConnect]
  * gives the binding generator a type for typed TypeScript, while
  * internal/service stays cgo-free.

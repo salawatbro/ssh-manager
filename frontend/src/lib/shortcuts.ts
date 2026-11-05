@@ -1,23 +1,14 @@
 import { isMac } from './platform'
 
 const mod = isMac ? '⌘' : 'Ctrl+Shift+'
-const modP = isMac ? '⌘' : 'Ctrl+' // for digit/comma bindings
+const modP = isMac ? '⌘' : 'Ctrl+' // for the comma binding
 
 // The keymap the app actually binds (dizayn Shortcuts), for read-only display.
 // Rebinding is a later version — this is a reference list, not an editor.
 export const SHORTCUTS: { label: string; keys: string }[] = [
-  { label: 'Command palette', keys: `${isMac ? '⌘' : 'Ctrl+Shift+'}K` },
-  { label: 'New server', keys: `${isMac ? '⌘' : 'Ctrl+Shift+'}N` },
+  { label: 'Command palette', keys: `${mod}K` },
+  { label: 'New server', keys: `${mod}N` },
   { label: 'Settings', keys: `${modP},` },
   { label: 'Show / hide window', keys: '⌘⇧S' },
-  { label: 'Split vertical / horizontal', keys: isMac ? '⌘D / ⌘⇧D' : 'Ctrl+Shift+D / Ctrl+Shift+E' },
-  { label: 'Close pane', keys: `${mod}W` },
-  { label: 'Switch to tab 1…9', keys: `${modP}1…9` },
-  { label: 'Next / previous tab', keys: isMac ? '⌘⇧] / ⌘⇧[' : 'Ctrl+Shift+] / [' },
-  { label: 'Find in terminal', keys: `${isMac ? '⌘' : 'Ctrl+Shift+'}F` },
-  { label: 'Search block history', keys: `${isMac ? '⌘' : 'Ctrl+Shift+'}R` },
-  { label: 'Jump to failed command', keys: isMac ? '⌘⇧E' : 'Ctrl+Shift+J' },
-  { label: 'Snippet palette', keys: isMac ? '⌘E' : 'Ctrl+Shift+S' },
-  { label: 'Run snippet quick-slot 1…9', keys: isMac ? '⌘⇧1…9' : 'Ctrl+Shift+1…9' },
-  { label: 'Lock Zish', keys: isMac ? '⌘L' : 'Ctrl+Shift+L' },
+  { label: 'Lock Zish', keys: `${mod}L` },
 ]

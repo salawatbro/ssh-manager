@@ -70,7 +70,7 @@ func (r *ServerRepo) Create(s *domain.Server) error {
 // on s.
 var updatableColumns = []string{
 	"name", "host", "port", "user",
-	"auth_type", "key_path", "two_factor", "jump_id",
+	"auth_type", "key_path", "agent_key_id", "two_factor", "jump_id",
 	"group_name", "environment", "tags", "notes",
 	"updated_at",
 }
@@ -175,6 +175,17 @@ func (r *ServerRepo) CountByJumpID(id string) (int64, error) {
 			"cannot count servers jumping through %s; check the database file is readable and not locked by another instance: %w", id, err)
 	}
 	return n, nil
+}
+
+// ListByAgentKey returns the servers that authenticate with the Zish agent
+// key keyID, by name.
+func (r *ServerRepo) ListByAgentKey(keyID string) ([]domain.Server, error) {
+	var servers []domain.Server
+	err := r.db.Where("agent_key_id = ?", keyID).Order("name COLLATE NOCASE").Find(&servers).Error
+	if err != nil {
+		return nil, fmt.Errorf("cannot read the servers using key %s: %w", keyID, err)
+	}
+	return servers, nil
 }
 
 // SetGroupOrder rewrites sort_order for one group to match ids' positions

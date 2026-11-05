@@ -1,27 +1,11 @@
-import { useEffect, useState } from 'react'
 import { useSettings } from '../../stores/settings'
 import { Row } from './Row'
-import { Toggle, Stepper, ProdBadge } from './controls'
+import { Toggle, Stepper } from './controls'
 import { LockSection } from './LockSection'
 
-// FR-14.9/SEC-15: the guard is an ergonomic confirmation step, never a
-// security control — this copy must never say "protected" or "secure".
 export function GeneralSection() {
   const s = useSettings((st) => st.settings)
   const update = useSettings((st) => st.update)
-
-  // Local draft of the patterns textarea, saved on blur rather than per
-  // keystroke (each save is a SettingsService.Update round-trip). Re-seeded
-  // whenever the stored value changes from elsewhere (e.g. another window).
-  const [patterns, setPatterns] = useState(s?.guardPatterns ?? '')
-  useEffect(() => {
-    if (s) setPatterns(s.guardPatterns)
-  }, [s?.guardPatterns])
-
-  const [localPatterns, setLocalPatterns] = useState(s?.guardPatternsLocal ?? '')
-  useEffect(() => {
-    if (s) setLocalPatterns(s.guardPatternsLocal)
-  }, [s?.guardPatternsLocal])
 
   if (!s) return null
   return (
@@ -35,62 +19,9 @@ export function GeneralSection() {
       <Row label="Menu bar agent" hint="Keeps Zish reachable when the window is closed; ⌘⇧S brings it back.">
         <Toggle on={s.keepRunningInTray} onChange={(v) => void update({ keepRunningInTray: v })} />
       </Row>
-      <Row label="Confirm before quitting" hint="Ask when terminal sessions are still open.">
+      <Row label="Confirm before quitting" hint="Ask when tunnels are still running — quitting stops them.">
         <Toggle on={s.confirmOnQuit} onChange={(v) => void update({ confirmOnQuit: v })} />
       </Row>
-      {/* Design: "Confirm before closing a session". Guards a single tab close
-          (× or ⌘W on a one-pane tab), distinct from quitting the whole app. */}
-      <Row label="Confirm before closing a session" hint="Ask before the × or ⌘W closes a terminal tab.">
-        <Toggle on={s.confirmSessionClose} onChange={(v) => void update({ confirmSessionClose: v })} />
-      </Row>
-      {/* Design: "Restore sessions on launch". Reopens the terminal tabs that
-          were open at quit; a split comes back as a single pane. */}
-      <Row label="Restore sessions on launch" hint="Reopen the terminal tabs that were open when you quit.">
-        <Toggle on={s.restoreTabs} onChange={(v) => void update({ restoreTabs: v })} />
-      </Row>
-      {/* Design: "Keep the terminal awake" · "Sends a keepalive every 30s".
-          On, a keepalive holds an idle session open and spots a dead peer
-          promptly; off, an idle connection may drop and a dead peer is only
-          noticed on the next keystroke. */}
-      <Row label="Keep the terminal awake" hint="Send a keepalive every 30s so idle sessions don’t drop.">
-        <Toggle on={s.keepAwake} onChange={(v) => void update({ keepAwake: v })} />
-      </Row>
-      <Row
-        label="Production command guard"
-        badge={<ProdBadge />}
-        hint="Ask for confirmation before running a matching command on a production server."
-      >
-        <Toggle on={s.guardEnabled} onChange={(v) => void update({ guardEnabled: v })} />
-      </Row>
-      <div className="flex flex-col gap-[4px] border-b border-border py-[13px]">
-        <span className="text-[13px] text-text">Dangerous command patterns</span>
-        <span className="text-[11.5px] text-textDim">
-          One per line, matched as plain text against what you type.
-        </span>
-        <textarea
-          className="mt-[4px] h-[92px] resize-none rounded-[5px] border border-border bg-bg0 px-[8px] py-[6px] font-mono text-[12px] text-text outline-none focus:border-accent"
-          spellCheck={false}
-          value={patterns}
-          onChange={(e) => setPatterns(e.target.value)}
-          onBlur={() => void update({ guardPatterns: patterns })}
-        />
-      </div>
-      <div className="flex flex-col gap-[4px] border-b border-border py-[13px]">
-        <span className="text-[13px] text-text">Local terminal patterns</span>
-        <span className="text-[11.5px] text-textDim">
-          Confirmation is asked in the local terminal tab, matched as plain text against what you
-          type. Kept shorter than the list above on purpose — a bare
-          <span className="font-mono"> rm -rf </span>
-          is an everyday command on your own machine.
-        </span>
-        <textarea
-          className="mt-[4px] h-[92px] resize-none rounded-[5px] border border-border bg-bg0 px-[8px] py-[6px] font-mono text-[12px] text-text outline-none focus:border-accent"
-          spellCheck={false}
-          value={localPatterns}
-          onChange={(e) => setLocalPatterns(e.target.value)}
-          onBlur={() => void update({ guardPatternsLocal: localPatterns })}
-        />
-      </div>
       <Row label="Connection timeout" hint="Give up if the host does not answer.">
         <Stepper value={s.connectTimeoutSecs} min={1} max={120} suffix="s" onChange={(v) => void update({ connectTimeoutSecs: v })} />
       </Row>

@@ -9,8 +9,7 @@ import type { Action } from './keymap'
 // update this table — that forced touch is the point.
 //
 // Rows with no probes are advertised in the cheat-sheet but bound elsewhere:
-// "Show / hide window" is the native cgo hotkey (global_hotkey_darwin.go) and
-// "Find in terminal" and "Search block history" are pane-local bindings.
+// "Show / hide window" is the native cgo hotkey (global_hotkey_darwin.go).
 
 // Both modules read `isMac` at import time, so each platform run needs the
 // mock in place before a fresh module graph loads.
@@ -47,34 +46,6 @@ const MAC: Row[] = [
   { label: 'New server', keys: '⌘N', probes: [{ event: key({ metaKey: true, key: 'n' }), action: 'new-server' }] },
   { label: 'Settings', keys: '⌘,', probes: [{ event: key({ metaKey: true, key: ',' }), action: 'settings' }] },
   { label: 'Show / hide window', keys: '⌘⇧S', probes: [] },
-  {
-    label: 'Split vertical / horizontal',
-    keys: '⌘D / ⌘⇧D',
-    probes: [
-      { event: key({ metaKey: true, key: 'd' }), action: 'split-v' },
-      { event: key({ metaKey: true, shiftKey: true, key: 'd' }), action: 'split-h' },
-    ],
-  },
-  { label: 'Close pane', keys: '⌘W', probes: [{ event: key({ metaKey: true, key: 'w' }), action: 'close-pane' }] },
-  { label: 'Switch to tab 1…9', keys: '⌘1…9', probes: [{ event: key({ metaKey: true, key: '4' }), action: { tab: 4 } }] },
-  {
-    label: 'Next / previous tab',
-    keys: '⌘⇧] / ⌘⇧[',
-    probes: [
-      { event: key({ metaKey: true, shiftKey: true, key: '}' }), action: 'next-tab' },
-      { event: key({ metaKey: true, shiftKey: true, key: '{' }), action: 'prev-tab' },
-    ],
-  },
-  { label: 'Find in terminal', keys: '⌘F', probes: [] },
-  { label: 'Search block history', keys: '⌘R', probes: [] },
-  { label: 'Jump to failed command', keys: '⌘⇧E', probes: [] },
-  { label: 'Snippet palette', keys: '⌘E', probes: [{ event: key({ metaKey: true, key: 'e' }), action: 'snippets' }] },
-  {
-    label: 'Run snippet quick-slot 1…9',
-    keys: '⌘⇧1…9',
-    // Shift+7 delivers key '&' (US layout); the binding is keyed off e.code.
-    probes: [{ event: key({ metaKey: true, shiftKey: true, key: '&', code: 'Digit7' }), action: { snippetSlot: 7 } }],
-  },
   { label: 'Lock Zish', keys: '⌘L', probes: [{ event: key({ metaKey: true, key: 'l' }), action: 'lock' }] },
 ]
 
@@ -85,33 +56,6 @@ const WIN: Row[] = [
   // The cheat-sheet shows the mac chord even off-mac (the global hotkey is
   // mac-only cgo); pinned as-is so a fix here is a conscious one.
   { label: 'Show / hide window', keys: '⌘⇧S', probes: [] },
-  {
-    label: 'Split vertical / horizontal',
-    keys: 'Ctrl+Shift+D / Ctrl+Shift+E',
-    probes: [
-      { event: key({ ctrlKey: true, shiftKey: true, key: 'd' }), action: 'split-v' },
-      { event: key({ ctrlKey: true, shiftKey: true, key: 'e' }), action: 'split-h' },
-    ],
-  },
-  { label: 'Close pane', keys: 'Ctrl+Shift+W', probes: [{ event: key({ ctrlKey: true, shiftKey: true, key: 'w' }), action: 'close-pane' }] },
-  { label: 'Switch to tab 1…9', keys: 'Ctrl+1…9', probes: [{ event: key({ ctrlKey: true, key: '4' }), action: { tab: 4 } }] },
-  {
-    label: 'Next / previous tab',
-    keys: 'Ctrl+Shift+] / [',
-    probes: [
-      { event: key({ ctrlKey: true, shiftKey: true, key: '}' }), action: 'next-tab' },
-      { event: key({ ctrlKey: true, shiftKey: true, key: '{' }), action: 'prev-tab' },
-    ],
-  },
-  { label: 'Find in terminal', keys: 'Ctrl+Shift+F', probes: [] },
-  { label: 'Search block history', keys: 'Ctrl+Shift+R', probes: [] },
-  { label: 'Jump to failed command', keys: 'Ctrl+Shift+J', probes: [] },
-  { label: 'Snippet palette', keys: 'Ctrl+Shift+S', probes: [{ event: key({ ctrlKey: true, shiftKey: true, key: 's' }), action: 'snippets' }] },
-  {
-    label: 'Run snippet quick-slot 1…9',
-    keys: 'Ctrl+Shift+1…9',
-    probes: [{ event: key({ ctrlKey: true, shiftKey: true, key: '&', code: 'Digit7' }), action: { snippetSlot: 7 } }],
-  },
   { label: 'Lock Zish', keys: 'Ctrl+Shift+L', probes: [{ event: key({ ctrlKey: true, shiftKey: true, key: 'l' }), action: 'lock' }] },
 ]
 

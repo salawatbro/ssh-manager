@@ -5,7 +5,8 @@
  * LockService owns the app-lock PIN. The PIN is stored only as a bcrypt hash
  * in the Keychain (via secret.Store) — never in the DB, never in an event or
  * log. It is the layer the frontend calls to set, verify, change and remove
- * the PIN, and to factory-reset the app when the PIN is forgotten.
+ * the PIN, to lock and unlock the backend LockGate, and to factory-reset the
+ * app when the PIN is forgotten.
  * @module
  */
 
@@ -25,6 +26,21 @@ export function ChangePin(oldPin: string, newPin: string): $CancellablePromise<v
  */
 export function HasPin(): $CancellablePromise<boolean> {
     return $Call.ByID(1511923617);
+}
+
+/**
+ * IsLocked reports the backend lock state; the frontend reads it at boot.
+ */
+export function IsLocked(): $CancellablePromise<boolean> {
+    return $Call.ByID(434101704);
+}
+
+/**
+ * Lock engages the lock (⌘L, idle timer). Without a PIN there would be no way
+ * back in, so it does nothing then.
+ */
+export function Lock(): $CancellablePromise<void> {
+    return $Call.ByID(316331981);
 }
 
 /**
@@ -59,8 +75,16 @@ export function SetPin(pin: string): $CancellablePromise<void> {
 }
 
 /**
- * VerifyPin reports whether pin matches the stored hash. A false with a nil
- * error means "wrong PIN"; a non-nil error means the Keychain read failed.
+ * UnlockWithBiometrics shows the Touch ID prompt and unlocks on success.
+ */
+export function UnlockWithBiometrics(reason: string): $CancellablePromise<boolean> {
+    return $Call.ByID(1739594761, reason);
+}
+
+/**
+ * VerifyPin reports whether pin matches the stored hash, and unlocks on a
+ * match. A false with a nil error means "wrong PIN"; a non-nil error means
+ * the Keychain read failed.
  */
 export function VerifyPin(pin: string): $CancellablePromise<boolean> {
     return $Call.ByID(2044862290, pin);

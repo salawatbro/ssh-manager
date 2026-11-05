@@ -14,9 +14,10 @@ export interface DetailField {
 }
 
 const AUTH_LABEL: Record<string, string> = {
-  [AuthType.AuthKey]: 'SSH key',
+  [AuthType.AuthKey]: 'Key file',
   [AuthType.AuthPassword]: 'Password · macOS keychain',
-  [AuthType.AuthAgent]: 'Agent',
+  [AuthType.AuthAgent]: 'System ssh-agent',
+  [AuthType.AuthZishKey]: 'Key from Zish',
 }
 
 // The design shows "SSH key · ~/.ssh/id_ed25519" — the method, then the detail
@@ -37,10 +38,10 @@ export function sshCommand(s: Server): string {
 }
 
 const STATUS_LABEL: Record<Status, string> = {
-  connected: 'Connected',
+  connected: 'Tunnel running',
   connecting: 'Connecting…',
   failed: 'Last attempt failed',
-  disc: 'Not connected',
+  disc: 'No tunnel running',
   unknown: 'Unknown',
 }
 

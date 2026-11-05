@@ -2,9 +2,9 @@ import { statusClassOf, type Status } from '../../lib/status'
 
 interface Props {
   status: Status
-  // Server rows (UI-01) use the default 8px dot; the tunnels panel's cards
-  // (dizayn manbasi: MainWindow.dc.html panel=tunnels) use a smaller 6px
-  // circle; the title bar's tab strip (panel=title bar + tabs) uses 7px.
+  // Server rows (UI-01) use the default 8px dot; the tunnel cards and status
+  // bar (dizayn manbasi: MainWindow.dc.html panel=tunnels) use a smaller 6px
+  // circle; palette rows use 7px.
   // Tailwind v4 scans source files for LITERAL class strings, so all sizes
   // are spelled out in `sizeClasses` below rather than interpolated
   // (`h-[${size}px]` would never be seen by the scanner).

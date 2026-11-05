@@ -17,6 +17,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/skeema/knownhosts"
@@ -51,6 +53,11 @@ type Verifier struct {
 	path     string
 	cb       knownhosts.HostKeyCallback
 	prompter HostKeyPrompter
+
+	mu        sync.Mutex
+	matchCB   knownhosts.HostKeyCallback
+	matchMod  time.Time
+	matchSize int64
 }
 
 // NewVerifier loads (or creates) the known_hosts file. It ensures the
@@ -74,6 +81,42 @@ func NewVerifier(knownHostsPath string, prompter HostKeyPrompter) (*Verifier, er
 // "key changed"). Empty slice for an unknown host — fall back to defaults.
 func (v *Verifier) HostKeyAlgorithms(hostWithPort string) []string {
 	return v.cb.HostKeyAlgorithms(hostWithPort)
+}
+
+// Matches reports, without prompting, whether known_hosts trusts key for
+// hostport. The file is re-read when it changed, because the external ssh
+// adds hosts to it while Zish runs.
+func (v *Verifier) Matches(hostport string, key ssh.PublicKey) bool {
+	cb, err := v.fresh()
+	if err != nil {
+		return false
+	}
+	return cb(hostport, hostPortAddr(hostport), key) == nil
+}
+
+// hostPortAddr is a net.Addr for knownhosts, which needs one only to split
+// it when no hostname is given.
+type hostPortAddr string
+
+func (a hostPortAddr) Network() string { return "tcp" }
+func (a hostPortAddr) String() string  { return string(a) }
+
+func (v *Verifier) fresh() (knownhosts.HostKeyCallback, error) {
+	fi, err := os.Stat(v.path)
+	if err != nil {
+		return nil, err
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.matchCB != nil && fi.ModTime().Equal(v.matchMod) && fi.Size() == v.matchSize {
+		return v.matchCB, nil
+	}
+	cb, err := loadTolerant(v.path)
+	if err != nil {
+		return nil, err
+	}
+	v.matchCB, v.matchMod, v.matchSize = cb, fi.ModTime(), fi.Size()
+	return cb, nil
 }
 
 // Callback returns the ssh.HostKeyCallback that classifies and prompts.

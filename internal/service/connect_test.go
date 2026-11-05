@@ -48,7 +48,7 @@ func TestResolveChainJumplessTarget(t *testing.T) {
 	sec := secret.NewFake()
 	tgt := mkServer(t, repo, "t", nil)
 
-	chain, err := resolveChain(repo, sec, tgt)
+	chain, err := resolveChain(repo, sec, nil, tgt, "test")
 	if err != nil {
 		t.Fatalf("resolveChain: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestResolveChainOrderRootFirst(t *testing.T) {
 	mkServer(t, repo, "a", strptr("b"))
 	tgt := mkServer(t, repo, "t", strptr("a"))
 
-	chain, err := resolveChain(repo, sec, tgt)
+	chain, err := resolveChain(repo, sec, nil, tgt, "test")
 	if err != nil {
 		t.Fatalf("resolveChain: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestResolveChainCycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := resolveChain(repo, sec, a); err == nil || codeOf(t, err) != domain.CodeJumpCycle {
+	if _, err := resolveChain(repo, sec, nil, a, "test"); err == nil || codeOf(t, err) != domain.CodeJumpCycle {
 		t.Fatalf("cycle: got %v; want ERR_JUMP_CYCLE", err)
 	}
 }
@@ -113,7 +113,7 @@ func TestResolveChainDepthExceeded(t *testing.T) {
 		prev = strptr(id)
 	}
 
-	if _, err := resolveChain(repo, sec, last); err == nil || codeOf(t, err) != domain.CodeJumpFailed {
+	if _, err := resolveChain(repo, sec, nil, last, "test"); err == nil || codeOf(t, err) != domain.CodeJumpFailed {
 		t.Fatalf("depth: got %v; want ERR_JUMP_FAILED", err)
 	}
 }
@@ -131,7 +131,7 @@ func TestResolveChainLoadsPerHopCreds(t *testing.T) {
 	}
 	tgt := mkServer(t, repo, "t", strptr("root")) // agent auth — no stored secret
 
-	chain, err := resolveChain(repo, sec, tgt)
+	chain, err := resolveChain(repo, sec, nil, tgt, "test")
 	if err != nil {
 		t.Fatalf("resolveChain: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestCredsForAttachesStoredTOTPSecret(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	creds, err := credsFor(sec, srv)
+	creds, err := credsFor(sec, nil, srv, "test")
 	if err != nil {
 		t.Fatalf("credsFor: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestCredsForTOTPMissingSecretIsNotAnError(t *testing.T) {
 	}
 	// No TOTP secret stored.
 
-	creds, err := credsFor(sec, srv)
+	creds, err := credsFor(sec, nil, srv, "test")
 	if err != nil {
 		t.Fatalf("credsFor: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestCredsForNonTwoFactorServerUnaffected(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	creds, err := credsFor(sec, srv)
+	creds, err := credsFor(sec, nil, srv, "test")
 	if err != nil {
 		t.Fatalf("credsFor: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestResolveChainAttachesTOTPSecretToTheHopThatNeedsIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain, err := resolveChain(repo, sec, tgt)
+	chain, err := resolveChain(repo, sec, nil, tgt, "test")
 	if err != nil {
 		t.Fatalf("resolveChain: %v", err)
 	}

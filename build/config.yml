@@ -8,7 +8,7 @@ info:
   companyName: "Salawat" # The name of the company
   productName: "Zish" # The name of the application
   productIdentifier: "uz.salawat.sshmgr" # The unique product identifier
-  description: "Local-first SSH connection manager for macOS — servers, jump hosts, tunnels, and a built-in terminal." # The application description
+  description: "Local-first SSH connection manager for macOS — servers, jump hosts and tunnels." # The application description
   copyright: "(c) 2026 Salawat" # Copyright text
   comments: "Local SSH connection manager." # Comments
   version: "1.5.0" # The application version

@@ -36,12 +36,11 @@ export function ImportServers(): $CancellablePromise<number> {
 }
 
 /**
- * OpenExternalURL opens an http/https URL (a link clicked in block-terminal
- * output) in the user's default browser. Scheme validation lives in
- * platform.OpenExternalURL — the URL comes from untrusted terminal output.
+ * PickKeyFile asks for a private key file to import into the Zish agent,
+ * starting in ~/.ssh. It returns "" when cancelled.
  */
-export function OpenExternalURL(url: string): $CancellablePromise<void> {
-    return $Call.ByID(3596933751, url);
+export function PickKeyFile(): $CancellablePromise<string> {
+    return $Call.ByID(778430809);
 }
 
 /**

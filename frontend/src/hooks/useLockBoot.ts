@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react'
+import { LockService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { useLock } from '../stores/lock'
 import { useSettings } from '../stores/settings'
 import { createIdleTimer } from '../lib/idle'
 
-// Boots the lock: once settings have loaded it reads hasPin/biometrics and, when
-// "Require unlock" is on with a PIN set, locks immediately (launch trigger).
-// While enabled it runs an idle timer over user input; firing engages the lock.
-// Manual ⌘L is handled in useAppKeymap, not here.
+// Boots the lock: once settings have loaded it reads hasPin/biometrics and
+// adopts the backend's lock state (the app starts locked when "Require unlock"
+// is on with a PIN set). While enabled it runs an idle timer over user input;
+// firing engages the lock. Manual ⌘L is handled in useAppKeymap, not here.
 export function useLockBoot() {
   const settings = useSettings((s) => s.settings)
   const bootedRef = useRef(false)
@@ -15,9 +16,9 @@ export function useLockBoot() {
   useEffect(() => {
     if (bootedRef.current || !settings) return
     bootedRef.current = true
-    void useLock.getState().refresh().then(() => {
-      if (settings.lockEnabled && useLock.getState().hasPin) useLock.getState().lock()
-    }).catch(() => {})
+    void Promise.all([useLock.getState().refresh(), LockService.IsLocked()])
+      .then(([, locked]) => useLock.getState().setLocked(locked))
+      .catch(() => {})
   }, [settings])
 
   // Idle lock — re-created whenever the relevant settings change.

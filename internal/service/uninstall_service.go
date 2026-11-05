@@ -14,11 +14,12 @@ import (
 // dataDir/logDir are injected (not read from platform here) so tests point them
 // at temp dirs and never touch the developer's real data.
 type UninstallService struct {
-	servers *store.ServerRepo
-	secret  secret.Store
-	login   LoginAgent
-	dataDir string
-	logDir  string
+	servers  *store.ServerRepo
+	secret   secret.Store
+	login    LoginAgent
+	dataDir  string
+	logDir   string
+	cacheDir string
 
 	// packaged is true only when running from an installed .app bundle
 	// (platform.RunningFromAppBundle at main.go startup). Uninstall refuses to
@@ -30,14 +31,21 @@ type UninstallService struct {
 	// onUninstalled is called only after a fully successful uninstall (main.go
 	// wires it to app.Quit). Left unset in tests -> the test asserts it fired.
 	onUninstalled func()
+
+	// agent's Keychain keys are deleted before the data folder goes.
+	agent *AgentService
 }
 
+// SetUninstallAgent lets Uninstall delete the agent's Keychain keys.
+func SetUninstallAgent(s *UninstallService, as *AgentService) { s.agent = as }
+
 // NewUninstallService wires the repo (to enumerate servers for Keychain
-// cleanup), the keychain, the login agent, and the data/log dirs to remove.
+// cleanup), the keychain, the login agent, and the data/log/cache dirs to
+// remove.
 // packaged must be platform.RunningFromAppBundle() — Uninstall is a no-op
 // unless it's true.
-func NewUninstallService(servers *store.ServerRepo, sec secret.Store, login LoginAgent, dataDir, logDir string, packaged bool) *UninstallService {
-	return &UninstallService{servers: servers, secret: sec, login: login, dataDir: dataDir, logDir: logDir, packaged: packaged}
+func NewUninstallService(servers *store.ServerRepo, sec secret.Store, login LoginAgent, dataDir, logDir, cacheDir string, packaged bool) *UninstallService {
+	return &UninstallService{servers: servers, secret: sec, login: login, dataDir: dataDir, logDir: logDir, cacheDir: cacheDir, packaged: packaged}
 }
 
 // SetOnUninstalled registers the quit callback. Package-level (not a method)
@@ -66,9 +74,13 @@ func (s *UninstallService) Uninstall() error {
 			_ = s.secret.Delete(srv.ID)
 		}
 	}
+	s.agent.wipeAll()
 	_ = s.login.Set(false)      // remove the LaunchAgent (no-op if absent)
 	_ = os.RemoveAll(s.dataDir) // sshmgr.db + WAL/shm; open fds survive unlink on macOS
 	_ = os.RemoveAll(s.logDir)
+	if s.cacheDir != "" {
+		_ = os.RemoveAll(s.cacheDir) // launch scripts only
+	}
 
 	if err := platform.MoveAppBundleToTrash(); err != nil {
 		return fmt.Errorf("all data was removed, but the app could not be moved to the Trash — please drag it there yourself: %w", err)

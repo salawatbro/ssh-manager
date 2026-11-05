@@ -26,12 +26,6 @@ const (
 	CodeHostKeyRejected = "ERR_HOSTKEY_REJECTED"
 	CodeHostKeyRevoked  = "ERR_HOSTKEY_REVOKED"
 
-	// Session lifecycle. Emitted when an established terminal session drops
-	// (dead peer / remote shell exit) — a soft, recoverable stop the frontend
-	// turns into a Reconnect pane. Not in the original TZ 11.2; recorded for
-	// the TZ update (see the v0.3 plan's Task 7).
-	CodeSessionClosed = "ERR_SESSION_CLOSED"
-
 	// Keychain (TZ 11.2)
 	CodeKeychain = "ERR_KEYCHAIN"
 
@@ -39,6 +33,18 @@ const (
 	// UI selector arrives v0.6.
 	CodeJumpFailed = "ERR_JUMP_FAILED"
 	CodeJumpCycle  = "ERR_JUMP_CYCLE"
+
+	// External terminal launch.
+	CodeTerminalNotFound = "ERR_TERMINAL_NOT_FOUND"
+	CodeTerminalLaunch   = "ERR_TERMINAL_LAUNCH"
+	CodeAutomationDenied = "ERR_AUTOMATION_DENIED"
+	CodeLaunchUnsafe     = "ERR_LAUNCH_UNSAFE"
+	CodeLauncherBusy     = "ERR_LAUNCHER_BUSY"
+
+	// Built-in ssh-agent.
+	CodeAgentKeyInUse   = "ERR_AGENT_KEY_IN_USE"
+	CodeKeyImport       = "ERR_KEY_IMPORT"
+	CodeAgentKeyMissing = "ERR_AGENT_KEY_MISSING"
 
 	// CodeInternal is an unexpected internal failure with no more specific code.
 	CodeInternal = "ERR_INTERNAL"
