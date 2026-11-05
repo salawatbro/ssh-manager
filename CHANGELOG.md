@@ -8,6 +8,67 @@ Only **1.0.0**, **1.1.0**, **1.2.0**, **1.3.0**, **1.3.1**, **1.4.0** and **1.5.
 Versions **0.1–0.7** are the development milestones that built up to 1.0; **1.1.1**
 was a version bump that first shipped packaged as part of 1.2.0.
 
+## [Unreleased]
+
+Zish stops being a terminal. It now manages your servers, opens them in your own
+terminal app with stored secrets filled in, runs its own ssh-agent with keys in
+the Keychain behind Touch ID, and keeps port-forwarding tunnels. Existing
+servers, settings, tunnels, Keychain secrets and the App Lock PIN carry over; an
+existing database and older backups open unchanged.
+
+### Removed (breaking)
+
+- **The embedded terminal** — classic and block mode, tabs, split panes, find,
+  shell integration (OSC 133), broadcast input, the production guard, snippets,
+  the local terminal tab, and session close confirmation.
+- **SFTP** (dual-pane browser and transfers) and the remote file editor.
+- **The TOTP Authenticator panel.** 2FA codes are still generated from the
+  stored seed — now typed into ssh for you by auto-fill.
+- **Server health checks, session history / recent sessions, and restoring
+  sessions on launch.**
+- Terminal settings (font, size, cursor, scrollback, mode). Their database
+  columns and tables are left in place, unused, so existing databases keep
+  opening.
+
+### Added
+
+- **Connect in your terminal app** — Terminal (default), iTerm2, Ghostty,
+  WezTerm, kitty, Alacritty, or a custom command (run without a shell), in a
+  new window or, where the app supports it, a tab. Settings → Connect picks the
+  app and has a "Test terminal" button that triggers macOS's Automation prompt
+  up front. A missing app falls back to Terminal with a notice.
+- **System OpenSSH** — sessions run Apple's `/usr/bin/ssh` with the server's
+  port, user, key, jump hosts (through a generated, self-deleting config),
+  connection timeout and keep-alive; your own `~/.ssh/config` still applies to
+  everything else.
+- **Auto-fill** — stored passwords, key passphrases and 2FA codes are answered
+  through an `SSH_ASKPASS` helper: each secret at most once per connection,
+  within three minutes, never on disk, in argv or in the environment. Host-key
+  questions are always left to you in the terminal. Can be turned off.
+- **Copy ssh command** now renders the whole jump chain.
+- **Built-in ssh-agent** — a Keys page (sidebar Servers / Keys switch) to
+  generate Ed25519, ECDSA P-256 or RSA 4096 keys or import existing ones into
+  the Keychain; per-key "Confirm every use" (on by default) asks for Touch ID,
+  Apple Watch or the Mac password; a sign log of every decision; temporary
+  `ssh-add` keys; `ssh-add -x`/`-X`; "Install on server…" to append the public
+  key to `authorized_keys`; copyable `~/.ssh/config` and `SSH_AUTH_SOCK`
+  snippets (Zish never edits those files).
+- **"Key from Zish"** server auth method — Connect, tunnels and Test connection
+  sign with an agent key through the same confirmation policy.
+- **Settings → Keys** — turn the agent socket on or off and see its status.
+
+### Changed
+
+- **App Lock is enforced by the backend.** While locked, Connect is refused,
+  pending auto-fills are revoked (prompts fall back to typing), and every agent
+  signature needs Touch ID or the Mac password, whatever the key's setting.
+  "Forgot PIN" reset and Uninstall also delete the agent's keys.
+- Auth methods are labelled "Key file", "System ssh-agent" and "Key from Zish".
+- Only one Zish per user serves connections and the agent; a second copy (for
+  example a development build) reports "In use by another Zish".
+- The keep-alive setting now lives in Settings → Connect and applies to the
+  launched ssh session.
+
 ## [1.5.0] — 2026-08-01
 
 A new block-based terminal mode that keeps commands and their output easy to
