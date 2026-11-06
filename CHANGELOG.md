@@ -87,9 +87,14 @@ existing database and older backups open unchanged.
 - **Launcher** — ⌥Space from any app finds servers, stacks and tunnels, or
   connects to a typed `user@host`. The shortcut can be changed or turned off;
   while Zish is locked it offers Touch ID first.
+- **Menu-bar panel** — the Zish bolt in the menu bar opens a panel instead of
+  a plain menu: pinned servers, the stacks shown in the menu bar and every
+  tunnel with an on/off switch, plus the agent's state, a Search button for the
+  launcher, and Open Zish, Lock, Settings and Quit. A server opens straight in
+  your terminal app; while Zish is locked the panel offers Touch ID.
 - **Day theme** — Settings → Appearance picks Night, Day or Match macOS. Menus,
-  dialogs, the launcher, the approval window and the full-screen title bar
-  follow it.
+  dialogs, the launcher, the menu-bar panel, the approval window and the
+  full-screen title bar follow it.
 - **Lock on sleep** — the App Lock engages when the Mac sleeps, its display
   sleeps, the screen locks or you switch users.
 - **First run** — a welcome screen imports hosts from `~/.ssh/config` with a

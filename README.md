@@ -38,12 +38,12 @@ in your own terminal app (Terminal, iTerm2, Ghostty, …) running the system
 
 ### Opening servers
 - **Your terminal app** — Connect (detail page, double-click or Enter on a row,
-  the row menu, the palette, a tray pin, Quick Connect) opens a new window in
-  the terminal chosen under Settings → Connect: Terminal (default), iTerm2,
-  Ghostty, WezTerm, kitty, Alacritty, Warp, or a custom command. Tabs instead
-  of windows work in iTerm2, Ghostty 1.3+ and WezTerm; Warp picks a tab or a
-  window itself. If the chosen app isn't installed, Zish opens Terminal and
-  says so.
+  the row menu, the palette, the menu-bar panel, Quick Connect) opens a new
+  window in the terminal chosen under Settings → Connect: Terminal (default),
+  iTerm2, Ghostty, WezTerm, kitty, Alacritty, Warp, or a custom command. Tabs
+  instead of windows work in iTerm2, Ghostty 1.3+ and WezTerm; Warp picks a
+  tab or a window itself. If the chosen app isn't installed, Zish opens
+  Terminal and says so.
 - **Automation permission** — iTerm2 and Ghostty are driven by AppleScript, so
   macOS asks once to let Zish control them (System Settings › Privacy &
   Security › Automation). "Test terminal" in Settings triggers that prompt up
@@ -139,9 +139,10 @@ forward, keep confirmation on so a remote server can't sign unnoticed.
   menus, dialogs and the full-screen title bar follow.
 - **Global hotkey** (`⌘⇧S`) — show/hide the window from anywhere, even when the
   app is in the background.
-- **Menu-bar tray** — the app lives in the tray; closing the window hides it
-  instead of quitting, so tunnels stay up. Pin up to five servers there for
-  one-click connect.
+- **Menu-bar panel** — the app lives in the menu bar; closing the window hides
+  it instead of quitting, so tunnels stay up. Clicking the bolt opens a panel
+  with up to five pinned servers, the stacks shown in the menu bar and every
+  tunnel with an on/off switch, plus Lock, Settings and Quit.
 - **App Lock** — an optional 6-digit PIN (a bcrypt hash in the Keychain) with
   Touch ID, engaged with `⌘L`, after idle time, when the Mac sleeps or its
   screen locks, or at launch. While locked,
