@@ -42,6 +42,18 @@ describe('forwardCommand', () => {
     )
   })
 
+  it('adds -p for the server port only when it is not 22', () => {
+    const local = { ...base, type: ForwardType.ForwardLocal }
+    expect(forwardCommand({ ...local, port: 22 })).toBe('ssh -N -L 5432:10.20.4.20:5432 deploy@db-01.internal')
+    expect(forwardCommand({ ...local, port: 0 })).toBe('ssh -N -L 5432:10.20.4.20:5432 deploy@db-01.internal')
+    expect(forwardCommand({ ...local, port: 2222 })).toBe(
+      'ssh -N -L 5432:10.20.4.20:5432 -p 2222 deploy@db-01.internal',
+    )
+    expect(forwardCommand({ ...local, port: 2222, jump: 'ops@bastion:2200' })).toBe(
+      'ssh -N -J ops@bastion:2200 -L 5432:10.20.4.20:5432 -p 2222 deploy@db-01.internal',
+    )
+  })
+
   // An unfinished form must not render a command that looks runnable — a 0 port
   // is a valid-looking number, `<port>` is obviously a blank to fill in.
   it('marks empty fields as placeholders', () => {
@@ -60,5 +72,6 @@ describe('jumpSpec', () => {
         { user: 'root', host: '10.0.0.1', port: 2222 },
       ]),
     ).toBe('ops@edge,root@10.0.0.1:2222')
+    expect(jumpSpec([{ user: 'ops', host: 'edge', port: 0 }])).toBe('ops@edge')
   })
 })

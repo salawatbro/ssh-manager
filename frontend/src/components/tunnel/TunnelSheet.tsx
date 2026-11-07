@@ -78,6 +78,7 @@ export function TunnelSheet({ serverId, initial, preset: startPreset, onClose }:
     destPort: remote ? draft.macPort : draft.serverPort,
     user: server?.user ?? '',
     host: server?.host ?? '',
+    port: server?.port,
     jump: jumpSpec(hops),
   })
 

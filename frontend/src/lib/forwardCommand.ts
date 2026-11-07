@@ -14,6 +14,8 @@ export interface ForwardCommandInput {
   destPort: number | ''
   user: string
   host: string
+  // The server's ssh port; 0 or absent means ssh's default, 22.
+  port?: number
   // The -J value for a server behind jump hosts, '' when it is reached directly.
   jump?: string
 }
@@ -29,6 +31,7 @@ export function forwardCommand({
   destPort,
   user,
   host,
+  port,
   jump = '',
 }: ForwardCommandInput): string {
   // ssh takes an optional bind address before the port. 127.0.0.1 is ssh's own
@@ -41,7 +44,8 @@ export function forwardCommand({
       ? `${bind}${or(bindPort, '<port>')}`
       : `${bind}${or(bindPort, '<port>')}:${or(destHost, '<host>')}:${or(destPort, '<port>')}`
   const flag = type === ForwardType.ForwardRemote ? '-R' : type === ForwardType.ForwardDynamic ? '-D' : '-L'
-  return `ssh -N ${jump ? `-J ${jump} ` : ''}${flag} ${spec} ${target}`
+  const portFlag = port && port !== 22 ? `-p ${port} ` : ''
+  return `ssh -N ${jump ? `-J ${jump} ` : ''}${flag} ${spec} ${portFlag}${target}`
 }
 
 // jumpSpec writes jump hosts as ssh's -J list, outermost first.
