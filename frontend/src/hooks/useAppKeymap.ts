@@ -23,8 +23,8 @@ export function useAppKeymap(onNewServer: () => void) {
       } else if (action === 'lock') {
         e.preventDefault()
         // ⌘L locks when a PIN is set; otherwise send the user to set one.
-        if (useLock.getState().hasPin) useLock.getState().lock()
-        else useSettings.getState().show()
+        if (useLock.getState().hasPin) useLock.getState().lock('manual')
+        else useSettings.getState().show('lock')
       }
     }
     document.addEventListener('keydown', onKey)

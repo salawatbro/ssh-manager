@@ -146,3 +146,23 @@ func TestServerAgentKeyIDIsUpdatable(t *testing.T) {
 		t.Fatalf("still using after clear: %+v", using)
 	}
 }
+
+func TestAgentKeyRepoCreateKeepsConfirmOff(t *testing.T) {
+	r, _, _ := newKeyRepos(t)
+	off := sampleKey("k1", "silent", "SHA256:a")
+	off.RequireConfirm = false
+	if err := r.Create(off); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Create(sampleKey("k2", "asks", "SHA256:b")); err != nil {
+		t.Fatal(err)
+	}
+	if off.RequireConfirm {
+		t.Fatal("Create turned the caller's RequireConfirm on")
+	}
+	for id, want := range map[string]bool{"k1": false, "k2": true} {
+		if k, err := r.Get(id); err != nil || k.RequireConfirm != want {
+			t.Fatalf("Get(%s) = %+v, %v; want RequireConfirm %v", id, k, err, want)
+		}
+	}
+}

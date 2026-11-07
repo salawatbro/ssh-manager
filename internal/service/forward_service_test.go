@@ -3,7 +3,12 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
+	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/salawat/sshmgr/internal/domain"
@@ -18,6 +23,12 @@ import (
 // real accept-loop/teardown machinery is covered exhaustively in
 // internal/forward.
 type fakeTunnelManager struct {
+	mu        sync.Mutex
+	startIDs  []string
+	idle      []forward.Status
+	probes    int
+	ticks     []forward.Traffic
+	statuses  []forward.Status
 	startFwd  domain.PortForward
 	startConn *sshx.Conn
 	startErr  error
@@ -34,6 +45,9 @@ type fakeTunnelManager struct {
 }
 
 func (m *fakeTunnelManager) Start(fwd domain.PortForward, conn *sshx.Conn) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.startIDs = append(m.startIDs, fwd.ID)
 	m.started = true
 	m.startFwd = fwd
 	m.startConn = conn
@@ -49,6 +63,36 @@ func (m *fakeTunnelManager) Running() []forward.Status { return m.running }
 
 func (m *fakeTunnelManager) Status(id string) forward.Status {
 	return forward.Status{ForwardID: id, State: m.statusState}
+}
+
+func (m *fakeTunnelManager) Statuses() []forward.Status { return m.statuses }
+
+func (m *fakeTunnelManager) ReportIdle(id string, state forward.State, detail string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.idle = append(m.idle, forward.Status{ForwardID: id, State: state, Detail: detail})
+	return true
+}
+
+func (m *fakeTunnelManager) ProbeAll() {
+	m.mu.Lock()
+	m.probes++
+	m.mu.Unlock()
+}
+
+func (m *fakeTunnelManager) Tick() []forward.Traffic    { return m.ticks }
+func (m *fakeTunnelManager) Traffic() []forward.Traffic { return m.ticks }
+
+func (m *fakeTunnelManager) startedIDs() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]string(nil), m.startIDs...)
+}
+
+func (m *fakeTunnelManager) idleReports() []forward.Status {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]forward.Status(nil), m.idle...)
 }
 
 // newForwardService wires a ForwardService over a real, shared database (so
@@ -312,12 +356,13 @@ func TestForwardUpdateChangesEditableFields(t *testing.T) {
 	in.Name = "renamed"
 	in.BindPort = 15432
 	in.DestPort = 5432
+	in.AutoStart, in.Reconnect = true, true
 	got, err := svc.Update(in)
 	if err != nil {
 		t.Fatalf("Update error = %v", err)
 	}
-	if got.Name != "renamed" || got.BindPort != 15432 || got.DestPort != 5432 {
-		t.Fatalf("Update = %+v, want name/ports changed", got)
+	if got.Name != "renamed" || got.BindPort != 15432 || got.DestPort != 5432 || !got.AutoStart || !got.Reconnect {
+		t.Fatalf("Update = %+v, want name/ports/switches changed", got)
 	}
 }
 
@@ -400,5 +445,43 @@ func TestForwardStartAlreadyRunningDoesNotDial(t *testing.T) {
 	}
 	if mgr.started {
 		t.Error("manager.Start was called for an already-running forward")
+	}
+}
+
+func TestForwardCheckPort(t *testing.T) {
+	svc := &ForwardService{}
+
+	for _, bad := range []int{0, -1, 65536} {
+		if _, err := svc.CheckPort(bad); errCode(err) != domain.CodeValidation {
+			t.Errorf("CheckPort(%d) error = %v, want ERR_VALIDATION", bad, err)
+		}
+	}
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+
+	held, err := svc.CheckPort(port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if held.Free || held.Suggest == 0 || held.Suggest == port {
+		t.Fatalf("CheckPort(held %d) = %+v, want busy with another port suggested", port, held)
+	}
+	if _, err := os.Stat("/usr/sbin/lsof"); err != nil {
+		t.Log("no lsof; owner not checked")
+	} else if want := fmt.Sprintf("(pid %d)", os.Getpid()); !strings.HasSuffix(held.Owner, want) {
+		t.Errorf("Owner = %q, want this test process %q", held.Owner, want)
+	}
+
+	_ = ln.Close()
+	free, err := svc.CheckPort(port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !free.Free || free.Owner != "" || free.Suggest != 0 {
+		t.Fatalf("CheckPort(released %d) = %+v, want free and nothing else", port, free)
 	}
 }

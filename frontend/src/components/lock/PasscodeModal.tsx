@@ -20,10 +20,8 @@ export function PasscodeModal({ hasPin, onClose }: Props) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape' || e.isComposing) return
-      // Capture-phase + stopImmediatePropagation: SettingsModal's own Escape
-      // listener is bubble-phase on the same document target, so without
-      // intercepting during capture (before the event ever reaches the
-      // bubble phase) it would still fire and close Settings too.
+      // Caught in the capture phase and stopped there, so the settings
+      // page's own Escape (a bubble listener) does not close Settings too.
       e.stopImmediatePropagation()
       onClose()
     }
@@ -54,16 +52,16 @@ export function PasscodeModal({ hasPin, onClose }: Props) {
     }
   }
 
-  const field = 'h-[32px] rounded-[6px] border border-border bg-bg2 px-[10px] text-[13px] text-text outline-none'
+  const field = 'h-[32px] rounded-[6px] border border-line bg-s2 px-[10px] text-[13px] text-tx outline-none'
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-scrim" onClick={onClose}>
       <div
-        className="relative flex w-[420px] flex-col rounded-[10px] border border-border bg-bg1b p-[22px] shadow-[0_16px_48px_rgba(0,0,0,.5)]"
+        className="relative flex w-[420px] flex-col rounded-[10px] border border-line bg-s1 p-[22px] shadow-sheet"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-[15px] font-semibold text-text">{hasPin ? 'Change PIN' : 'Set PIN'}</div>
-        <div className="mt-[10px] text-[12.5px] leading-[1.5] text-textMuted">
+        <div className="text-[15px] font-semibold text-tx">{hasPin ? 'Change PIN' : 'Set PIN'}</div>
+        <div className="mt-[10px] text-[12.5px] leading-[1.5] text-tx2">
           Six digits. Zish keeps the PIN in the macOS keychain and never writes it to the servers database.
         </div>
         {hasPin && (
@@ -93,25 +91,25 @@ export function PasscodeModal({ hasPin, onClose }: Props) {
           onChange={(e) => setConfirm(sanitizePin(e.target.value))}
           className={'mt-[12px] w-full ' + field}
         />
-        {err && <div className="mt-[12px] text-[12px] text-stFailed">{err}</div>}
+        {err && <div className="mt-[12px] text-[12px] text-bad">{err}</div>}
         <div className="mt-[18px] flex items-center gap-[9px]">
           {hasPin && (
             <button
               type="button"
               onClick={() => void remove()}
-              className="h-[30px] rounded-[6px] border border-stFailed/40 bg-bg0 px-[11px] text-[11.5px] text-stFailed hover:bg-stFailed/10"
+              className="h-[30px] rounded-[6px] border border-bad/40 bg-bg px-[11px] text-[11.5px] text-bad hover:bg-bad/10"
             >
               Remove
             </button>
           )}
           <div className="flex-1" />
-          <button type="button" onClick={onClose} className="h-[30px] rounded-[6px] px-[14px] text-[12.5px] text-textMuted hover:text-text">
+          <button type="button" onClick={onClose} className="h-[30px] rounded-[6px] px-[14px] text-[12.5px] text-tx2 hover:text-tx">
             Cancel
           </button>
           <button
             type="button"
             onClick={() => void save()}
-            className="h-[30px] rounded-[6px] bg-accent px-[14px] text-[12.5px] font-medium text-onAccent"
+            className="h-[30px] rounded-[6px] bg-acc px-[14px] text-[12.5px] font-medium text-acc-on"
           >
             Save
           </button>

@@ -75,10 +75,11 @@ export function Groups(): $CancellablePromise<string[] | null> {
 }
 
 /**
- * ImportJSON reads a server-JSON file, validates every entry (SEC-07), skips
- * duplicates (same host/port/user) — both against servers already in the
- * database and against ones created earlier in this same import — and
- * creates the rest. Returns the count created.
+ * ImportJSON reads an export file, validates every entry (SEC-07), skips
+ * duplicate servers (same host/port/user) — both against servers already in
+ * the database and against ones created earlier in this same import — and
+ * creates the rest, then the file's tunnels and stacks on them. Returns the
+ * count of servers created.
  */
 export function ImportJSON(path: string): $CancellablePromise<number> {
     return $Call.ByID(3445467517, path);
@@ -100,18 +101,25 @@ export function SSHCommand(id: string): $CancellablePromise<string> {
 
 /**
  * SetGroupOrder persists a sidebar drag-reorder: ids is one group's full row
- * list in its new visual order. A successful change fires onServersChanged so
- * the tray's pinned list follows the sidebar's order.
+ * list in its new visual order.
  */
 export function SetGroupOrder(group: string, ids: string[] | null): $CancellablePromise<void> {
     return $Call.ByID(1348005271, group, ids);
 }
 
 /**
- * SetPinned pins or unpins a server for the menu-bar tray. Pinning is capped at
+ * SetLook changes only a server's icon and colour, with the same rules as a
+ * form save.
+ */
+export function SetLook(id: string, icon: string, color: string): $CancellablePromise<void> {
+    return $Call.ByID(2438680625, id, icon, color);
+}
+
+/**
+ * SetPinned pins or unpins a server for the menu-bar panel. Pinning is capped at
  * maxPinned; the next pin is refused with a validation error the frontend
  * surfaces. Re-pinning an already-pinned server and unpinning are always
- * allowed. A successful change fires onServersChanged so the tray rebuilds.
+ * allowed.
  */
 export function SetPinned(id: string, pinned: boolean): $CancellablePromise<void> {
     return $Call.ByID(2336406732, id, pinned);

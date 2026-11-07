@@ -103,9 +103,22 @@ func BuildPlan(chain []domain.Server, opts Options, configPath string) (Plan, er
 	for _, kv := range auth {
 		argv = append(argv, "-o", kv[0]+"="+kv[1])
 	}
-	argv = append(argv, "-p", strconv.Itoa(portOf(target)), "-l", target.User, "--", target.Host)
+	argv = append(argv, "-p", strconv.Itoa(portOf(target)), "-l", target.User)
+	if target.RunAfterConnect == "" {
+		argv = append(argv, "--", target.Host)
+	} else {
+		if err := checkNoControl("command to run after connecting", target.RunAfterConnect); err != nil {
+			return Plan{}, err
+		}
+		argv = append(argv, "-t", "--", target.Host, target.RunAfterConnect+execLoginShell)
+	}
 	return Plan{Argv: argv, Config: cfg, Hops: hops}, nil
 }
+
+// execLoginShell follows the user's command in the remote shell's -c string:
+// a remote command ends the session when it exits, so re-exec the login shell
+// to keep the user there (and keep a `cd` useful). Only the remote side parses it.
+const execLoginShell = "\nexec \"$SHELL\" -l"
 
 func hopAlias(i int) string { return "zish-hop-" + strconv.Itoa(i+1) }
 

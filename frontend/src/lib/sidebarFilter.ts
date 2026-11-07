@@ -1,9 +1,6 @@
-import Fuse from 'fuse.js'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { SERVER_FUSE_OPTIONS } from './fuzzy'
 
-// Sidebar filter helpers (spec 2026-07-21). Pure and framework-free so the
-// OR/AND semantics and the order guarantee are unit-testable.
+// Tag helpers for the sidebar and the server list.
 
 // parseTags splits the CSV `Server.tags` column. The backend joins tags with
 // ',' on save (internal/service/server_service.go, strings.Join) and never
@@ -26,29 +23,6 @@ export function allTags(servers: Server[]): string[] {
         out.push(t)
       }
     }
-  }
-  return out
-}
-
-// filterServers narrows the sidebar list: selected tags are OR'd (a server
-// passes with ANY of them), the text query fuzzes over the same fields the
-// ⌘K palette searches, and the two combine as AND. The BACKEND order is
-// preserved throughout — fuse returns score order, but groupServers folds
-// adjacent runs, so only the match SET is taken from it and the original
-// array is filtered.
-export function filterServers(servers: Server[], query: string, tags: string[]): Server[] {
-  let out = servers
-  if (tags.length > 0) {
-    out = out.filter((s) => {
-      const own = parseTags(s.tags)
-      return tags.some((t) => own.includes(t))
-    })
-  }
-  const q = query.trim()
-  if (q) {
-    const fuse = new Fuse(out, SERVER_FUSE_OPTIONS)
-    const hit = new Set(fuse.search(q).map((r) => r.item.id))
-    out = out.filter((s) => hit.has(s.id))
   }
   return out
 }

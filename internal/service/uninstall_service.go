@@ -75,6 +75,8 @@ func (s *UninstallService) Uninstall() error {
 		}
 	}
 	s.agent.wipeAll()
+	// Backups stop; the backup files themselves stay where they are.
+	_ = s.secret.DeleteBackupPassword()
 	_ = s.login.Set(false)      // remove the LaunchAgent (no-op if absent)
 	_ = os.RemoveAll(s.dataDir) // sshmgr.db + WAL/shm; open fds survive unlink on macOS
 	_ = os.RemoveAll(s.logDir)

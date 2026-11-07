@@ -23,25 +23,25 @@ export function HostKeyChangedModal({ request, onConfirm }: Props) {
   const blocked = step === 1 && !verified
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/[.58]">
-      <div className="w-[460px] rounded-[9px] border border-stFailed/45 bg-bg2 p-[20px] shadow-[0_20px_60px_rgba(0,0,0,.45)]">
-        <div className="flex items-center gap-[8px] text-stFailed">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-scrim">
+      <div className="w-[460px] rounded-[9px] border border-bad/45 bg-s2 p-[20px] shadow-sheet">
+        <div className="flex items-center gap-[8px] text-bad">
           <WarningTriangle />
           <span className="text-[15px] font-semibold">Host key CHANGED</span>
         </div>
 
-        <div className="mt-[10px] rounded-[6px] border border-stFailed/40 bg-stFailed/[.08] px-[10px] py-[8px] text-[12px] leading-[1.5] text-text">
+        <div className="mt-[10px] rounded-[6px] border border-bad/40 bg-bad/[.08] px-[10px] py-[8px] text-[12px] leading-[1.5] text-tx">
           The key offered by <span className="font-mono">{request.hostname}</span> does not match the one stored for it.
           This can mean the host was rebuilt — or that the connection is being intercepted.
         </div>
 
         <div className="mt-[12px] flex flex-col gap-[6px]">
-          <span className="text-[11px] font-medium text-textMuted">Stored</span>
-          <div className="selectable break-all rounded-[6px] border border-border bg-bg0 px-[10px] py-[7px] font-mono text-[11.5px] text-textMuted">
+          <span className="text-[11px] font-medium text-tx2">Stored</span>
+          <div className="selectable break-all rounded-[6px] border border-line bg-bg px-[10px] py-[7px] font-mono text-[11.5px] text-tx2">
             {request.oldFingerprint}
           </div>
-          <span className="mt-[4px] text-[11px] font-medium text-textMuted">Offered now</span>
-          <div className="selectable break-all rounded-[6px] border border-stFailed/40 bg-bg0 px-[10px] py-[7px] font-mono text-[11.5px] text-text">
+          <span className="mt-[4px] text-[11px] font-medium text-tx2">Offered now</span>
+          <div className="selectable break-all rounded-[6px] border border-bad/40 bg-bg px-[10px] py-[7px] font-mono text-[11.5px] text-tx">
             {request.fingerprint}
           </div>
         </div>
@@ -50,28 +50,28 @@ export function HostKeyChangedModal({ request, onConfirm }: Props) {
           <button
             type="button"
             onClick={() => setVerified((v) => !v)}
-            className="mt-[12px] flex w-full items-center gap-[8px] rounded-[6px] border border-border bg-bg0 px-[10px] py-[8px] text-left"
+            className="mt-[12px] flex w-full items-center gap-[8px] rounded-[6px] border border-line bg-bg px-[10px] py-[8px] text-left"
           >
             <span
               className={`flex h-[16px] w-[18px] shrink-0 items-center justify-center rounded-[3px] border text-[10px] ${
-                verified ? 'border-accent bg-accentDim text-accentFg' : 'border-borderStrong text-transparent'
+                verified ? 'border-acc bg-acc-soft text-acc-tx' : 'border-line2 text-transparent'
               }`}
             >
               ✓
             </span>
-            <span className="text-[12px] text-text">I verified this fingerprint out of band</span>
+            <span className="text-[12px] text-tx">I verified this fingerprint out of band</span>
           </button>
         )}
 
         <div className="mt-[18px] flex items-center gap-[9px]">
-          <span className="text-[12px] text-textDim">This is a security decision.</span>
+          <span className="text-[12px] text-tx3">This is a security decision.</span>
           <span className="flex-1" />
           <button
             type="button"
             disabled={blocked}
             onClick={() => (step === 0 ? setStep(1) : onConfirm(true))}
             className={`h-[32px] rounded-[6px] px-[14px] text-[12.5px] font-medium ${
-              blocked ? 'cursor-not-allowed border border-border bg-bg0 text-textDim' : 'border border-stFailed/50 text-stFailed'
+              blocked ? 'cursor-not-allowed border border-line bg-bg text-tx3' : 'border border-bad/50 text-bad'
             }`}
           >
             {step === 0 ? 'Continue anyway' : 'Replace key and connect'}
@@ -79,7 +79,7 @@ export function HostKeyChangedModal({ request, onConfirm }: Props) {
           <button
             type="button"
             onClick={() => onConfirm(false)}
-            className="h-[32px] rounded-[6px] bg-accent px-[16px] text-[12.5px] font-semibold text-onAccent"
+            className="h-[32px] rounded-[6px] bg-acc px-[16px] text-[12.5px] font-semibold text-acc-on"
           >
             Cancel
           </button>

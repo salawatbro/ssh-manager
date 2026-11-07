@@ -19,7 +19,9 @@ const (
 )
 
 // PortForward is a saved tunnel definition attached to a server. It carries no
-// secret (SEC-01) — it only names ports and hosts.
+// secret (SEC-01) — it only names ports and hosts. AutoStart brings it up when
+// Zish starts (after unlock when the App Lock is on); Reconnect brings it back
+// after it drops on its own.
 type PortForward struct {
 	ID        string      `gorm:"primaryKey;type:text" json:"id"`
 	ServerID  string      `gorm:"not null;index" json:"serverId"`
@@ -30,6 +32,10 @@ type PortForward struct {
 	BindPort  int         `gorm:"not null" json:"bindPort"`
 	DestHost  string      `gorm:"not null" json:"destHost"`
 	DestPort  int         `gorm:"not null" json:"destPort"`
+	Icon      string      `gorm:"not null;default:''" json:"icon"`
+	Color     string      `gorm:"not null;default:''" json:"color"`
+	AutoStart bool        `gorm:"not null;default:false" json:"autoStart"`
+	Reconnect bool        `gorm:"not null;default:false" json:"reconnect"`
 	CreatedAt time.Time   `json:"createdAt"`
 	UpdatedAt time.Time   `json:"updatedAt"`
 }
@@ -51,6 +57,9 @@ func (f *PortForward) Validate() error {
 	}
 	if !validPort(f.BindPort) {
 		return validationError("The bind port must be between 1 and 65535.")
+	}
+	if err := validateLook(&f.Icon, &f.Color); err != nil {
+		return err
 	}
 	// -D (dynamic/SOCKS5) has no fixed destination: the SOCKS client
 	// negotiates one per proxied connection, so DestHost/DestPort don't

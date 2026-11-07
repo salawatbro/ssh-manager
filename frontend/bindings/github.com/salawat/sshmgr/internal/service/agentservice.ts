@@ -13,11 +13,22 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as agent$0 from "../agent/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as domain$0 from "../domain/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
+
+/**
+ * AnswerApproval settles the shown request. length is "once", "15m" or
+ * "lock"; a request that isn't grantable is always once.
+ */
+export function AnswerApproval(id: string, allow: boolean, length: string): $CancellablePromise<void> {
+    return $Call.ByID(4228968953, id, allow, length);
+}
 
 /**
  * ClearSignLog deletes the whole sign log.
@@ -49,6 +60,13 @@ export function Generate($in: $models.GenerateKeyInput): $CancellablePromise<dom
 }
 
 /**
+ * Grants returns the open approvals, newest first.
+ */
+export function Grants(): $CancellablePromise<agent$0.Grant[] | null> {
+    return $Call.ByID(2696163295);
+}
+
+/**
  * HostSnippet is a ~/.ssh/config block that uses this key for one host.
  */
 export function HostSnippet(id: string): $CancellablePromise<string> {
@@ -71,11 +89,12 @@ export function InspectFile(path: string): $CancellablePromise<$models.KeyFileIn
 }
 
 /**
- * InstallPublicKey adds the key to the server's ~/.ssh/authorized_keys,
- * connecting with the server's current auth method.
+ * InstallPublicKey adds the key to the server's ~/.ssh/authorized_keys. With
+ * an empty password Zish signs in the way the server is set up; otherwise the
+ * server itself takes that password just this once and nothing is stored.
  */
-export function InstallPublicKey(keyID: string, serverID: string): $CancellablePromise<void> {
-    return $Call.ByID(598729381, keyID, serverID);
+export function InstallPublicKey(keyID: string, serverID: string, password: string): $CancellablePromise<void> {
+    return $Call.ByID(598729381, keyID, serverID, password);
 }
 
 /**
@@ -83,6 +102,14 @@ export function InstallPublicKey(keyID: string, serverID: string): $CancellableP
  */
 export function ListKeys(): $CancellablePromise<domain$0.AgentKey[] | null> {
     return $Call.ByID(1730970236);
+}
+
+/**
+ * PendingApproval returns the request the approval window should show, or
+ * nil. Fetching it is how the window tells the confirmer it is up.
+ */
+export function PendingApproval(): $CancellablePromise<$models.ApprovalRequest | null> {
+    return $Call.ByID(22081152);
 }
 
 /**
@@ -97,6 +124,24 @@ export function PublicKeyLine(id: string): $CancellablePromise<string> {
  */
 export function Rename(id: string, name: string): $CancellablePromise<domain$0.AgentKey | null> {
     return $Call.ByID(645987890, id, name);
+}
+
+/**
+ * RevokeGrant closes one approval. An approval that already closed is not an
+ * error.
+ */
+export function RevokeGrant(id: string): $CancellablePromise<void> {
+    return $Call.ByID(2891584340, id);
+}
+
+/**
+ * RotateKeyOnServer moves one server from oldKeyID to newKeyID. Signed in
+ * with the old key it adds the new one; then it signs in with the new key,
+ * switches the server to it and only then takes the old key out of
+ * authorized_keys. Any failure before the switch leaves the server as it was.
+ */
+export function RotateKeyOnServer(oldKeyID: string, newKeyID: string, serverID: string): $CancellablePromise<$models.RotateResult | null> {
+    return $Call.ByID(1403583268, oldKeyID, newKeyID, serverID);
 }
 
 /**

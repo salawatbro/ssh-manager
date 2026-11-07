@@ -35,11 +35,23 @@ type ImportPreview struct {
 	Items []ImportItem `json:"items"`
 }
 
+// ImportPick is one host to import and the group it goes into ("" = none).
+type ImportPick struct {
+	Alias string `json:"alias"`
+	Group string `json:"group"`
+}
+
 // ImportService imports servers from ~/.ssh/config (FR-11).
 type ImportService struct {
-	repo *store.ServerRepo
-	path string
+	repo     *store.ServerRepo
+	path     string
+	settings *store.SettingsRepo
 }
+
+// SetImportSettings gives imported servers the icon and colour Settings ›
+// Appearance picks for new servers. Package-level so it never becomes a
+// frontend binding.
+func SetImportSettings(s *ImportService, settings *store.SettingsRepo) { s.settings = settings }
 
 // NewImportService reads from the user's real ~/.ssh/config.
 func NewImportService(repo *store.ServerRepo) (*ImportService, error) {
@@ -98,14 +110,27 @@ func (s *ImportService) Preview() (*ImportPreview, error) {
 // duplicate/invalid), then wires jump_id from ProxyJump. Returns the count
 // created.
 func (s *ImportService) Confirm(aliases []string) (int, error) {
+	picks := make([]ImportPick, len(aliases))
+	for i, a := range aliases {
+		picks[i] = ImportPick{Alias: a}
+	}
+	return s.ConfirmGroups(picks)
+}
+
+// ConfirmGroups is Confirm with a group for each host (first run guesses
+// them).
+func (s *ImportService) ConfirmGroups(picks []ImportPick) (int, error) {
 	want := map[string]bool{}
-	for _, a := range aliases {
-		want[a] = true
+	group := map[string]string{}
+	for _, p := range picks {
+		want[p.Alias] = true
+		group[p.Alias] = p.Group
 	}
 	pv, err := s.Preview()
 	if err != nil {
 		return 0, err
 	}
+	icon, color := s.newServerLook()
 
 	// Pass 1: create the selected, importable servers.
 	created := map[string]string{} // alias → new server id
@@ -120,6 +145,8 @@ func (s *ImportService) Confirm(aliases []string) (int, error) {
 			continue // defensive; Preview already flagged it
 		}
 		srv.ID = uuid.NewString()
+		srv.Icon, srv.Color = icon, color
+		srv.GroupName = strings.TrimSpace(group[it.Alias])
 		if err := s.repo.Create(srv); err != nil {
 			return count, err
 		}
@@ -157,6 +184,16 @@ func (s *ImportService) Confirm(aliases []string) (int, error) {
 		_ = s.repo.Update(srv)
 	}
 	return count, nil
+}
+
+func (s *ImportService) newServerLook() (icon, color string) {
+	set := domain.DefaultSettings()
+	if s.settings != nil {
+		if cur, err := s.settings.Get(); err == nil {
+			set = *cur
+		}
+	}
+	return set.NewServerLook()
 }
 
 func (s *ImportService) toItem(h sshx.ConfigHost) ImportItem {

@@ -36,7 +36,7 @@ func credsFor(sec secret.Store, signers SignerSource, srv *domain.Server, purpos
 		if srv.AgentKeyID == nil {
 			return sshx.Credentials{}, agent.ErrKeyMissing
 		}
-		s, err := signers.Signer(*srv.AgentKeyID, agent.ClientInfo{Purpose: purpose, Destination: srv.Name})
+		s, err := signers.Signer(*srv.AgentKeyID, agent.ClientInfo{Purpose: purpose, Target: agentTarget(srv)})
 		if err != nil {
 			return sshx.Credentials{}, err
 		}

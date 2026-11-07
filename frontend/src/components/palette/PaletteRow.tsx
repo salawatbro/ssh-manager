@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { envClassOf } from '../../lib/env'
 import { formatRecency } from '../../lib/relativeTime'
 import { formatQuickTarget } from '../../lib/quickConnect'
-import { StatusDot } from '../server/StatusDot'
+import { StatusDot } from '../ui/StatusDot'
 import type { PaletteRowData } from '../../stores/palette'
 
 // One palette row. mouseDown (not click) so it fires before the input blur, and
@@ -37,7 +37,7 @@ export function PaletteRow({
         onChoose()
       }}
       onMouseMove={onHover}
-      className={`flex h-[40px] cursor-pointer items-center gap-[10px] rounded-[6px] px-[10px] ${active ? 'bg-bgSel' : ''}`}
+      className={`flex h-[40px] cursor-pointer items-center gap-[10px] rounded-[6px] px-[10px] ${active ? 'bg-s3' : ''}`}
     >
       {row.kind === 'server' ? (
         <>
@@ -46,11 +46,11 @@ export function PaletteRow({
               sidebar row, there is no live per-server status to show. */}
           <span className={`h-[8px] w-[8px] shrink-0 rounded-env ${envClassOf(row.server.environment)}`} />
           <StatusDot status="disc" size={7} />
-          <span className="min-w-0 flex-1 truncate text-[13.5px] text-text">{row.server.name || row.server.host}</span>
-          <span className="shrink-0 truncate font-mono text-[11.5px] text-textDim">
+          <span className="min-w-0 flex-1 truncate text-[13.5px] text-tx">{row.server.name || row.server.host}</span>
+          <span className="shrink-0 truncate font-mono text-[11.5px] text-tx3">
             {row.server.user}@{row.server.host}
           </span>
-          <span className="w-[64px] shrink-0 text-right text-[11px] text-textDim">
+          <span className="w-[64px] shrink-0 text-right text-[11px] text-tx3">
             {formatRecency(row.server.lastUsedAt)}
           </span>
         </>
@@ -59,19 +59,19 @@ export function PaletteRow({
           {/* icon · label · hint, the design's three palette columns. The icon
               is a glyph, never a dot or a square — those two shapes stay
               reserved for status and environment (UI-11). */}
-          <row.icon size={13} strokeWidth={2} className="shrink-0 text-textDim" />
-          <span className="min-w-0 flex-1 truncate text-[13.5px] text-text">{row.label}</span>
-          {row.hint && <span className="shrink-0 font-mono text-[10.5px] text-textDim">{row.hint}</span>}
+          <row.icon size={13} strokeWidth={2} className="shrink-0 text-tx3" />
+          <span className="min-w-0 flex-1 truncate text-[13.5px] text-tx">{row.label}</span>
+          {row.hint && <span className="shrink-0 font-mono text-[10.5px] text-tx3">{row.hint}</span>}
         </>
       ) : (
         <>
           {/* Quick connect: a text glyph, deliberately not a dot (UI-11 —
               bare circles mean status, squares mean environment). */}
-          <span className="w-[7px] shrink-0 text-center text-[13px] text-accent">→</span>
-          <span className="min-w-0 flex-1 truncate text-[13.5px] text-text">
+          <span className="w-[7px] shrink-0 text-center text-[13px] text-acc">→</span>
+          <span className="min-w-0 flex-1 truncate text-[13.5px] text-tx">
             Connect to {formatQuickTarget(row.target)}
           </span>
-          <span className="shrink-0 text-[11px] text-textDim">
+          <span className="shrink-0 text-[11px] text-tx3">
             {row.existingName ? `opens ${row.existingName}` : 'saves to Quick connects'}
           </span>
         </>

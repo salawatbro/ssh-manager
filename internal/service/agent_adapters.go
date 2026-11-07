@@ -78,15 +78,68 @@ func NewHostResolver(servers *store.ServerRepo, known HostMatcher) agent.HostRes
 	return hostResolver{servers: servers, known: known}
 }
 
-func (h hostResolver) Resolve(key ssh.PublicKey) string {
+// Resolve prefers a production match: two servers can share a host key, and
+// the production rule must not depend on which one is listed first.
+func (h hostResolver) Resolve(key ssh.PublicKey) agent.Host {
 	list, err := h.servers.List()
 	if err != nil {
-		return ""
+		return agent.Host{}
 	}
-	for _, s := range list {
-		if h.known.Matches(net.JoinHostPort(s.Host, strconv.Itoa(s.Port)), key) {
-			return s.Name
+	var found *domain.Server
+	for i := range list {
+		s := &list[i]
+		if !h.known.Matches(net.JoinHostPort(s.Host, strconv.Itoa(s.Port)), key) {
+			continue
+		}
+		if found == nil || (s.Environment == domain.EnvProd && found.Environment != domain.EnvProd) {
+			found = s
 		}
 	}
-	return ""
+	if found == nil {
+		return agent.Host{}
+	}
+	host := agentTarget(found)
+	host.Via = jumpNames(found, list)
+	return host
+}
+
+// KeyOnProd reports whether a production server signs in with the Zish key.
+func (h hostResolver) KeyOnProd(keyID string) bool {
+	list, err := h.servers.ListByAgentKey(keyID)
+	if err != nil {
+		return true
+	}
+	for _, s := range list {
+		if s.Environment == domain.EnvProd {
+			return true
+		}
+	}
+	return false
+}
+
+// agentTarget describes a server for the approval prompt.
+func agentTarget(s *domain.Server) agent.Host {
+	addr := s.User + "@" + s.Host
+	if s.Port != 0 && s.Port != 22 {
+		addr = s.User + "@" + net.JoinHostPort(s.Host, strconv.Itoa(s.Port))
+	}
+	return agent.Host{Name: s.Name, Address: addr, Env: string(s.Environment)}
+}
+
+// jumpNames lists a server's jump hosts, the one nearest the Mac first.
+func jumpNames(s *domain.Server, all []domain.Server) []string {
+	byID := make(map[string]*domain.Server, len(all))
+	for i := range all {
+		byID[all[i].ID] = &all[i]
+	}
+	var via []string
+	for cur := s; cur.JumpID != nil && len(via) < 8; {
+		next, ok := byID[*cur.JumpID]
+		if !ok {
+			break
+		}
+		via = append([]string{next.Name}, via...)
+		cur = next
+	}
+	return via
 }

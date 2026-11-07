@@ -18,7 +18,12 @@ type SettingsService struct {
 	repo    *store.SettingsRepo
 	login   LoginAgent
 	onSaved func(prev, next domain.Settings)
+	stacks  *store.StackRepo
 }
+
+// SetSettingsStacks lets Update refuse a launcher shortcut a stack already
+// uses. Package-level so it never becomes a frontend binding.
+func SetSettingsStacks(s *SettingsService, stacks *store.StackRepo) { s.stacks = stacks }
 
 // SetOnSettingsSaved registers fn to run after every successful Update, e.g.
 // to start or stop the agent socket. Package-level so it never becomes a
@@ -51,6 +56,16 @@ func (s *SettingsService) Update(in domain.Settings) (*domain.Settings, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Sanitise would quietly put ⌥Space back; a shortcut the user recorded
+	// is refused with the reason instead.
+	if in.LauncherHotkey, err = domain.ParseLauncherShortcut(in.LauncherHotkey); err != nil {
+		return nil, err
+	}
+	if in.LauncherHotkey != prev.LauncherHotkey {
+		if err := s.launcherHotkeyFree(in.LauncherHotkey); err != nil {
+			return nil, err
+		}
+	}
 	in.Sanitise()
 	if err := s.repo.Save(&in); err != nil {
 		return nil, err
@@ -64,4 +79,21 @@ func (s *SettingsService) Update(in domain.Settings) (*domain.Settings, error) {
 		}
 	}
 	return &in, nil
+}
+
+func (s *SettingsService) launcherHotkeyFree(sc string) error {
+	if sc == "" || s.stacks == nil {
+		return nil
+	}
+	all, err := s.stacks.List()
+	if err != nil {
+		return err
+	}
+	for _, st := range all {
+		if st.Shortcut == sc {
+			return domain.NewError(domain.CodeValidation,
+				ShortcutLabel(sc)+" already launches "+st.Name+". Pick another shortcut.")
+		}
+	}
+	return nil
 }

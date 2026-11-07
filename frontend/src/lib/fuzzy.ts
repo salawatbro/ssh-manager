@@ -1,13 +1,14 @@
 import Fuse, { type IFuseOptions } from 'fuse.js'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 
-// One fuse config for every server search surface: the ⌘K palette here and
-// the sidebar filter (lib/sidebarFilter.ts) must match exactly — a shared
-// constant is what keeps them from drifting apart.
+// How loose every fuzzy search is: the ⌘K palette, the sidebar filter
+// (lib/sidebarFilter.ts) and the launcher (lib/launcherRows.ts) must match
+// alike — a shared constant is what keeps them from drifting apart.
+export const FUZZY_MATCH = { threshold: 0.4, ignoreLocation: true } as const
+
 export const SERVER_FUSE_OPTIONS: IFuseOptions<Server> = {
   keys: ['name', 'host', 'user', 'group', 'tags'],
-  threshold: 0.4,
-  ignoreLocation: true,
+  ...FUZZY_MATCH,
 }
 
 // searchServers returns the palette's server rows. Empty query → recency order

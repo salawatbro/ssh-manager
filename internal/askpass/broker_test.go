@@ -361,3 +361,28 @@ func TestSanitizeTitle(t *testing.T) {
 		t.Fatalf("title has %d runes", n)
 	}
 }
+
+// OnRedeem hears the helper's pid once, on a successful redeem only.
+func TestRedeemFromReportsThePid(t *testing.T) {
+	b, _, _ := newTestBroker(t, &fakeSecrets{})
+	var got []int
+	l := testLaunch("")
+	l.OnRedeem = func(pid int) { got = append(got, pid) }
+	tok, err := b.Issue(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.RedeemFrom(tok, 4242); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.RedeemFrom(tok, 4243); !errors.Is(err, ErrTokenUsed) {
+		t.Fatalf("second redeem = %v", err)
+	}
+	tok2, _ := b.Issue(l)
+	if _, err := b.RedeemFrom(tok2, 0); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != 4242 {
+		t.Fatalf("OnRedeem calls = %v", got)
+	}
+}

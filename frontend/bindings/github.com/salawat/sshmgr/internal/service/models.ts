@@ -4,6 +4,9 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as domain$0 from "../domain/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as forward$0 from "../forward/models.js";
 
 /**
  * AgentSnippet is the text the Keys view offers to paste.
@@ -31,6 +34,131 @@ export interface AgentStatus {
 }
 
 /**
+ * ApprovalHost is a server a stack approval names.
+ */
+export interface ApprovalHost {
+    "name": string;
+    "env": string;
+}
+
+/**
+ * ApprovalRequest is what the approval window shows: the approval:request
+ * event payload and PendingApproval's result.
+ */
+export interface ApprovalRequest {
+    "id": string;
+    "keyName": string;
+    "fingerprint": string;
+
+    /**
+     * server name, or "host key SHA256:…"; "" if unknown
+     */
+    "server": string;
+
+    /**
+     * user@host[:port] of a Zish server
+     */
+    "address": string;
+
+    /**
+     * "" when the server isn't in Zish
+     */
+    "env": string;
+
+    /**
+     * jump hosts, nearest the Mac first
+     */
+    "via": string[] | null;
+
+    /**
+     * "ssh"
+     */
+    "client": string;
+
+    /**
+     * "iTerm"
+     */
+    "app": string;
+
+    /**
+     * "ssh ← zsh ← login ← iTerm2"
+     */
+    "chain": string;
+    "pid": number;
+    "inProcess": boolean;
+    "forwarded": boolean;
+
+    /**
+     * the window may offer longer than once
+     */
+    "grantable": boolean;
+
+    /**
+     * the length picked first
+     */
+    "length": string;
+
+    /**
+     * approving runs Touch ID next
+     */
+    "touchId": boolean;
+    "expiresAt": string;
+
+    /**
+     * Stack is set when one approval covers a whole stack launch.
+     */
+    "stack": string;
+    "stackServers": ApprovalHost[] | null;
+    "stackTunnels": string[] | null;
+}
+
+/**
+ * BackupEntry is one backup a restore can pick.
+ */
+export interface BackupEntry {
+    "path": string;
+    "mac": string;
+
+    /**
+     * unix ms
+     */
+    "created": number;
+    "size": number;
+    "inCloud": boolean;
+    "thisMac": boolean;
+}
+
+/**
+ * BackupStatus is what Settings › Data shows about backups.
+ */
+export interface BackupStatus {
+    "enabled": boolean;
+
+    /**
+     * Folder is where this Mac's backups go.
+     */
+    "folder": string;
+    "icloud": boolean;
+
+    /**
+     * Available is false while iCloud Drive is off or the chosen folder is gone.
+     */
+    "available": boolean;
+
+    /**
+     * unix ms of this Mac's newest backup; 0 = none
+     */
+    "last": number;
+    "count": number;
+    "running": boolean;
+
+    /**
+     * Error is the last backup's failure, cleared by the next success.
+     */
+    "error": string;
+}
+
+/**
  * CodeRequest is the code:request event payload (TZ 8 TOTP/2FA addendum).
  * It mirrors sshx.CodeRequest as a concrete named type so main.go's
  * application.RegisterEvent[CodeRequest] gives the binding generator a type
@@ -46,6 +174,18 @@ export interface CodeRequest {
      * whether the typed answer should be visible
      */
     "echo": boolean;
+}
+
+/**
+ * CommandInput is what the command form sends. An empty ID creates a command
+ * for ServerID; otherwise ServerID is ignored.
+ */
+export interface CommandInput {
+    "id": string;
+    "serverId": string;
+    "name": string;
+    "command": string;
+    "inMenuBar": boolean;
 }
 
 /**
@@ -89,6 +229,10 @@ export interface CreateServerInput {
     "environment": domain$0.Environment;
     "tags": string[] | null;
     "notes": string;
+    "icon": string;
+    "color": string;
+    "runAfterConnect": string;
+    "terminal": string;
 }
 
 /**
@@ -105,6 +249,10 @@ export interface ForwardInput {
     "destHost": string;
     "bindPort": number;
     "destPort": number;
+    "icon": string;
+    "color": string;
+    "autoStart": boolean;
+    "reconnect": boolean;
 }
 
 /**
@@ -169,6 +317,14 @@ export interface ImportKeyInput {
 }
 
 /**
+ * ImportPick is one host to import and the group it goes into ("" = none).
+ */
+export interface ImportPick {
+    "alias": string;
+    "group": string;
+}
+
+/**
  * ImportPreview is the whole preview: the source path and every host, keep and
  * skip alike.
  */
@@ -193,6 +349,19 @@ export interface KeyFileInfo {
 }
 
 /**
+ * LockStatus is what the lock screen says about the lock.
+ */
+export interface LockStatus {
+    "locked": boolean;
+    "reason": string;
+
+    /**
+     * Since is when the lock engaged, in Unix milliseconds; 0 while unlocked.
+     */
+    "since": number;
+}
+
+/**
  * OpenResult carries a non-error notice for a successful Open, e.g. that the
  * chosen terminal was missing and Terminal opened instead.
  */
@@ -206,6 +375,122 @@ export interface OpenResult {
 export interface PlatformInfo {
     "os": string;
     "arch": string;
+}
+
+/**
+ * PortCheck answers whether a tunnel could listen on a port of this Mac and,
+ * when not, who holds it and the next port that is free.
+ */
+export interface PortCheck {
+    "free": boolean;
+    "owner": string;
+    "suggest": number;
+}
+
+/**
+ * RotateResult is how moving one server to a new key went.
+ */
+export interface RotateResult {
+    /**
+     * OldKeyRemoved is false when the server already uses the new key but
+     * the old one is still in its authorized_keys; Note says why.
+     */
+    "oldKeyRemoved": boolean;
+    "note": string;
+}
+
+/**
+ * SecurityCheck is one check. Items name what failed; Notes are plain facts
+ * shown next to them.
+ */
+export interface SecurityCheck {
+    "id": string;
+    "ok": boolean;
+    "ignored": boolean;
+    "title": string;
+    "detail": string;
+    "items": SecurityItem[] | null;
+    "notes": string[] | null;
+}
+
+/**
+ * SecurityItem is a server or key a failing check names.
+ */
+export interface SecurityItem {
+    /**
+     * "server" | "key"
+     */
+    "kind": string;
+    "id": string;
+    "name": string;
+}
+
+/**
+ * SecurityReport is the Security page: ten checks over Zish's own data.
+ */
+export interface SecurityReport {
+    /**
+     * passing checks
+     */
+    "score": number;
+    "total": number;
+    "checks": SecurityCheck[] | null;
+    "checkedAt": string;
+}
+
+/**
+ * StackInput is what the frontend sends to create or update a stack. Update
+ * replaces every field and every step.
+ */
+export interface StackInput {
+    "name": string;
+    "description": string;
+    "icon": string;
+    "color": string;
+    "shortcut": string;
+    "inMenuBar": boolean;
+    "oneApproval": boolean;
+    "steps": StackStepInput[] | null;
+}
+
+/**
+ * StackLaunch is what one Launch did, for the toast.
+ */
+export interface StackLaunch {
+    "servers": number;
+
+    /**
+     * Tunnels counts the tunnels this launch started; running ones are skipped.
+     */
+    "tunnels": number;
+    "terminal": string;
+
+    /**
+     * OneApproval: one Touch ID covered the launch.
+     */
+    "oneApproval": boolean;
+    "note": string;
+}
+
+/**
+ * StackLaunched is the stack:launched event: a launch the tray or a global
+ * shortcut started, so the window can show its outcome.
+ */
+export interface StackLaunched {
+    "stackId": string;
+    "result": StackLaunch;
+    "error": string;
+}
+
+/**
+ * StackStepInput is one step as the stack sheet sends it.
+ */
+export interface StackStepInput {
+    "kind": domain$0.StepKind;
+    "serverId": string;
+    "forwardId": string;
+    "placement": domain$0.Placement;
+    "runCommand": string;
 }
 
 /**
@@ -250,13 +535,12 @@ export interface TestResult {
 }
 
 /**
- * TrayConnect is the tray:connect event payload: the id of the pinned server
- * whose menu-bar entry was clicked. main.go emits it (after showing the window)
- * and the frontend connects to that server. Named here — like
- * HostKeyRequest/CodeRequest — so main.go's application.RegisterEvent[TrayConnect]
- * gives the binding generator a type for typed TypeScript, while
- * internal/service stays cgo-free.
+ * TunnelRow is one line of the Tunnels page: a saved forward, the name of the
+ * server it runs on, its last status and its recent traffic.
  */
-export interface TrayConnect {
-    "serverID": string;
+export interface TunnelRow {
+    "forward": domain$0.PortForward;
+    "serverName": string;
+    "status": forward$0.Status;
+    "traffic": forward$0.Traffic;
 }

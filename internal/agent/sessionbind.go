@@ -13,6 +13,7 @@ const maxBinds = 16
 
 type sessionBind struct {
 	hostKey    ssh.PublicKey
+	sessionID  []byte
 	forwarding bool
 }
 
@@ -39,5 +40,5 @@ func parseSessionBind(contents []byte) (sessionBind, error) {
 	if err := hostKey.Verify(msg.SessionID, &sig); err != nil {
 		return sessionBind{}, errors.New("agent: session-bind signature does not verify")
 	}
-	return sessionBind{hostKey: hostKey, forwarding: msg.Forwarding}, nil
+	return sessionBind{hostKey: hostKey, sessionID: msg.SessionID, forwarding: msg.Forwarding}, nil
 }

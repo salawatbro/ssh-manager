@@ -3,43 +3,67 @@
 
 import * as AgentService from "./agentservice.js";
 import * as AppInfoService from "./appinfoservice.js";
+import * as BackupService from "./backupservice.js";
+import * as CommandService from "./commandservice.js";
 import * as ForwardService from "./forwardservice.js";
 import * as ImportService from "./importservice.js";
 import * as LauncherService from "./launcherservice.js";
 import * as LockService from "./lockservice.js";
 import * as SSHService from "./sshservice.js";
+import * as SecurityService from "./securityservice.js";
 import * as ServerService from "./serverservice.js";
 import * as SettingsService from "./settingsservice.js";
+import * as StackService from "./stackservice.js";
 import * as UninstallService from "./uninstallservice.js";
 export {
     AgentService,
     AppInfoService,
+    BackupService,
+    CommandService,
     ForwardService,
     ImportService,
     LauncherService,
     LockService,
     SSHService,
+    SecurityService,
     ServerService,
     SettingsService,
+    StackService,
     UninstallService
 };
 
 export type {
     AgentSnippet,
     AgentStatus,
+    ApprovalHost,
+    ApprovalRequest,
+    BackupEntry,
+    BackupStatus,
     CodeRequest,
+    CommandInput,
     CreateServerInput,
     ForwardInput,
     GenerateKeyInput,
     HostKeyRequest,
     ImportItem,
     ImportKeyInput,
+    ImportPick,
     ImportPreview,
     KeyFileInfo,
+    LockStatus,
     OpenResult,
     PlatformInfo,
+    PortCheck,
+    RotateResult,
+    SecurityCheck,
+    SecurityItem,
+    SecurityReport,
+    StackInput,
+    StackLaunch,
+    StackLaunched,
+    StackStepInput,
     TempKeyView,
     TerminalOption,
     TestResult,
-    TrayConnect
+    TunnelRow
 } from "./models.js";

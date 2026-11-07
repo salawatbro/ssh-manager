@@ -43,29 +43,29 @@ export function DeleteKeyModal({ k, onClose }: { k: AgentKey; onClose: () => voi
       }
     >
       {inUse ? (
-        <div className="text-[12.5px] leading-[1.5] text-textMuted">
+        <div className="text-[12.5px] leading-[1.5] text-tx2">
           These servers sign in with this key. Switch them to another key first:
           <ul className="mt-[8px] flex flex-col gap-[3px]">
             {usedBy!.map((s) => (
-              <li key={s.id} className="text-text">
-                • {s.name} <span className="font-mono text-textDim">{s.user}@{s.host}</span>
+              <li key={s.id} className="text-tx">
+                • {s.name} <span className="font-mono text-tx3">{s.user}@{s.host}</span>
               </li>
             ))}
           </ul>
         </div>
       ) : (
-        <div className="flex flex-col gap-[10px] text-[12.5px] leading-[1.5] text-textMuted">
+        <div className="flex flex-col gap-[10px] text-[12.5px] leading-[1.5] text-tx2">
           <span>
             The private key is removed from the Keychain. Servers that trust it keep its public key in
             authorized_keys until you remove it there.
           </span>
           <span>
-            Type <span className="font-semibold text-text">{k.name}</span> to confirm.
+            Type <span className="font-semibold text-tx">{k.name}</span> to confirm.
           </span>
           <Input autoFocus value={text} onChange={(e) => setText(e.target.value)} />
         </div>
       )}
-      {error && <div className="mt-[8px] text-[12px] text-stFailed">{error}</div>}
+      {error && <div className="mt-[8px] text-[12px] text-bad">{error}</div>}
     </KeyModal>
   )
 }

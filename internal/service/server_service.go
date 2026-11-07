@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -48,6 +49,11 @@ type CreateServerInput struct {
 	Environment domain.Environment `json:"environment"`
 	Tags        []string           `json:"tags"`
 	Notes       string             `json:"notes"`
+
+	Icon            string `json:"icon"`
+	Color           string `json:"color"`
+	RunAfterConnect string `json:"runAfterConnect"`
+	Terminal        string `json:"terminal"`
 }
 
 // TestResult is the outcome of TestConnection (FR-04). A connection outcome
@@ -97,11 +103,11 @@ type ServerService struct {
 	// unchanged.
 	forwards *store.ForwardRepo
 	stopper  forwardStopper
-
-	// onServersChanged, when set (SetOnServersChanged), fires after any change
-	// to the server set the menu-bar tray reflects: SetPinned, Update, Delete.
-	// nil for every non-tray caller (all tests) — then notify is a no-op.
-	onServersChanged func()
+	// stacks is nil until SetStackDeps; the export then carries no stacks.
+	stacks           *store.StackRepo
+	onStacksImported func()
+	// commands is nil until SetCommandDeps; the export then carries none.
+	commands *store.CommandRepo
 
 	// agent signs for Zish-key servers; nil until SetSignerSource.
 	agent *AgentService
@@ -143,30 +149,14 @@ func SetForwardDeps(s *ServerService, forwards *store.ForwardRepo, stopper forwa
 	s.stopper = stopper
 }
 
-// maxPinned caps how many servers show in the menu-bar tray's quick-connect
-// list. SetPinned refuses the (maxPinned+1)-th pin; PinnedForTray also truncates.
+// maxPinned caps how many servers the menu-bar panel lists. SetPinned refuses
+// the (maxPinned+1)-th pin.
 const maxPinned = 5
 
-// SetOnServersChanged registers the tray-rebuild callback. Package-level, not a
-// method, for the SAME reason as SetForwardDeps: application.NewService binds
-// every EXPORTED METHOD to the frontend, and a method here would leak a
-// spurious, unusable ServerService binding (a func param has no JS
-// construction). A package-level function stays callable by main.go yet
-// invisible to the binding generator.
-func SetOnServersChanged(s *ServerService, fn func()) {
-	s.onServersChanged = fn
-}
-
-func (s *ServerService) notifyServersChanged() {
-	if s.onServersChanged != nil {
-		s.onServersChanged()
-	}
-}
-
-// SetPinned pins or unpins a server for the menu-bar tray. Pinning is capped at
+// SetPinned pins or unpins a server for the menu-bar panel. Pinning is capped at
 // maxPinned; the next pin is refused with a validation error the frontend
 // surfaces. Re-pinning an already-pinned server and unpinning are always
-// allowed. A successful change fires onServersChanged so the tray rebuilds.
+// allowed.
 func (s *ServerService) SetPinned(id string, pinned bool) error {
 	if pinned {
 		srv, err := s.repo.Get(id)
@@ -180,20 +170,35 @@ func (s *ServerService) SetPinned(id string, pinned bool) error {
 			}
 			if n >= maxPinned {
 				return domain.NewError(domain.CodeValidation,
-					"You can pin up to 5 servers to the tray. Unpin one first.")
+					"You can pin up to 5 servers to the menu bar. Unpin one first.")
 			}
 		}
 	}
 	if err := s.repo.SetPinned(id, pinned); err != nil {
 		return err
 	}
-	s.notifyServersChanged()
+	return nil
+}
+
+// SetLook changes only a server's icon and colour, with the same rules as a
+// form save.
+func (s *ServerService) SetLook(id, icon, color string) error {
+	srv, err := s.repo.Get(id)
+	if err != nil {
+		return err
+	}
+	srv.Icon, srv.Color = icon, color
+	if err := srv.Validate(); err != nil {
+		return err
+	}
+	if err := s.repo.SetLook(id, srv.Icon, srv.Color); err != nil {
+		return err
+	}
 	return nil
 }
 
 // SetGroupOrder persists a sidebar drag-reorder: ids is one group's full row
-// list in its new visual order. A successful change fires onServersChanged so
-// the tray's pinned list follows the sidebar's order.
+// list in its new visual order.
 func (s *ServerService) SetGroupOrder(group string, ids []string) error {
 	if len(ids) == 0 {
 		return domain.NewError(domain.CodeValidation, "Nothing to reorder.")
@@ -201,27 +206,7 @@ func (s *ServerService) SetGroupOrder(group string, ids []string) error {
 	if err := s.repo.SetGroupOrder(group, ids); err != nil {
 		return err
 	}
-	s.notifyServersChanged()
 	return nil
-}
-
-// PinnedForTray returns the servers to show in the menu-bar tray: those the
-// user pinned, in the given order, capped at maxPinned. Pure (no repo access)
-// so it stays trivially testable; main.go feeds it serverService.List(). The
-// cap is belt-and-suspenders — SetPinned already refuses a 6th pin, but a
-// hand-edited database must never flood the menu.
-func PinnedForTray(servers []domain.Server) []domain.Server {
-	out := make([]domain.Server, 0, maxPinned)
-	for _, srv := range servers {
-		if !srv.Pinned {
-			continue
-		}
-		out = append(out, srv)
-		if len(out) == maxPinned {
-			break
-		}
-	}
-	return out
 }
 
 // List returns every server, ordered for the sidebar.
@@ -320,7 +305,6 @@ func (s *ServerService) Update(id string, input CreateServerInput) (*domain.Serv
 	if err := s.writeSecrets(id, input); err != nil {
 		return nil, err
 	}
-	s.notifyServersChanged()
 	// Return the freshly stored row so the caller sees the real usage
 	// state, which Update did not touch.
 	return s.repo.Get(id)
@@ -362,7 +346,6 @@ func (s *ServerService) Delete(id string) error {
 	// Best-effort: the secret is now unreachable (no server references it)
 	// and will be overwritten if the same UUID ever recurs (it won't).
 	_ = s.secret.Delete(id)
-	s.notifyServersChanged()
 	return nil
 }
 
@@ -489,13 +472,13 @@ func (s *ServerService) DetectKeys() ([]sshx.KeyInfo, error) {
 // ExportJSON writes all servers as JSON to path (FR-12 Data). Secrets stay in
 // the keychain; only server profiles are written.
 func (s *ServerService) ExportJSON(path string) error {
-	servers, err := s.repo.List()
+	f, err := s.exportFile()
 	if err != nil {
 		return err
 	}
-	b, err := ExportServersJSON(servers)
+	b, err := json.MarshalIndent(f, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot serialise the export: %w", err)
 	}
 	if err := os.WriteFile(path, b, 0o600); err != nil {
 		return domain.NewError(domain.CodeValidation, "Cannot write the export file. Check the folder is writable.")
@@ -503,30 +486,36 @@ func (s *ServerService) ExportJSON(path string) error {
 	return nil
 }
 
-// ImportJSON reads a server-JSON file, validates every entry (SEC-07), skips
-// duplicates (same host/port/user) — both against servers already in the
-// database and against ones created earlier in this same import — and
-// creates the rest. Returns the count created.
+// ImportJSON reads an export file, validates every entry (SEC-07), skips
+// duplicate servers (same host/port/user) — both against servers already in
+// the database and against ones created earlier in this same import — and
+// creates the rest, then the file's tunnels and stacks on them. Returns the
+// count of servers created.
 func (s *ServerService) ImportJSON(path string) (int, error) {
 	b, err := os.ReadFile(path) //nolint:gosec // user-chosen path via native dialog
 	if err != nil {
 		return 0, domain.NewError(domain.CodeValidation, "Cannot read the file.")
 	}
-	incoming, err := ParseServersJSON(b)
+	file, err := ParseExportJSON(b)
 	if err != nil {
 		return 0, err
 	}
+	incoming := file.Servers
 	existing, err := s.repo.List()
 	if err != nil {
 		return 0, err
 	}
 	count := 0
+	ids := map[string]string{}
 	for i := range incoming {
 		srv := incoming[i]
-		if serversDuplicate(existing, srv) {
+		if dup := serversDuplicate(existing, srv); dup != "" {
+			ids[srv.ID] = dup
 			continue
 		}
+		old := srv.ID
 		srv.ID = uuid.NewString()
+		ids[old] = srv.ID
 		srv.JumpID = nil // imported JSON may reference ids that don't exist here
 		if err := s.repo.Create(&srv); err != nil {
 			return count, err
@@ -536,16 +525,32 @@ func (s *ServerService) ImportJSON(path string) (int, error) {
 		// SAME file is also skipped, not just ones already in the database.
 		existing = append(existing, srv)
 	}
+	delete(ids, "")
+	forwards, err := s.importForwards(file.Forwards, ids)
+	if err != nil {
+		return count, err
+	}
+	if err := s.importStacks(file.Stacks, ids, forwards); err != nil {
+		return count, err
+	}
+	if err := s.importCommands(file.Commands, ids); err != nil {
+		return count, err
+	}
+	if len(file.Stacks) > 0 && s.onStacksImported != nil {
+		s.onStacksImported()
+	}
 	return count, nil
 }
 
-func serversDuplicate(existing []domain.Server, s domain.Server) bool {
+// serversDuplicate returns the id of a server with the same host, port and
+// user, or "".
+func serversDuplicate(existing []domain.Server, s domain.Server) string {
 	for _, e := range existing {
 		if e.Host == s.Host && e.Port == s.Port && e.User == s.User {
-			return true
+			return e.ID
 		}
 	}
-	return false
+	return ""
 }
 
 // toServer maps the input onto a domain server, applying defaults.
@@ -582,5 +587,10 @@ func (in CreateServerInput) toServer() *domain.Server {
 		Environment: env,
 		Tags:        strings.Join(in.Tags, ","),
 		Notes:       in.Notes,
+
+		Icon:            in.Icon,
+		Color:           in.Color,
+		RunAfterConnect: in.RunAfterConnect,
+		Terminal:        in.Terminal,
 	}
 }

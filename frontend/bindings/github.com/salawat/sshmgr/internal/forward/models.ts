@@ -11,13 +11,15 @@ export enum State {
     $zero = "",
 
     /**
-     * The three states a forward can report: running while its listener is
-     * accepting, stopped after a deliberate Stop, error when the listener failed
-     * to bind or the accept loop died unexpectedly.
+     * The states a forward can report: running while its listener is accepting,
+     * stopped after a deliberate Stop, error when the listener failed to bind or
+     * the tunnel died on its own, retrying while the service waits to reconnect a
+     * dropped tunnel (reported through ReportIdle, never by the Manager itself).
      */
     StateRunning = "running",
     StateStopped = "stopped",
     StateError = "error",
+    StateRetrying = "retrying",
 };
 
 /**
@@ -28,4 +30,27 @@ export interface Status {
     "forwardId": string;
     "state": State;
     "detail": string;
+
+    /**
+     * PortBusy marks an error from a listener on this Mac whose port another
+     * process holds, so the UI can name the owner and offer a free port.
+     */
+    "portBusy": boolean;
+}
+
+/**
+ * Traffic is one tunnel's recent throughput: bytes per interval, oldest first,
+ * and their sum.
+ */
+export interface Traffic {
+    "forwardId": string;
+    "buckets": number[] | null;
+    "total": number;
+}
+
+/**
+ * TrafficReport is the forward:stats event payload.
+ */
+export interface TrafficReport {
+    "tunnels": Traffic[] | null;
 }

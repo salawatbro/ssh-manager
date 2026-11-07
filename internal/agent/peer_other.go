@@ -12,3 +12,5 @@ func peerCred(*net.UnixConn) (uid, pid int, err error) {
 }
 
 func processInfo(pid int) ClientInfo { return ClientInfo{PID: pid} }
+
+func procStart(int) (int64, bool) { return 0, false }

@@ -22,5 +22,9 @@ export function serverInputWithKey(s: Server, keyId: string): CreateServerInput 
     environment: s.environment,
     tags: parseTags(s.tags),
     notes: s.notes,
+    icon: s.icon,
+    color: s.color,
+    runAfterConnect: s.runAfterConnect,
+    terminal: s.terminal,
   }
 }

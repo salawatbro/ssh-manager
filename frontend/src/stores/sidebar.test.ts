@@ -21,22 +21,25 @@ beforeEach(() => {
 })
 
 describe('sidebar store', () => {
-  it('toggles tags on and off', async () => {
+  it('toggles a scope back to all servers', async () => {
     const useSidebar = await loadStore()
-    useSidebar.getState().toggleTag('db')
-    useSidebar.getState().toggleTag('web')
-    expect(useSidebar.getState().tags).toEqual(['db', 'web'])
-    useSidebar.getState().toggleTag('db')
-    expect(useSidebar.getState().tags).toEqual(['web'])
+    useSidebar.getState().toggleScope({ kind: 'group', group: 'Prod' })
+    expect(useSidebar.getState().scope).toEqual({ kind: 'group', group: 'Prod' })
+    useSidebar.getState().toggleScope({ kind: 'tag', tag: 'Prod' })
+    expect(useSidebar.getState().scope).toEqual({ kind: 'tag', tag: 'Prod' })
+    useSidebar.getState().toggleScope({ kind: 'tag', tag: 'Prod' })
+    expect(useSidebar.getState().scope).toEqual({ kind: 'all' })
   })
 
-  it('clearFilter resets query and tags', async () => {
-    const useSidebar = await loadStore()
-    useSidebar.getState().setQuery('prod')
-    useSidebar.getState().toggleTag('db')
-    useSidebar.getState().clearFilter()
-    expect(useSidebar.getState().query).toBe('')
-    expect(useSidebar.getState().tags).toEqual([])
+  it('persists the sort and ignores an unknown stored value', async () => {
+    let useSidebar = await loadStore()
+    expect(useSidebar.getState().sort).toBe('manual')
+    useSidebar.getState().setSort('recent')
+    useSidebar = await loadStore()
+    expect(useSidebar.getState().sort).toBe('recent')
+    backing['serverList.sort'] = 'sideways'
+    useSidebar = await loadStore()
+    expect(useSidebar.getState().sort).toBe('manual')
   })
 
   it('persists collapsed groups across a fresh load', async () => {

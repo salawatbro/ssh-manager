@@ -1,36 +1,39 @@
-import { Folder, FolderOpen } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
+import { Environment } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 
 interface Props {
   group: string
   count: number
+  env: Environment | null
   collapsed: boolean
   onToggle: () => void
 }
 
-// The redesign replaces the ▾/▸ glyph with a folder that opens and closes
-// (Zish.dc.html detail: a 13px stroked folder in textMuted). Lucide's
-// Folder/FolderOpen are the same two shapes at the same weight, and this
-// codebase already draws every other icon from lucide — no reason to inline
-// the design's raw paths.
-export function GroupHeader({ group, count, collapsed, onToggle }: Props) {
-  const Icon = collapsed ? Folder : FolderOpen
+const ENV_SQUARE: Record<string, string> = {
+  [Environment.EnvProd]: 'bg-prod',
+  [Environment.EnvStaging]: 'bg-stg',
+  [Environment.EnvDev]: 'bg-dev',
+}
+
+// The whole header toggles the group; the count stays visible when folded.
+export function GroupHeader({ group, count, env, collapsed, onToggle }: Props) {
   return (
-    // The whole header is the collapse toggle (spec 2026-07-21 §4). The count
-    // stays visible collapsed, so a folded group still reads as "N servers".
-    // Fixed glyph width keeps the title from shifting as the folder toggles.
     <button
       type="button"
       onClick={onToggle}
       aria-expanded={!collapsed}
-      className="flex w-full items-center gap-[7px] px-[10px] pt-[10px] pb-[4px] text-left"
+      className="group flex w-full items-center gap-[8px] px-[12px] pb-[5px] pt-[12px] text-left"
     >
-      <span className="flex w-[13px] shrink-0 items-center justify-center text-textMuted">
-        <Icon size={13} strokeWidth={1.8} />
-      </span>
-      <span className="min-w-0 flex-1 truncate text-[10.5px] font-semibold tracking-[.07em] text-textMuted">
-        {group.toUpperCase()}
-      </span>
-      <span className="shrink-0 text-[10.5px] text-textDim">{count}</span>
+      <span
+        aria-hidden="true"
+        className={`h-[7px] w-[7px] shrink-0 rounded-[2px] ${env ? ENV_SQUARE[env] : 'shadow-[inset_0_0_0_1.5px_var(--color-idle)]'}`}
+      />
+      <span className="min-w-0 truncate text-[12px] font-semibold text-tx2">{group || 'Ungrouped'}</span>
+      <span className="text-[11.5px] text-tx3">{count}</span>
+      <ChevronRight
+        size={12}
+        className={`shrink-0 text-tx3 opacity-0 transition-transform group-hover:opacity-100 ${collapsed ? 'opacity-100' : 'rotate-90'}`}
+      />
     </button>
   )
 }

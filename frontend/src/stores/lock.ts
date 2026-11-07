@@ -2,12 +2,18 @@ import { create } from 'zustand'
 import { LockService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { BiometricService } from '@bindings/github.com/salawat/sshmgr'
 
+export type LockReason = 'manual' | 'idle'
+
 interface LockState {
   locked: boolean
   hasPin: boolean
   biometricsAvailable: boolean
+  // Why and when the lock engaged ('' / 0 while unlocked); the lock screen
+  // says so. Sleep and launch locks come from the backend's Status.
+  reason: string
+  since: number
   refresh: () => Promise<void>
-  lock: () => void
+  lock: (reason: LockReason) => void
   unlock: () => void
   unlockWithBiometrics: (reason: string) => Promise<boolean>
   setLocked: (v: boolean) => void
@@ -21,6 +27,8 @@ export const useLock = create<LockState>((set, get) => ({
   locked: false,
   hasPin: false,
   biometricsAvailable: false,
+  reason: '',
+  since: 0,
 
   async refresh() {
     const [hasPin, biometricsAvailable] = await Promise.all([
@@ -32,24 +40,35 @@ export const useLock = create<LockState>((set, get) => ({
 
   // Engaging the lock only makes sense with a PIN set — otherwise there is no
   // way back in. Callers (⌘L, idle) rely on this guard.
-  lock() {
+  lock(reason) {
     if (!get().hasPin) return
-    set({ locked: true })
-    void LockService.Lock().catch(() => {})
+    if (!get().locked) set({ locked: true, reason, since: Date.now() })
+    void LockService.Lock(reason).catch(() => {})
   },
 
   // Only after the backend accepted the PIN (VerifyPin unlocks its gate).
   unlock() {
-    set({ locked: false })
+    set({ locked: false, reason: '', since: 0 })
   },
 
   async unlockWithBiometrics(reason) {
     const ok = await LockService.UnlockWithBiometrics(reason)
-    if (ok) set({ locked: false })
+    if (ok) set({ locked: false, reason: '', since: 0 })
     return ok
   },
 
+  // Follows the backend (boot, lock:changed); a lock this window did not
+  // start reads its reason from the backend.
   setLocked(v) {
-    set({ locked: v })
+    if (!v) {
+      set({ locked: false, reason: '', since: 0 })
+      return
+    }
+    if (!get().locked) set({ locked: true })
+    void LockService.Status()
+      .then((st) => {
+        if (st.locked && get().locked) set({ reason: st.reason, since: st.since })
+      })
+      .catch(() => {})
   },
 }))

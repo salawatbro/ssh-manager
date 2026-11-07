@@ -3,13 +3,14 @@ import { LauncherService, type TerminalOption } from '@bindings/github.com/salaw
 import { useSettings } from '../../stores/settings'
 import { toastError, toastSuccess } from '../../stores/toasts'
 import { launchErrorMessage } from '../../lib/launchErrors'
-import { tabHint, terminalSelectOptions } from '../../lib/terminalOptions'
-import { Select } from '../ui/Select'
-import { Row } from './Row'
+import { tabHint } from '../../lib/terminalOptions'
+import { Button } from '../ui/Button'
 import { Toggle } from './controls'
 import { LaunchCustomRow } from './LaunchCustomRow'
+import { Group, Row, Value } from './Row'
+import { TerminalTiles } from './TerminalTiles'
 
-// Settings → Connect: which terminal app opens a server, and how ssh is run.
+// Settings › Connect: which terminal app opens a server, and how ssh is run.
 export function LaunchSection() {
   const s = useSettings((st) => st.settings)
   const update = useSettings((st) => st.update)
@@ -39,57 +40,46 @@ export function LaunchSection() {
   }
 
   return (
-    <div className="flex flex-col">
-      <Row label="Terminal app" hint="Connect opens the server here, running your system ssh.">
-        <div className="w-[200px]">
-          <Select
-            ariaLabel="Terminal app"
-            value={s.terminal}
-            options={terminalSelectOptions(terminals, s.terminal)}
-            onChange={(v) => void update({ terminal: v })}
-          />
-        </div>
-      </Row>
-
+    <>
+      <TerminalTiles options={terminals} value={s.terminal} onChange={(terminal) => void update({ terminal })} />
       {s.terminal === 'custom' && (
-        <LaunchCustomRow value={s.terminalCustomCommand} onSave={(v) => void update({ terminalCustomCommand: v })} />
+        <Group>
+          <LaunchCustomRow value={s.terminalCustomCommand} onSave={(v) => void update({ terminalCustomCommand: v })} />
+        </Group>
       )}
-
-      <Row label="Open in a new tab" hint={tabHint(current) || 'Uses a tab in the front window when one is open.'}>
-        <Toggle
-          on={tabsOk && s.terminalOpenInTab}
-          onChange={(v) => {
-            if (tabsOk) void update({ terminalOpenInTab: v })
-          }}
-        />
-      </Row>
-
-      <Row
-        label="Auto-fill passwords, passphrases and 2FA codes"
-        hint="Zish answers ssh’s prompt once per connection. Host-key questions always stay with you."
+      <Group title="Opening">
+        <Row label="Open in a new tab" hint={tabHint(current) || 'Uses a tab in the front window when one is open.'}>
+          <Toggle
+            label="Open in a new tab"
+            on={tabsOk && s.terminalOpenInTab}
+            disabled={!tabsOk}
+            onChange={(v) => void update({ terminalOpenInTab: v })}
+          />
+        </Row>
+        <Row label="Split panes for stacks" hint="Other apps open each stack step in its own tab.">
+          <Value>iTerm2 only</Value>
+        </Row>
+        <Row label="Test terminal" hint="Opens a window that only prints a line; macOS may ask once to allow Automation.">
+          <Button size="sm" disabled={testing} onClick={() => void testTerminal()}>
+            {testing ? 'Opening…' : 'Open a test window'}
+          </Button>
+        </Row>
+      </Group>
+      <Group
+        title="Signing in"
+        note="Host keys are checked by ssh in the terminal against ~/.ssh/known_hosts, shared with your system ssh. Zish never answers a host-key question."
       >
-        <Toggle on={s.autoFillSecrets} onChange={(v) => void update({ autoFillSecrets: v })} />
-      </Row>
-
-      <Row label="Keep connections alive" hint="Sends a keep-alive every 30 s so idle sessions survive NAT and firewalls.">
-        <Toggle on={s.keepAlive} onChange={(v) => void update({ keepAlive: v })} />
-      </Row>
-
-      <Row label="Test terminal" hint="Opens a window that only prints a line — macOS may ask to allow Automation once.">
-        <button
-          type="button"
-          disabled={testing}
-          onClick={() => void testTerminal()}
-          className="h-[26px] shrink-0 rounded-[5px] border border-borderStrong px-[10px] text-[11.5px] text-textMuted hover:text-text disabled:opacity-50"
-        >
-          {testing ? 'Opening…' : 'Test'}
-        </button>
-      </Row>
-
-      <div className="pt-[13px] text-[11.5px] leading-[1.5] text-textDim">
-        Host keys are checked by ssh in the terminal and shared with your system ssh in{' '}
-        <span className="font-mono">~/.ssh/known_hosts</span>. Zish never answers a host-key question.
-      </div>
-    </div>
+        <Row label="Auto-fill passwords, passphrases and codes" hint="Zish answers ssh from Keychain, once per connection.">
+          <Toggle
+            label="Auto-fill passwords, passphrases and codes"
+            on={s.autoFillSecrets}
+            onChange={(v) => void update({ autoFillSecrets: v })}
+          />
+        </Row>
+        <Row label="Keep connections alive" hint="Sends ServerAliveInterval 30 so idle sessions stay open.">
+          <Toggle label="Keep connections alive" on={s.keepAlive} onChange={(v) => void update({ keepAlive: v })} />
+        </Row>
+      </Group>
+    </>
   )
 }

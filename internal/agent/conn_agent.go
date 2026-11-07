@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"io"
 	"sync"
@@ -33,8 +35,8 @@ func (a *connAgent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error)
 }
 
 func (a *connAgent) SignWithFlags(key ssh.PublicKey, data []byte, flags sshagent.SignatureFlags) (*ssh.Signature, error) {
-	dest, fwd := a.destination()
-	return a.core.sign(signRequest{pub: key, data: data, flags: flags, client: a.client, dest: dest, forwarded: fwd})
+	host, verified, fwd := a.destination(data)
+	return a.core.sign(signRequest{pub: key, data: data, flags: flags, client: a.client, host: host, verified: verified, forwarded: fwd})
 }
 
 func (a *connAgent) Add(key sshagent.AddedKey) error { return a.core.addTemp(key) }
@@ -61,29 +63,43 @@ func (a *connAgent) Extension(extensionType string, contents []byte) ([]byte, er
 	return nil, nil
 }
 
-// destination names the server the last bind points at; forwarded is true
-// when any bind on this connection came through agent forwarding.
-func (a *connAgent) destination() (string, bool) {
+// destination names the server a request signs for. A bind whose session id
+// opens the signed userauth request proves it (verified); otherwise the last
+// bind is shown, unproven. forwarded: any bind came through agent forwarding.
+func (a *connAgent) destination(data []byte) (host Host, verified, forwarded bool) {
 	a.mu.Lock()
 	binds := append([]sessionBind(nil), a.binds...)
 	a.mu.Unlock()
 	if len(binds) == 0 {
-		return "", false
+		return Host{}, false, false
 	}
-	fwd := false
 	for _, b := range binds {
-		fwd = fwd || b.forwarding
+		forwarded = forwarded || b.forwarding
 	}
-	last := binds[len(binds)-1].hostKey
-	a.core.mu.Lock()
-	hosts := a.core.hosts
-	a.core.mu.Unlock()
-	if hosts != nil {
-		if name := hosts.Resolve(last); name != "" {
-			return name, fwd
+	pick := binds[len(binds)-1]
+	if sid, ok := userauthSessionID(data); ok {
+		for i := len(binds) - 1; i >= 0; i-- {
+			if bytes.Equal(binds[i].sessionID, sid) {
+				pick, verified = binds[i], true
+				break
+			}
 		}
 	}
-	return "host key " + shortFingerprint(ssh.FingerprintSHA256(last)), fwd
+	return a.core.describeHost(pick.hostKey), verified, forwarded
+}
+
+// userauthSessionID returns the session id that opens an SSH userauth
+// request (RFC 4252 §7), the data ssh asks the agent to sign.
+func userauthSessionID(data []byte) ([]byte, bool) {
+	const msgUserauthRequest = 50
+	if len(data) < 4 {
+		return nil, false
+	}
+	n := binary.BigEndian.Uint32(data)
+	if n == 0 || uint64(len(data)) < 4+uint64(n)+1 || data[4+n] != msgUserauthRequest {
+		return nil, false
+	}
+	return data[4 : 4+n], true
 }
 
 func shortFingerprint(fp string) string {

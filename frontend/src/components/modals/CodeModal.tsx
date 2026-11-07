@@ -20,10 +20,10 @@ export function CodeModal({ request, onSubmit, onCancel }: Props) {
   }
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-[460px] rounded-[9px] border border-borderStrong bg-bg2 p-[20px] shadow-[0_20px_60px_rgba(0,0,0,.45)]">
-        <div className="text-[15px] font-semibold text-text">Verification code for {request.serverName}</div>
-        <div className="mt-[3px] break-words font-mono text-[12px] text-textMuted">{request.prompt}</div>
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-scrim">
+      <div className="w-[460px] rounded-[9px] border border-line2 bg-s2 p-[20px] shadow-sheet">
+        <div className="text-[15px] font-semibold text-tx">Verification code for {request.serverName}</div>
+        <div className="mt-[3px] break-words font-mono text-[12px] text-tx2">{request.prompt}</div>
         <input
           autoFocus
           type={request.echo ? 'text' : 'password'}
@@ -38,13 +38,13 @@ export function CodeModal({ request, onSubmit, onCancel }: Props) {
               onCancel()
             }
           }}
-          className="mt-[13px] h-[32px] w-full rounded-[5px] border border-border bg-bg0 px-[9px] font-mono text-[13px] text-text outline-none focus:border-accent"
+          className="mt-[13px] h-[32px] w-full rounded-[5px] border border-line bg-bg px-[9px] font-mono text-[13px] text-tx outline-none focus:border-acc"
         />
         <div className="mt-[18px] flex justify-end gap-[9px]">
           <button
             type="button"
             onClick={onCancel}
-            className="h-[32px] rounded-[6px] border border-borderStrong px-[15px] text-[13px] font-medium text-text"
+            className="h-[32px] rounded-[6px] border border-line2 px-[15px] text-[13px] font-medium text-tx"
           >
             Cancel
           </button>
@@ -52,7 +52,7 @@ export function CodeModal({ request, onSubmit, onCancel }: Props) {
             type="button"
             onClick={submit}
             disabled={code === ''}
-            className="h-[32px] rounded-[6px] bg-accent px-[15px] text-[13px] font-semibold text-onAccent disabled:opacity-50"
+            className="h-[32px] rounded-[6px] bg-acc px-[15px] text-[13px] font-semibold text-acc-on disabled:opacity-50"
           >
             Submit
           </button>

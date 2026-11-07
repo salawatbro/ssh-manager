@@ -70,21 +70,21 @@ export function ImportKeyModal({ onClose }: { onClose: () => void }) {
     >
       <div className="flex flex-col gap-[12px]">
         <div className="flex items-center gap-[10px]">
-          <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-textMuted" title={path}>
+          <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-tx2" title={path}>
             {path || 'No file chosen'}
           </span>
           <ModalButton onClick={() => void pick()}>{path ? 'Choose another…' : 'Choose file…'}</ModalButton>
         </div>
 
         {info && (
-          <div className="rounded-[6px] border border-border bg-bg1 px-[11px] py-[8px] text-[12px] text-textMuted">
+          <div className="rounded-[6px] border border-line bg-side px-[11px] py-[8px] text-[12px] text-tx2">
             {info.supported ? (
               <>
                 {keyTypeLabel(info.type)} key{info.encrypted ? ', protected by a passphrase' : ''}
-                {info.comment && <span className="font-mono text-textDim"> · {info.comment}</span>}
+                {info.comment && <span className="font-mono text-tx3"> · {info.comment}</span>}
               </>
             ) : (
-              <span className="text-stFailed">{info.reason || 'This key can’t be imported.'}</span>
+              <span className="text-bad">{info.reason || 'This key can’t be imported.'}</span>
             )}
           </div>
         )}
@@ -99,7 +99,7 @@ export function ImportKeyModal({ onClose }: { onClose: () => void }) {
               onChange={(e) => setPassphrase(e.target.value)}
               className="font-mono tracking-[1px]"
             />
-            <span className="text-[11px] text-textDim">Used once to read the key; Zish doesn’t store it.</span>
+            <span className="text-[11px] text-tx3">Used once to read the key; Zish doesn’t store it.</span>
           </label>
         )}
 
@@ -110,13 +110,13 @@ export function ImportKeyModal({ onClose }: { onClose: () => void }) {
               <Input value={name} onChange={(e) => setName(e.target.value)} />
             </label>
             <div className="flex items-center gap-[10px]">
-              <span className="min-w-0 flex-1 text-[12.5px] text-text">Confirm every use with Touch ID</span>
-              <Toggle on={confirm} onChange={setConfirm} />
+              <span className="min-w-0 flex-1 text-[12.5px] text-tx">Confirm every use with Touch ID</span>
+              <Toggle on={confirm} onChange={setConfirm} label="Confirm every use with Touch ID" />
             </div>
           </>
         )}
 
-        {(error || nameErr) && <div className="text-[12px] text-stFailed">{error ?? nameErr}</div>}
+        {(error || nameErr) && <div className="text-[12px] text-bad">{error ?? nameErr}</div>}
       </div>
     </KeyModal>
   )

@@ -1,18 +1,19 @@
 import { create } from 'zustand'
+import { sameScope, type Scope, type SortMode } from '../lib/serverList'
 
-// Sidebar-only UI state (spec 2026-07-21). Collapsed groups survive restarts
-// via localStorage; the filter text and tag selection are deliberately
-// session-only — a filter that silently persisted across launches would read
-// as missing servers. Keys are the RAW group value ('' for the ungrouped
-// run), never the "Ungrouped" display label.
-const LS_KEY = 'sidebar.collapsedGroups'
+// Server-list UI state. Collapsed groups and the sort survive restarts via
+// localStorage; the scope is session-only, so a restart never opens on a
+// filtered list that reads as missing servers. Collapse keys are the RAW group
+// value ('' for the ungrouped run), never the "Ungrouped" label.
+const COLLAPSED_KEY = 'sidebar.collapsedGroups'
+const SORT_KEY = 'serverList.sort'
+const SORTS: SortMode[] = ['manual', 'recent', 'name']
 
 // try/catch on every storage touch: vitest runs in node (no localStorage at
-// all), and a corrupted value must degrade to "everything expanded", never
-// throw at import time.
+// all), and a corrupted value must degrade to the default, never throw.
 function readCollapsed(): Record<string, true> {
   try {
-    const raw = localStorage.getItem(LS_KEY)
+    const raw = localStorage.getItem(COLLAPSED_KEY)
     if (!raw) return {}
     const parsed: unknown = JSON.parse(raw)
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -28,39 +29,53 @@ function readCollapsed(): Record<string, true> {
   return {}
 }
 
+function readSort(): SortMode {
+  try {
+    const raw = localStorage.getItem(SORT_KEY)
+    return SORTS.find((s) => s === raw) ?? 'manual'
+  } catch {
+    return 'manual'
+  }
+}
+
+function write(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // storage unavailable — the change still holds for this session
+  }
+}
+
 interface SidebarState {
-  query: string
-  tags: string[]
+  scope: Scope
+  sort: SortMode
   collapsed: Record<string, true>
-  setQuery: (q: string) => void
-  toggleTag: (tag: string) => void
-  clearFilter: () => void
+  setScope: (scope: Scope) => void
+  // Picking the scope that is already active goes back to all servers.
+  toggleScope: (scope: Scope) => void
+  setSort: (sort: SortMode) => void
   toggleGroup: (group: string) => void
 }
 
 export const useSidebar = create<SidebarState>((set, get) => ({
-  query: '',
-  tags: [],
+  scope: { kind: 'all' },
+  sort: readSort(),
   collapsed: readCollapsed(),
 
-  setQuery: (query) => set({ query }),
+  setScope: (scope) => set({ scope }),
 
-  toggleTag: (tag) =>
-    set((s) => ({
-      tags: s.tags.includes(tag) ? s.tags.filter((t) => t !== tag) : [...s.tags, tag],
-    })),
+  toggleScope: (scope) => set({ scope: sameScope(get().scope, scope) ? { kind: 'all' } : scope }),
 
-  clearFilter: () => set({ query: '', tags: [] }),
+  setSort: (sort) => {
+    set({ sort })
+    write(SORT_KEY, sort)
+  },
 
   toggleGroup: (group) => {
     const next = { ...get().collapsed }
     if (next[group]) delete next[group]
     else next[group] = true
     set({ collapsed: next })
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(next))
-    } catch {
-      // storage unavailable — collapse still works for this session
-    }
+    write(COLLAPSED_KEY, JSON.stringify(next))
   },
 }))

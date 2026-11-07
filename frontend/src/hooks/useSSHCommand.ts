@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ServerService } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { sshCommand } from '../lib/serverDetail'
+import { sshCommand } from '../lib/sshCommand'
 
 // The pastable ssh command for a server, rendered by the backend (shell
 // quoting, the whole jump chain). The local rendering shows until it arrives.

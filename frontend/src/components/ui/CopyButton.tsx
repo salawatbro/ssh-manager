@@ -18,8 +18,8 @@ export function CopyButton({ text, label = 'Copy' }: { text: string | (() => Pro
     <button
       type="button"
       onClick={() => void copy()}
-      className={`h-[24px] shrink-0 rounded-[5px] px-[9px] text-[11px] ${
-        copied ? 'bg-accentDim text-accentFg' : 'border border-borderStrong text-textMuted hover:text-text'
+      className={`h-[24px] shrink-0 rounded-[6px] px-[9px] text-[11px] ${
+        copied ? 'bg-acc-soft text-acc-tx' : 'border border-line2 text-tx2 hover:bg-s2 hover:text-tx'
       }`}
     >
       {copied ? 'Copied' : label}

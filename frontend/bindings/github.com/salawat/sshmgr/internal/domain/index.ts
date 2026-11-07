@@ -4,7 +4,9 @@
 export {
     AuthType,
     Environment,
-    ForwardType
+    ForwardType,
+    Placement,
+    StepKind
 } from "./models.js";
 
 export type {
@@ -12,5 +14,8 @@ export type {
     AgentSignEvent,
     PortForward,
     Server,
-    Settings
+    ServerCommand,
+    Settings,
+    Stack,
+    StackStep
 } from "./models.js";

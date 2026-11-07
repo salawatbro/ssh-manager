@@ -14,20 +14,36 @@ export interface QuickConnectTarget {
   port: number
 }
 
+// One `[user@]host[:port]` token; user is '' and port null when left out.
+// Shared with the New server sheet's ssh-command parser (lib/sshCommand.ts).
+export interface SshTarget {
+  user: string
+  host: string
+  port: number | null
+}
+
 // Full-string match only: mixed text like "deploy@web prod" is a search, not
 // a target. Port digits are validated by range below, not by the regex.
-const TARGET = /^([A-Za-z0-9._-]+)@([A-Za-z0-9.-]+)(?::(\d{1,5}))?$/
+const TARGET = /^(?:([A-Za-z0-9._-]+)@)?([A-Za-z0-9.-]+)(?::(\d{1,5}))?$/
 
-export function parseQuickConnect(q: string): QuickConnectTarget | null {
-  const m = TARGET.exec(q.trim())
+export function parseTarget(s: string): SshTarget | null {
+  const m = TARGET.exec(s.trim())
   if (!m) return null
-  const [, user, host, portStr] = m
+  const [, user = '', host, portStr] = m
   // Hostname sanity: no edge dots/dashes, no empty labels. (ssh would also
   // reject these — failing early keeps the row from ever offering them.)
   if (/^[.-]|[.-]$/.test(host) || host.includes('..')) return null
-  const port = portStr === undefined ? 22 : Number(portStr)
+  if (portStr === undefined) return { user, host, port: null }
+  const port = Number(portStr)
   if (port < 1 || port > 65535) return null
   return { user, host, port }
+}
+
+// The `@` is what makes ⌘K input a target, so a user is required here.
+export function parseQuickConnect(q: string): QuickConnectTarget | null {
+  const t = parseTarget(q)
+  if (!t || !t.user) return null
+  return { user: t.user, host: t.host, port: t.port ?? 22 }
 }
 
 // One rule for both the palette row label and the saved server's name, so a
@@ -51,6 +67,8 @@ export interface QuickConnectDeps {
   open: (serverId: string) => void
   reload: () => Promise<void>
   onError: (message: string) => void
+  // Settings › Appearance's start look for a new server; none = plain.
+  look?: { icon: string; color: string }
 }
 
 // The whole quick-connect flow. Collaborators are injected rather than
@@ -81,6 +99,10 @@ export async function runQuickConnect(target: QuickConnectTarget, deps: QuickCon
       environment: Environment.EnvNone,
       tags: [],
       notes: '',
+      icon: deps.look?.icon ?? '',
+      color: deps.look?.color ?? '',
+      runAfterConnect: '',
+      terminal: '',
     })
     if (!created) return
     deps.open(created.id)

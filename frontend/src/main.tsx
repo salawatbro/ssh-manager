@@ -1,6 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import '@fontsource-variable/geist/wght.css'
+import '@fontsource-variable/geist-mono/wght.css'
 import './styles/tokens.css'
+import { startTheme } from './lib/themeSync'
 import App from './App'
 
 // This is a desktop app, not a web page: the browser's default right-click
@@ -13,6 +16,8 @@ document.addEventListener('contextmenu', (e) => {
   if (el?.closest('input, textarea, [contenteditable="true"], .selectable')) return
   e.preventDefault()
 })
+
+startTheme()
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

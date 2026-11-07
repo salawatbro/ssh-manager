@@ -1,43 +1,43 @@
 import { useEffect, useRef, useState } from 'react'
+import { Fingerprint } from 'lucide-react'
 import { LockService } from '@bindings/github.com/salawat/sshmgr/internal/service'
+import { lockedLine } from '../../lib/lockScreen'
 import { useLock } from '../../stores/lock'
-import { useForwards } from '../../stores/forwards'
 import { useSettings } from '../../stores/settings'
+import { LockChips } from './LockChips'
 import { PinPad } from './PinPad'
 
-// Full-window lock. Rendered over a blurred UI; running tunnels keep going
-// underneath (the footer says so). Touch ID is offered when available
-// and enabled; the PIN is always the fallback. "Forgot passcode?" opens the
-// reset flow, wired via onForgot.
+const LINK = 'h-[28px] rounded-[7px] px-[10px] text-[12.5px] text-tx2 hover:bg-s2 hover:text-tx'
+
+// Full-window lock over the UI. Touch ID is offered when available and turned
+// on, and asked for once by itself; the PIN is always the fallback.
 export function LockOverlay({ onForgot }: { onForgot: () => void }) {
   const locked = useLock((s) => s.locked)
+  const reason = useLock((s) => s.reason)
+  const since = useLock((s) => s.since)
   const biometricsAvailable = useLock((s) => s.biometricsAvailable)
   const unlock = useLock((s) => s.unlock)
   const unlockWithBiometrics = useLock((s) => s.unlockWithBiometrics)
   const useBiometricsPref = useSettings((s) => s.settings?.lockUseBiometrics ?? false)
+  const idleMinutes = useSettings((s) => s.settings?.lockIdleMinutes ?? 0)
   const biometricsOn = biometricsAvailable && useBiometricsPref
   const [error, setError] = useState('')
   const [scanning, setScanning] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [useTouch, setUseTouch] = useState(biometricsOn)
-
-  const tunnelCount = useForwards(
-    (s) => Object.values(s.statusById).filter((st) => st.state === 'running').length,
-  )
   const autoTriedRef = useRef(false)
 
   async function submitPin(pin: string) {
     try {
-      const ok = await LockService.VerifyPin(pin)
-      if (ok) {
+      if (await LockService.VerifyPin(pin)) {
         setError('')
         unlock()
       } else {
-        setError('Incorrect PIN — try again.')
+        setError('Incorrect PIN. Try again.')
         setAttempt((a) => a + 1)
       }
     } catch {
-      setError('Could not verify — try again.')
+      setError('Could not check the PIN. Try again.')
       setAttempt((a) => a + 1)
     }
   }
@@ -46,20 +46,19 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
     setScanning(true)
     setError('')
     try {
-      const ok = await unlockWithBiometrics('Unlock Zish')
-      if (!ok) setError('Touch ID did not match — enter your PIN.')
+      if (!(await unlockWithBiometrics('Unlock Zish'))) setError('Touch ID did not match. Use your PIN.')
     } catch {
-      setError('Touch ID was cancelled — enter your PIN.')
+      setError('Touch ID was cancelled. Use your PIN.')
     } finally {
       setScanning(false)
     }
   }
 
-  // Auto-present Touch ID once when the overlay locks with biometrics on, so the
-  // user isn't required to click the button first. Resets on unlock for next time.
+  // Ask for Touch ID once per lock, so a finger is all it takes.
   useEffect(() => {
     if (!locked) {
       autoTriedRef.current = false
+      setUseTouch(biometricsOn)
       return
     }
     if (biometricsOn && useTouch && !scanning && !autoTriedRef.current) {
@@ -69,49 +68,79 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
   }, [locked, biometricsOn, useTouch, scanning])
 
   if (!locked) return null
+  const touchMode = useTouch && biometricsOn
+  const switchTo = (touch: boolean) => {
+    setError('')
+    setUseTouch(touch)
+  }
+  const why = lockedLine(reason, since, idleMinutes)
 
   return (
-    <div className="absolute inset-0 z-[100] flex items-center justify-center bg-bg0">
-      <div className="flex flex-col items-center" style={{ width: 320 }}>
-        <div className="mt-4 text-[19px] font-semibold text-text">Zish is locked</div>
-        <div className="mt-2 text-center text-[13.5px] leading-[1.5] text-textMuted">
-          Unlock to reach your hosts, keys and tunnels.
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Zish is locked"
+      className="absolute inset-0 z-[100] flex flex-col items-center bg-bg"
+      style={{ backgroundImage: 'radial-gradient(circle at 50% 38%, var(--color-acc-soft), transparent 46%)' }}
+    >
+      <div className="drag absolute inset-x-0 top-0 h-[52px]" />
+      <div className="mt-[176px] flex w-[320px] flex-col items-center gap-[18px]">
+        <span
+          aria-hidden="true"
+          className="flex h-[60px] w-[60px] items-center justify-center rounded-[18px] bg-acc text-acc-on shadow-[0_12px_32px_color-mix(in_srgb,var(--color-acc)_28%,transparent)]"
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14.74 2 6.42 13.67h4.73L8.88 22l8.7-12.37h-4.85z" />
+          </svg>
+        </span>
+        <div className="flex flex-col items-center gap-[6px] text-center">
+          <h1 className="m-0 text-[20px] font-semibold tracking-[-0.01em] text-tx">Zish is locked</h1>
+          {why && <span className="text-[12.5px] text-tx3">{why}</span>}
         </div>
 
-        {useTouch && biometricsOn ? (
-          <div className="mt-5 flex w-full flex-col items-center gap-3">
+        {touchMode ? (
+          <div className="mt-[6px] flex w-full flex-col items-center gap-[10px]">
             <button
               type="button"
               onClick={() => void touchUnlock()}
-              className="h-[34px] w-full rounded-[6px] bg-accent text-[12.5px] font-medium text-onAccent"
+              disabled={scanning}
+              className="flex h-[40px] w-full items-center justify-center gap-[8px] rounded-[10px] bg-acc text-[13.5px] font-semibold text-acc-on enabled:hover:brightness-110 disabled:opacity-80"
             >
+              <Fingerprint size={17} strokeWidth={1.9} aria-hidden="true" />
               {scanning ? 'Waiting for Touch ID…' : 'Unlock with Touch ID'}
             </button>
-            <button type="button" onClick={() => setUseTouch(false)} className="text-[12px] text-accentFg hover:text-accent">
+            <button type="button" onClick={() => switchTo(false)} className={LINK}>
               Use PIN instead
             </button>
           </div>
         ) : (
-          <div className="mt-5 flex w-full flex-col items-center gap-3">
+          <div className="mt-[6px] flex w-full flex-col items-center gap-[12px]">
             <PinPad resetKey={attempt} onComplete={(pin) => void submitPin(pin)} />
-            <span className="text-[11px] text-textDim">Six digits</span>
-            {biometricsOn && (
-              <button type="button" onClick={() => setUseTouch(true)} className="text-[12px] text-accentFg hover:text-accent">
-                Use Touch ID instead
+            <span className="text-[12px] text-tx3">Type your 6-digit PIN</span>
+            <div className="flex items-center gap-[6px]">
+              {biometricsOn && (
+                <>
+                  <button type="button" onClick={() => switchTo(true)} className={LINK}>
+                    Use Touch ID
+                  </button>
+                  <span aria-hidden="true" className="text-line2">
+                    ·
+                  </span>
+                </>
+              )}
+              <button type="button" onClick={onForgot} className={LINK}>
+                Forgot PIN?
               </button>
-            )}
+            </div>
           </div>
         )}
-
-        {error && <div className="mt-3 text-[12px] text-stFailed">{error}</div>}
-
-        <div className="mt-6 w-full border-t border-border pt-4 text-center font-mono text-[11px] text-textDim">
-          {tunnelCount} tunnels stay connected
-        </div>
-        <button type="button" onClick={onForgot} className="mt-4 text-[12px] text-textDim hover:text-text">
-          Forgot passcode?
-        </button>
+        {error && (
+          <span role="alert" className="text-[12px] text-bad-tx">
+            {error}
+          </span>
+        )}
       </div>
+      <LockChips />
     </div>
   )
 }

@@ -175,9 +175,12 @@ func (s *AgentService) Status() AgentStatus {
 	return st
 }
 
+// emitStatus pushes agent:status and agent:grants; the core's change hook
+// fires for both.
 func (s *AgentService) emitStatus() {
 	if e := s.deps().Emitter; e != nil {
 		e.Emit("agent:status", s.Status())
+		e.Emit("agent:grants", s.Grants())
 	}
 }
 

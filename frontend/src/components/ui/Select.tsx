@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { Check, ChevronDown } from 'lucide-react'
 
 export interface SelectOption<T extends string | number> {
   value: T
@@ -6,6 +7,9 @@ export interface SelectOption<T extends string | number> {
   // Optional leading node (e.g. an environment colour swatch), shown in the
   // trigger for the selected value and in every option row while choosing.
   adornment?: ReactNode
+  // Optional node after the label (e.g. an environment chip), in the trigger
+  // and in the option row.
+  trailing?: ReactNode
   // Shown but not choosable (e.g. a terminal app that isn't installed).
   disabled?: boolean
 }
@@ -72,11 +76,12 @@ export function Select<T extends string | number>({ value, options, onChange, ar
         aria-expanded={open}
         aria-label={ariaLabel}
         onClick={() => setOpen((o) => !o)}
-        className="flex h-[30px] w-full items-center gap-[8px] rounded-[5px] border border-border bg-bg0 px-[9px] text-text outline-none focus:border-accent"
+        className="flex h-[32px] w-full items-center gap-[8px] rounded-[8px] border border-line2 bg-s2 px-[10px] text-tx outline-none focus:border-acc"
       >
         {selected?.adornment}
         <span className="min-w-0 flex-1 truncate text-left text-[13px]">{selected?.label ?? ''}</span>
-        <span className={`shrink-0 text-[10px] text-textDim transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+        {selected?.trailing}
+        <ChevronDown size={14} className={`shrink-0 text-tx3 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
@@ -93,7 +98,7 @@ export function Select<T extends string | number>({ value, options, onChange, ar
           />
           <ul
             role="listbox"
-            className="fixed z-50 overflow-y-auto rounded-[6px] border border-border bg-bg2 py-[4px] shadow-[0_12px_32px_rgba(0,0,0,.45)]"
+            className="fixed z-50 overflow-y-auto rounded-[8px] border border-line2 bg-s2 p-[4px] shadow-pop"
             style={{ left: pos.left, top: pos.top, width: pos.width, maxHeight: MAX_POPOVER }}
           >
             {options.map((opt) => {
@@ -107,13 +112,14 @@ export function Select<T extends string | number>({ value, options, onChange, ar
                       onChange(opt.value)
                       setOpen(false)
                     }}
-                    className={`flex h-[30px] w-full items-center gap-[8px] px-[10px] text-left text-[13px] ${
-                      opt.disabled ? 'cursor-default text-textDim' : isSel ? 'text-text hover:bg-bgSel' : 'text-textMuted hover:bg-bgSel'
+                    className={`flex h-[30px] w-full items-center gap-[8px] rounded-[6px] px-[8px] text-left text-[13px] ${
+                      opt.disabled ? 'cursor-default text-tx3' : isSel ? 'text-tx hover:bg-s3' : 'text-tx2 hover:bg-s3 hover:text-tx'
                     }`}
                   >
                     {opt.adornment}
                     <span className="min-w-0 flex-1 truncate">{opt.label}</span>
-                    {isSel && <span className="shrink-0 text-[11px] text-accentFg">✓</span>}
+                    {opt.trailing}
+                    {isSel && <Check size={13} strokeWidth={2.4} className="shrink-0 text-acc-tx" />}
                   </button>
                 </li>
               )

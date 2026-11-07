@@ -8,17 +8,23 @@ import { toastError, toastSuccess } from './toasts'
 
 interface ServersState {
   servers: Server[]
+  // True once the first List has answered, so an empty list means "none"
+  // rather than "not read yet".
+  loaded: boolean
   loading: boolean
   error: string | null
   selectedId: string | null
 
   load: () => Promise<void>
   save: (id: string | null, input: CreateServerInput) => Promise<string | null>
+  // The created server, or the backend's message.
+  create: (input: CreateServerInput) => Promise<Server | string>
   remove: (id: string) => Promise<string | null>
   duplicate: (id: string) => Promise<string | null>
   copySSHCommand: (id: string) => Promise<void>
   setPinned: (id: string, pinned: boolean) => Promise<void>
   setGroupOrder: (group: string, ids: string[]) => Promise<void>
+  setLook: (id: string, icon: string, color: string) => Promise<string | null>
   select: (id: string | null) => void
   detectKeys: () => Promise<KeyInfo[]>
   testConnection: (id: string) => Promise<TestResult | null>
@@ -26,6 +32,7 @@ interface ServersState {
 
 export const useServers = create<ServersState>((set, get) => ({
   servers: [],
+  loaded: false,
   loading: false,
   error: null,
   selectedId: null,
@@ -36,9 +43,9 @@ export const useServers = create<ServersState>((set, get) => ({
       // List returns Server[] | null — GORM hands back a nil slice when the
       // table is empty, and that crosses the binding as null.
       const servers = (await ServerService.List()) ?? []
-      set({ servers, loading: false })
+      set({ servers, loading: false, loaded: true })
     } catch (e) {
-      set({ error: String(e), loading: false })
+      set({ error: String(e), loading: false, loaded: true })
     }
   },
 
@@ -53,6 +60,16 @@ export const useServers = create<ServersState>((set, get) => ({
       // Call.ByID rejects with a RuntimeError (extends Error), so a bare
       // String(e) would prefix the message with "RuntimeError: "; unwrap
       // .message to keep only the backend's text.
+      return e instanceof Error ? e.message : String(e)
+    }
+  },
+
+  create: async (input) => {
+    try {
+      const created = await ServerService.Create(input)
+      await get().load()
+      return created ?? 'The server was not saved.'
+    } catch (e) {
       return e instanceof Error ? e.message : String(e)
     }
   },
@@ -112,6 +129,16 @@ export const useServers = create<ServersState>((set, get) => ({
     }
   },
 
+  setLook: async (id, icon, color) => {
+    try {
+      await ServerService.SetLook(id, icon, color)
+      await get().load()
+      return null
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e)
+    }
+  },
+
   // FR-01.9. navigator.clipboard is local, not a network call (SEC-09 is
   // about outbound network) — no store state to update, the store is just
   // where the other server-scoped backend calls already live.
@@ -136,7 +163,7 @@ export const useServers = create<ServersState>((set, get) => ({
   select: (id) => set({ selectedId: id }),
 
   // Key detection is best-effort (FR-02.5): a scan failure must not block
-  // the form — the manual path picker in ServerFormKey still works.
+  // the server sheet — a typed key path still works.
   detectKeys: async () => {
     try {
       return (await ServerService.DetectKeys()) ?? []
@@ -163,26 +190,3 @@ export const useServers = create<ServersState>((set, get) => ({
     }
   },
 }))
-
-// FR-01.5. Servers arrive already ordered by group from the backend, so this
-// only has to fold them into runs — no sorting here, or the two orderings
-// could drift apart.
-//
-// Fold on the RAW s.group, not on a display label. `group` is free text
-// (internal/domain/validate.go only trims it — nothing forbids a server
-// literally named "Ungrouped"), so mapping '' -> 'Ungrouped' before folding
-// can collide two distinct runs onto the same key: a '' run and a literal
-// "Ungrouped" run become indistinguishable, either merging adjacent runs
-// (counts conflated) or producing two runs sharing one React key
-// (React drops one). Keep '' and 'Ungrouped' distinct here; only the
-// renderer maps '' to the "Ungrouped" display label.
-export function groupServers(servers: Server[]): { group: string; servers: Server[] }[] {
-  const out: { group: string; servers: Server[] }[] = []
-  for (const s of servers) {
-    const group = s.group
-    const last = out[out.length - 1]
-    if (last && last.group === group) last.servers.push(s)
-    else out.push({ group, servers: [s] })
-  }
-  return out
-}

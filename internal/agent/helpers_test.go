@@ -88,14 +88,15 @@ type fakeConfirmer struct {
 	mu      sync.Mutex
 	reqs    []ConfirmRequest
 	answer  bool
+	length  GrantLength
 	release chan struct{}
 	started chan struct{}
 }
 
-func (f *fakeConfirmer) Confirm(ctx context.Context, req ConfirmRequest) (bool, error) {
+func (f *fakeConfirmer) Confirm(ctx context.Context, req ConfirmRequest) (Decision, error) {
 	f.mu.Lock()
 	f.reqs = append(f.reqs, req)
-	rel, started := f.release, f.started
+	rel, started, d := f.release, f.started, Decision{Allow: f.answer, Length: f.length}
 	f.mu.Unlock()
 	if started != nil {
 		started <- struct{}{}
@@ -104,10 +105,16 @@ func (f *fakeConfirmer) Confirm(ctx context.Context, req ConfirmRequest) (bool, 
 		select {
 		case <-rel:
 		case <-ctx.Done():
-			return false, ctx.Err()
+			return Decision{}, ctx.Err()
 		}
 	}
-	return f.answer, nil
+	return d, nil
+}
+
+func (f *fakeConfirmer) set(answer bool, length GrantLength) {
+	f.mu.Lock()
+	f.answer, f.length = answer, length
+	f.mu.Unlock()
 }
 
 func (f *fakeConfirmer) requests() []ConfirmRequest {

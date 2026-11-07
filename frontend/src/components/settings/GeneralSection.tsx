@@ -1,31 +1,42 @@
+import { timeoutChoices } from '../../lib/settingsChoices'
 import { useSettings } from '../../stores/settings'
-import { Row } from './Row'
-import { Toggle, Stepper } from './controls'
-import { LockSection } from './LockSection'
+import { Select } from '../ui/Select'
+import { Toggle } from './controls'
+import { Group, Row, Value } from './Row'
 
 export function GeneralSection() {
   const s = useSettings((st) => st.settings)
   const update = useSettings((st) => st.update)
-
   if (!s) return null
   return (
-    <div className="flex flex-col">
-      <Row label="Start at login" hint="Launch Zish when you log in.">
-        <Toggle on={s.startAtLogin} onChange={(v) => void update({ startAtLogin: v })} />
-      </Row>
-      {/* The design calls this "Menu bar agent" (Zish.dc.html General), which
-          names the thing the user sees in the menu bar rather than the
-          mechanism. Same setting, same behaviour. */}
-      <Row label="Menu bar agent" hint="Keeps Zish reachable when the window is closed; ⌘⇧S brings it back.">
-        <Toggle on={s.keepRunningInTray} onChange={(v) => void update({ keepRunningInTray: v })} />
-      </Row>
-      <Row label="Confirm before quitting" hint="Ask when tunnels are still running — quitting stops them.">
-        <Toggle on={s.confirmOnQuit} onChange={(v) => void update({ confirmOnQuit: v })} />
-      </Row>
-      <Row label="Connection timeout" hint="Give up if the host does not answer.">
-        <Stepper value={s.connectTimeoutSecs} min={1} max={120} suffix="s" onChange={(v) => void update({ connectTimeoutSecs: v })} />
-      </Row>
-      <LockSection />
-    </div>
+    <>
+      <Group title="Start">
+        <Row label="Start at login" hint="Zish opens when you log in; auto-start tunnels come up with it.">
+          <Toggle label="Start at login" on={s.startAtLogin} onChange={(v) => void update({ startAtLogin: v })} />
+        </Row>
+        <Row label="Keep running in the menu bar" hint="Closing the window keeps tunnels, the agent and pinned servers available. ⌘⇧S brings it back.">
+          <Toggle label="Keep running in the menu bar" on={s.keepRunningInTray} onChange={(v) => void update({ keepRunningInTray: v })} />
+        </Row>
+        <Row label="Confirm before quitting" hint="Only asks while tunnels are running, since quitting stops them.">
+          <Toggle label="Confirm before quitting" on={s.confirmOnQuit} onChange={(v) => void update({ confirmOnQuit: v })} />
+        </Row>
+      </Group>
+      <Group title="Connections">
+        <Row label="Connection timeout" hint="Used by tunnels and Test connection.">
+          <Select
+            ariaLabel="Connection timeout"
+            value={s.connectTimeoutSecs}
+            options={timeoutChoices(s.connectTimeoutSecs)}
+            onChange={(v) => void update({ connectTimeoutSecs: v })}
+          />
+        </Row>
+        <Row
+          label="When I open a server that is already open"
+          hint="Zish cannot see yet which servers are open in your terminal, so it always starts another session."
+        >
+          <Value>New session</Value>
+        </Row>
+      </Group>
+    </>
   )
 }

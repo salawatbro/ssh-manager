@@ -135,3 +135,34 @@ func TestSettingsServiceUpdatePersistsTourSeen(t *testing.T) {
 		t.Fatal("TourSeen was not persisted by Update")
 	}
 }
+
+// A fresh install hands back the Phase 8 defaults, and Update repairs an
+// unknown choice instead of storing it.
+func TestSettingsServiceAppearanceDefaultsAndRepair(t *testing.T) {
+	svc := newSettingsService(t)
+	s, err := svc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Theme != domain.ThemeNight || s.IconStyle != domain.IconStyleIcon || !s.TunnelsKeepWhileLocked || !s.LockOnSleep {
+		t.Fatalf("fresh settings = %+v", s)
+	}
+	in := *s
+	in.Theme, in.Density, in.ColorBy, in.OpenAgain = "sepia", "tiny", "rainbow", "maybe"
+	in.TunnelsKeepWhileLocked, in.LockOnSleep = false, false
+	out, err := svc.Update(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Theme != domain.ThemeNight || out.Density != domain.DensityComfortable ||
+		out.ColorBy != domain.ColorByGroup || out.OpenAgain != domain.OpenAgainAsk {
+		t.Fatalf("not repaired: %+v", out)
+	}
+	got, err := svc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.TunnelsKeepWhileLocked || got.LockOnSleep {
+		t.Fatalf("switches off did not persist: %+v", got)
+	}
+}

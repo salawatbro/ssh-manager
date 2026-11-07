@@ -9,11 +9,15 @@ package forward
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"strconv"
 	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
 
 	"github.com/salawat/sshmgr/internal/domain"
 	"github.com/salawat/sshmgr/internal/sshx"
@@ -22,13 +26,15 @@ import (
 // State is a forward's lifecycle state.
 type State string
 
-// The three states a forward can report: running while its listener is
-// accepting, stopped after a deliberate Stop, error when the listener failed
-// to bind or the accept loop died unexpectedly.
+// The states a forward can report: running while its listener is accepting,
+// stopped after a deliberate Stop, error when the listener failed to bind or
+// the tunnel died on its own, retrying while the service waits to reconnect a
+// dropped tunnel (reported through ReportIdle, never by the Manager itself).
 const (
-	StateRunning State = "running"
-	StateStopped State = "stopped"
-	StateError   State = "error"
+	StateRunning  State = "running"
+	StateStopped  State = "stopped"
+	StateError    State = "error"
+	StateRetrying State = "retrying"
 )
 
 // Status is a snapshot of one forward's state, suitable for emitting to the
@@ -37,6 +43,9 @@ type Status struct {
 	ForwardID string `json:"forwardId"`
 	State     State  `json:"state"`
 	Detail    string `json:"detail"`
+	// PortBusy marks an error from a listener on this Mac whose port another
+	// process holds, so the UI can name the owner and offer a free port.
+	PortBusy bool `json:"portBusy"`
 }
 
 // runner holds one live tunnel's goroutine coordination. wg tracks every
@@ -60,21 +69,43 @@ type runner struct {
 	quit     chan struct{}   // closed by Stop to mark the shutdown as deliberate
 	ctx      context.Context // cancelled by Stop; bounds per-connection dials so they can't outlive the runner
 	cancel   context.CancelFunc
+	bytes    *atomic.Int64 // the tunnel's traffic counter, shared across reconnects of the same forward
 }
 
 // Manager owns all live forwards. It takes ownership of each conn passed to
 // Start and closes it on Stop.
 type Manager struct {
-	mu     sync.Mutex
-	runs   map[string]*runner
-	status map[string]Status // last-reported status per forward ID, kept after Stop removes it from runs
-	emit   func(Status)
+	mu      sync.Mutex
+	runs    map[string]*runner
+	status  map[string]Status   // last-reported status per forward ID, kept after Stop removes it from runs
+	traffic map[string]*traffic // per forward ID; survives a self-teardown so a reconnect keeps its history
+	emit    func(Status)
+
+	keepAlive    time.Duration // how often a running tunnel probes its server; 0 turns probing off
+	probeTimeout time.Duration // how long a probe waits for the server's answer
 }
+
+// Default keep-alive cadence: a silently dead connection (sleep, Wi-Fi
+// change) is noticed within about 45 s.
+const (
+	defaultKeepAlive    = 30 * time.Second
+	defaultProbeTimeout = 15 * time.Second
+)
 
 // NewManager builds a manager. emit is called on every state transition
 // (running/stopped/error); it may be nil.
 func NewManager(emit func(Status)) *Manager {
-	return &Manager{runs: map[string]*runner{}, status: map[string]Status{}, emit: emit}
+	return &Manager{
+		runs: map[string]*runner{}, status: map[string]Status{}, traffic: map[string]*traffic{}, emit: emit,
+		keepAlive: defaultKeepAlive, probeTimeout: defaultProbeTimeout,
+	}
+}
+
+// SetKeepAlive changes the probe cadence for tunnels started afterwards.
+func (m *Manager) SetKeepAlive(every, timeout time.Duration) {
+	m.mu.Lock()
+	m.keepAlive, m.probeTimeout = every, timeout
+	m.mu.Unlock()
 }
 
 // Start opens the tunnel described by fwd over conn. The Manager takes
@@ -158,11 +189,14 @@ func (m *Manager) Start(fwd domain.PortForward, conn *sshx.Conn) error {
 		m.mu.Unlock()
 		cancel()
 		_ = conn.Close()
-		m.report(fwd.ID, StateError, err.Error())
+		busy := fwd.Type != domain.ForwardRemote && errors.Is(err, syscall.EADDRINUSE)
+		m.reportStatus(Status{ForwardID: fwd.ID, State: StateError, Detail: err.Error(), PortBusy: busy})
 		return err
 	}
 	r.listener = ln
-	r.wg.Add(1)
+	r.bytes = m.trafficFor(fwd.ID)
+	every, timeout := m.keepAlive, m.probeTimeout
+	r.wg.Add(3) // accept loop, connection watch, keep-alive
 	m.mu.Unlock()
 
 	if fwd.Type == domain.ForwardDynamic {
@@ -170,6 +204,8 @@ func (m *Manager) Start(fwd domain.PortForward, conn *sshx.Conn) error {
 	} else {
 		go m.accept(fwd, r, dest)
 	}
+	go m.watch(fwd.ID, r)
+	go m.keepAliveLoop(fwd.ID, r, every, timeout)
 	m.report(fwd.ID, StateRunning, "")
 	return nil
 }
@@ -211,7 +247,7 @@ func (m *Manager) accept(fwd domain.PortForward, r *runner, dest string) {
 				return
 			}
 			defer func() { _ = out.Close() }()
-			pipe(in, out)
+			pipe(in, counted(out, r.bytes))
 		}()
 	}
 }
@@ -274,7 +310,13 @@ func (m *Manager) accept(fwd domain.PortForward, r *runner, dest string) {
 // correctly; only its Detail text is coarser here than -L/-R's.
 func (m *Manager) acceptDynamic(fwd domain.PortForward, r *runner) {
 	defer r.wg.Done()
-	dial := func(addr string) (net.Conn, error) { return r.conn.Client.Dial("tcp", addr) }
+	dial := func(addr string) (net.Conn, error) {
+		c, err := r.conn.Client.Dial("tcp", addr)
+		if err != nil {
+			return nil, err
+		}
+		return counted(c, r.bytes), nil
+	}
 	r.wg.Add(1)
 	serveSOCKS(r.listener, dial, r.quit, &r.wg)
 	select {
@@ -391,6 +433,7 @@ func (m *Manager) Stop(id string) error {
 	}
 	_ = r.conn.Close() // drops in-flight tunneled conns (and, if Start is still mid-listen, the listen itself)
 	r.wg.Wait()        // no goroutine leak: every accept/copy goroutine has now exited
+	m.dropTraffic(id)
 	m.report(id, StateStopped, "")
 	return nil
 }
@@ -448,7 +491,11 @@ func (m *Manager) Running() []Status {
 // re-entrant deadlock. So the status map update happens under the lock, and
 // emit is called only after it's released.
 func (m *Manager) report(id string, state State, detail string) {
-	st := Status{ForwardID: id, State: state, Detail: detail}
+	m.reportStatus(Status{ForwardID: id, State: state, Detail: detail})
+}
+
+func (m *Manager) reportStatus(st Status) {
+	id := st.ForwardID
 	m.mu.Lock()
 	m.status[id] = st
 	m.mu.Unlock()

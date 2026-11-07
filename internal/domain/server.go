@@ -67,6 +67,15 @@ type Server struct {
 	// (updatableColumns excludes it) — only by ServerService.SetPinned.
 	Pinned bool `gorm:"not null;default:false" json:"pinned"`
 
+	// Icon and Color style the icon tile only (rules in look.go).
+	Icon  string `gorm:"not null;default:''" json:"icon"`
+	Color string `gorm:"not null;default:''" json:"color"`
+
+	// RunAfterConnect is one line run by the remote shell after login.
+	RunAfterConnect string `gorm:"not null;default:''" json:"runAfterConnect"`
+	// Terminal overrides Settings.Terminal for this server; "" keeps the default.
+	Terminal string `gorm:"not null;default:''" json:"terminal"`
+
 	LastUsedAt *time.Time `gorm:"index" json:"lastUsedAt"`
 	UseCount   int        `gorm:"not null;default:0" json:"useCount"`
 	SortOrder  int        `gorm:"not null;default:0" json:"sortOrder"`

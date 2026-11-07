@@ -36,6 +36,9 @@ const appLockAccount = "app-lock"
 // It cannot collide with server UUID accounts or app-lock.
 const agentKeyPrefix = "agentkey:"
 
+// backupAccount holds the password encrypted backups are made with.
+const backupAccount = "backup-password"
+
 // maxSecretBytes caps a stored secret. macOS allows ~2982 bytes for our
 // service/account lengths; Windows Credential Manager caps the blob at
 // 2560. Use the smaller so a secret that saves on macOS also saves on
@@ -70,6 +73,10 @@ type Store interface {
 	SetAgentKey(keyID string, pkcs8 []byte) error
 	GetAgentKey(keyID string) ([]byte, error)
 	DeleteAgentKey(keyID string) error
+	// The encrypted-backup password; none stored means backups are off.
+	SetBackupPassword(password string) error
+	GetBackupPassword() (string, error)
+	DeleteBackupPassword() error
 }
 
 func checkSize(secret string) error {
@@ -222,4 +229,22 @@ func getWithTimeout(account string) (string, error) {
 	case <-time.After(getTimeout):
 		return "", domain.NewError(domain.CodeKeychain, "Cannot read password from Keychain. Check app permissions.")
 	}
+}
+
+// SetBackupPassword stores the encrypted-backup password.
+func (keyringStore) SetBackupPassword(password string) error {
+	if err := checkSize(password); err != nil {
+		return err
+	}
+	return mapSetErr(keyring.Set(Service, backupAccount, password))
+}
+
+// GetBackupPassword returns the backup password, or ErrNotStored.
+func (keyringStore) GetBackupPassword() (string, error) {
+	return getWithTimeout(backupAccount)
+}
+
+// DeleteBackupPassword removes the backup password, which turns backups off.
+func (keyringStore) DeleteBackupPassword() error {
+	return deleteIfPresent(backupAccount)
 }

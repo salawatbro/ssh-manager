@@ -14,6 +14,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
+	"github.com/salawat/sshmgr/internal/agent"
 	"github.com/salawat/sshmgr/internal/domain"
 	"github.com/salawat/sshmgr/internal/forward"
 	"github.com/salawat/sshmgr/internal/platform"
@@ -26,10 +27,10 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// mainWindow is captured so the global ⌘⇧S hot key and the tray can show/hide
-// it. onGlobalHotkey is the toggle the cgo hot-key callback invokes; it is set
-// in the ApplicationStarted hook (after NSApp exists) so the callback never
-// runs before it is wired.
+// mainWindow is captured so the global ⌘⇧S hot key and the menu-bar panel
+// can show/hide it. onGlobalHotkey is the toggle the cgo hot-key callback
+// invokes; it is set in the ApplicationStarted hook (after NSApp exists) so
+// the callback never runs before it is wired.
 var (
 	mainWindow     *application.WebviewWindow
 	onGlobalHotkey func()
@@ -49,6 +50,10 @@ func main() {
 	}
 	if _, err := platform.EnsureDataDir(); err != nil {
 		fatalStartup("cannot prepare the data folder", err)
+	}
+	// A restore leaves its database for this start (BackupService.Restore).
+	if _, err := store.ApplyPendingRestore(dbPath); err != nil {
+		fatalStartup("cannot put the restored backup in place", err)
 	}
 	db, err := store.Open(dbPath)
 	if err != nil {
@@ -104,17 +109,27 @@ func main() {
 	if err != nil {
 		fatalStartup("cannot resolve the ssh config path", err)
 	}
+	service.SetImportSettings(importService, settingsRepo)
+
 	dataService := &DataService{servers: serverService, db: db}
 
 	// forwardMgr's emit closure only runs at runtime, on a state transition
 	// well after app start (see appEmitter's comment above for why
 	// application.Get() is safe there but not at construction time) — the
 	// same deferred-lookup pattern the prompters use via appEmitter.
+	//
+	// The reconnect keeper hears each status after the frontend, so a
+	// "retrying" it reports in reply lands after the "error" that caused it.
 	forwardRepo := store.NewForwardRepo(db)
+	var forwardService *service.ForwardService
 	forwardMgr := forward.NewManager(func(st forward.Status) {
 		_ = application.Get().Event.Emit("forward:status", st)
+		service.ObserveForward(forwardService, st)
 	})
-	forwardService := service.NewForwardService(forwardRepo, repo, kr, dialer, forwardMgr)
+	forwardService = service.NewForwardService(forwardRepo, repo, kr, dialer, forwardMgr)
+	service.SetForwardSettings(forwardService, settingsRepo)
+	notifier := &macNotifier{}
+	service.SetTunnelNotifier(forwardService, notifier)
 
 	uninstallDataDir, _ := platform.DataDir()
 	uninstallLogDir, _ := platform.LogDir()
@@ -144,24 +159,60 @@ func main() {
 	agentKeys := store.NewAgentKeyRepo(db)
 	signLog := store.NewSignLogRepo(db)
 	agentService := service.NewAgentService(agentKeys, signLog, repo, kr, pubKeyDir())
-	startAgent(agentService, agentKeys, signLog, repo, kr, gate, verifier, dialer, instanceErr)
+	startAgent(agentService, settingsService, agentKeys, signLog, repo, kr, gate, verifier, dialer, instanceErr)
 	service.SetSignerSource(agentService, serverService, forwardService)
 	service.SetLauncherAgent(launcherService, agentService)
 	service.SetLockAgent(lockService, agentService)
 	service.SetUninstallAgent(uninstallService, agentService)
+	// Stacks open tunnels, then servers, under one approval when asked.
+	stackRepo := store.NewStackRepo(db)
+	stackService := service.NewStackService(stackRepo, repo, forwardRepo)
+	service.SetStackRuntime(stackService, launcherService, forwardService, agentService)
+	service.SetLockStacks(lockService, stackRepo)
+	// The launcher's shortcut and the stacks' must never be the same keys.
+	service.SetSettingsStacks(settingsService, stackRepo)
+	service.SetStackSettings(stackService, settingsRepo)
+	commandRepo := store.NewCommandRepo(db)
+	commandService := service.NewCommandService(commandRepo, repo, launcherService)
+	launcherWindowService := &LauncherWindowService{launcher: launcherService, stacks: stackService, commands: commandService}
+	// Both windows follow the backend lock; the launcher can unlock it too.
+	gate.OnLock(func() { emitLockChanged(true) })
+	gate.OnUnlock(func() { emitLockChanged(false) })
+	// The Security check only reads: repos, settings, the agent's socket and
+	// known_hosts through the verifier, which re-reads the file when it changed.
+	securityService := service.NewSecurityService(repo, agentKeys, settingsService, lockService, agentService, verifier)
+	backupService := newBackupService(db, dbPath, repo, agentKeys, settingsRepo, kr, gate, biometricService)
+	// Only the Zish that owns the sockets backs up, so a dev build beside the
+	// installed app does not write a second set.
+	backupStop := make(chan struct{})
+	if instanceErr == nil {
+		service.StartBackupSchedule(backupService, backupStop)
+	}
 	service.SetOnSettingsSaved(settingsService, func(prev, next domain.Settings) {
 		if prev.AgentEnabled != next.AgentEnabled {
 			service.ApplyAgentEnabled(agentService, next.AgentEnabled)
 		}
+		// Synchronous so LauncherWindowService.HotkeyTaken is current once
+		// Update returns.
+		if prev.LauncherHotkey != next.LauncherHotkey {
+			application.InvokeSync(func() { syncLauncherHotkey(next.LauncherHotkey, stackService) })
+		}
+		if prev.Theme != next.Theme {
+			applyTheme(next.Theme)
+			application.Get().Event.Emit("theme:changed", next.Theme)
+		}
+		if next.TunnelsNotify && !prev.TunnelsNotify {
+			go notifier.authorize()
+		}
 	})
 
-	// Wires forwardRepo + forwardMgr into serverService so Delete tears down a
-	// server's live tunnels first (Task 4's deviation: a package-level func,
+	// Wires forwardRepo + forwardService into serverService so Delete tears down
+	// a server's live tunnels (and pending reconnects) first (Task 4's deviation: a package-level func,
 	// not a method — see SetForwardDeps' doc comment in server_service.go for
 	// why a method form would leak a bogus frontend RPC). Must run after all
-	// three of serverService, forwardRepo and forwardMgr exist, which it does
-	// here.
-	service.SetForwardDeps(serverService, forwardRepo, forwardMgr)
+	// three of serverService, forwardRepo and forwardService exist, which it
+	// does here.
+	service.SetForwardDeps(serverService, forwardRepo, forwardService)
 
 	// FR-04.3: the Connection-timeout setting drives the dialer live — read at
 	// each dial rather than baked in at construction, so a Settings change
@@ -193,6 +244,12 @@ func main() {
 			application.NewService(biometricService),
 			application.NewService(launcherService),
 			application.NewService(agentService),
+			application.NewService(securityService),
+			application.NewService(stackService),
+			application.NewService(launcherWindowService),
+			application.NewService(commandService),
+			application.NewService(&TrayPanelService{}),
+			application.NewService(backupService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -224,6 +281,10 @@ func main() {
 		// pressed button is reported via AddButton(label).OnClick(func()), not
 		// a return value.
 		ShouldQuit: func() bool {
+			if restarting.Load() {
+				forwardMgr.StopAll()
+				return true
+			}
 			s, err := settingsService.Get()
 			running := len(forwardMgr.Running())
 			if err != nil || !s.ConfirmOnQuit || running == 0 {
@@ -247,16 +308,32 @@ func main() {
 		},
 	})
 
-	// UI-02: the app is dark regardless of the system setting. The window
-	// itself is pinned dark via MacWindow.Appearance below, but the menu bar
-	// and the fullscreen title-bar reveal follow NSApp's appearance, which
-	// Wails exposes no option for — pin it here, once NSApp exists.
+	stopTunnelRuntime := func() {}
+
+	startTheme := domain.DefaultSettings().Theme
+	if s, err := settingsService.Get(); err == nil {
+		startTheme = s.Theme
+	}
+	mainColour := windowColour(themeIsDark(startTheme, systemIsDark()))
+
+	// The theme reaches NSApp once it exists; Match macOS repaints the
+	// windows when the system appearance flips.
+	app.Event.OnApplicationEvent(events.Mac.ApplicationDidChangeTheme, func(*application.ApplicationEvent) {
+		systemAppearanceChanged()
+	})
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
-		forceDarkAppearance()
+		applyTheme(startTheme)
 		// Wire the toggle BEFORE registering the hot key, so the first ⌘⇧S can
 		// never fire into a nil onGlobalHotkey.
 		onGlobalHotkey = toggleMainWindow
 		registerGlobalHotkey()
+		onStackHotkey = func(id string) { launchStackNative(stackService, id) }
+		onLauncherHotkey = toggleLauncher
+		launcherHotkey := domain.DefaultSettings().LauncherHotkey
+		if s, err := settingsService.Get(); err == nil {
+			launcherHotkey = s.LauncherHotkey
+		}
+		syncLauncherHotkey(launcherHotkey, stackService)
 
 		// The red ✕ asks Go what to do (via the close-guard). Keep-in-tray on
 		// (default) hides the window — tunnels survive; off makes ✕ a real quit,
@@ -276,6 +353,9 @@ func main() {
 			enabled = s.AgentEnabled
 		}
 		go service.ApplyAgentEnabled(agentService, enabled)
+
+		stopTunnelRuntime = startTunnels(app, forwardService, gate)
+		watchAwayFromMac(func() { service.LockForSleep(lockService) })
 	})
 
 	mainWindow = app.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -290,17 +370,17 @@ func main() {
 			// band (52px, tuned to where Tahoe draws the lights).
 			TitleBar:                application.MacTitleBarHiddenInset,
 			InvisibleTitleBarHeight: 52,
-			// UI-02: the app is dark. Pin the window to the dark system
-			// appearance so the OS-drawn chrome — notably the title bar macOS
-			// reveals on a top-edge hover in fullscreen — is dark, not a light
-			// panel over the graphite content.
-			Appearance: application.NSAppearanceNameDarkAqua,
+			// No Appearance: the window inherits NSApp's, which applyTheme sets.
 		},
-		// bg0 from the graphite palette (TZ 12.1) — this is what shows before
-		// the webview paints, so it must match or the window flashes.
-		BackgroundColour: application.NewRGB(0x13, 0x16, 0x1b),
+		// What shows before the webview paints, so it must match the page.
+		BackgroundColour: mainColour,
 		URL:              "/",
 	})
+
+	// The approval panel is created hidden now so its page is loaded by the
+	// time the agent first asks; the launcher likewise for its first ⌥Space.
+	createApprovalWindow(app)
+	createLauncherWindow(app)
 
 	// Remap the red close button to hide-to-tray. Done on WindowShow — it fires
 	// once the native window and its traffic-light buttons exist (Application-
@@ -308,6 +388,12 @@ func main() {
 	// and is re-applied on every show so it survives Wails re-styling the button.
 	mainWindow.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) {
 		interceptCloseButton()
+	})
+	mainWindow.OnWindowEvent(events.Common.WindowFocus, func(*application.WindowEvent) {
+		notifier.inFront.Store(true)
+	})
+	mainWindow.OnWindowEvent(events.Common.WindowLostFocus, func(*application.WindowEvent) {
+		notifier.inFront.Store(false)
 	})
 
 	mainWindow.OnWindowEvent(events.Mac.WindowDidEnterFullScreen, func(*application.WindowEvent) {
@@ -317,39 +403,18 @@ func main() {
 		fullscreenTitlebarChanged(false)
 	})
 
-	// Tray-lite: a menu-bar presence so the app is reachable while its window is
-	// hidden (by ⌘⇧S or the close button). A text label (not an icon) is the
-	// v0.4 identity — a proper template icon is v0.5 polish (docs/v0.5-notes.md).
-	// Left-click toggles the window IN PLACE via toggleMainWindow — deliberately
-	// NOT AttachWindow, whose built-in ToggleWindow repositions the window under
-	// the menu-bar icon (wrong for a full-size window). Right-click shows the
-	// menu below (Wails' smart default when a menu is set).
-	tray := app.SystemTray.New()
-	tray.SetLabel("Zish")
-	tray.OnClick(func() { toggleMainWindow() })
+	// The menu-bar bolt opens the panel (tray.html) under it. It reads its
+	// lists on every show, so nothing here rebuilds it.
+	setupTray(app)
 
-	// The tray's server list mirrors the pinned set. rebuildTray refreshes it
-	// from the live list; SetOnServersChanged (below) reruns it whenever a
-	// server is pinned/renamed/deleted. Building it once here is the initial menu.
-	rebuildTray := func() {
-		servers, err := serverService.List()
-		if err != nil {
-			servers = nil // best-effort: an unreadable list just yields no pinned section
-		}
-		tray.SetMenu(buildTrayMenu(app, service.PinnedForTray(servers), func(id string) {
-			showMainWindow()
-			application.Get().Event.Emit("tray:connect", service.TrayConnect{ServerID: id})
-		}))
+	// A stack change moves the global shortcuts; Carbon hot keys are
+	// main-thread only.
+	refreshStacks := func() {
+		application.InvokeAsync(func() { syncStackHotkeys(stackService) })
 	}
-	rebuildTray() // initial build: setup-time, on the main thread — direct call is safe
-	// Live rebuilds fire from the SetPinned/Update/Delete bound-method
-	// goroutines, which run off the main thread after app.Run(). Mutating the
-	// AppKit tray menu (tray.SetMenu) off the main thread can crash on macOS, so
-	// marshal each live rebuild onto the main thread. InvokeAsync's
-	// dispatchOnMainThread has an isOnMainThread fast path, so this stays cheap.
-	service.SetOnServersChanged(serverService, func() {
-		application.InvokeAsync(rebuildTray)
-	})
+	service.SetOnStacksChanged(stackService, refreshStacks)
+	service.SetStackDeps(serverService, stackRepo, refreshStacks)
+	service.SetCommandDeps(serverService, commandRepo)
 
 	// Uninstall wipes the DB/keychain/log dirs and then must quit the app —
 	// there is nothing left for the UI to show once the data is gone.
@@ -373,6 +438,8 @@ func main() {
 	// ordering fix) was never checkpointed away by *any* code path, not even
 	// occasionally.
 	app.OnShutdown(func() {
+		close(backupStop)
+		stopTunnelRuntime()
 		service.StopAgent(agentService)
 		stopLaunchRuntime()
 		releaseInstance()
@@ -401,8 +468,8 @@ func toggleMainWindow() {
 	}
 }
 
-// showMainWindow brings the window back and focuses it (used by the tray's
-// "Show" item and the show half of the toggle).
+// showMainWindow brings the window back and focuses it (the menu-bar panel's
+// Open Zish, and the show half of the toggle).
 func showMainWindow() {
 	if mainWindow == nil {
 		return
@@ -494,7 +561,20 @@ func logStartupFailure(msg string) {
 type appEmitter struct{}
 
 func (appEmitter) Emit(name string, data ...any) bool {
+	// A dial started from the launcher, the tray or a global shortcut can
+	// need an answer while the main window is hidden.
+	if name == "hostkey:request" || name == "code:request" {
+		application.InvokeAsync(showMainWindow)
+	}
 	return application.Get().Event.Emit(name, data...)
+}
+
+// emitLockChanged tells both windows the backend lock moved. The gate can
+// only move once the app runs, but a nil app is cheap to rule out.
+func emitLockChanged(locked bool) {
+	if app := application.Get(); app != nil {
+		app.Event.Emit("lock:changed", locked)
+	}
 }
 
 // Register the hostkey:request event once, with a constant name and the
@@ -507,7 +587,18 @@ func init() {
 	application.RegisterEvent[service.HostKeyRequest]("hostkey:request")
 	application.RegisterEvent[service.CodeRequest]("code:request")
 	application.RegisterEvent[forward.Status]("forward:status")
-	application.RegisterEvent[service.TrayConnect]("tray:connect")
+	application.RegisterEvent[forward.TrafficReport]("forward:stats")
+	application.RegisterEvent[service.StackLaunched]("stack:launched")
 	application.RegisterEvent[domain.AgentSignEvent]("agent:sign")
 	application.RegisterEvent[service.AgentStatus]("agent:status")
+	application.RegisterEvent[[]agent.Grant]("agent:grants")
+	application.RegisterEvent[service.ApprovalRequest]("approval:request")
+	application.RegisterEvent[string]("approval:close")
+	application.RegisterEvent[bool]("lock:changed")
+	application.RegisterEvent[string]("theme:changed")
+	application.RegisterEvent[string]("servers:changed")
+	application.RegisterEvent[application.Void]("launcher:show")
+	application.RegisterEvent[application.Void]("tray:show")
+	application.RegisterEvent[application.Void]("settings:open")
+	application.RegisterEvent[service.BackupStatus]("backup:status")
 }

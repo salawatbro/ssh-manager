@@ -20,12 +20,17 @@ const agentSocketName = "agent.sock"
 // signing), its listener and the AgentService deps. instanceErr is the result
 // of taking the single-instance lock: only the holder serves the socket. The
 // socket itself starts with ApplyAgentEnabled once the app runs.
-func startAgent(as *service.AgentService, keys *store.AgentKeyRepo, logRepo *store.SignLogRepo, servers *store.ServerRepo,
-	sec secret.Store, gate *service.LockGate, known service.HostMatcher, dialer service.Dialer, instanceErr error,
+func startAgent(as *service.AgentService, settings *service.SettingsService, keys *store.AgentKeyRepo, logRepo *store.SignLogRepo,
+	servers *store.ServerRepo, sec secret.Store, gate *service.LockGate, known service.HostMatcher, dialer service.Dialer, instanceErr error,
 ) {
-	core := agent.NewCore(service.NewAgentKeySource(keys, sec), agentConfirmer{}, gate, service.NewSignLogger(logRepo, appEmitter{}), time.Now)
+	core := agent.NewCore(service.NewAgentKeySource(keys, sec), newAgentConfirmer(as, settings), gate, service.NewSignLogger(logRepo, appEmitter{}), time.Now)
 	core.SetHostResolver(service.NewHostResolver(servers, known))
-	// Locking the app wipes decrypted keys and ssh-add keys from memory.
+	// An unreadable setting keeps production out of approvals.
+	core.SetNeverProd(func() bool {
+		s, err := settings.Get()
+		return err != nil || s.GrantNeverProd
+	})
+	// Locking the app wipes decrypted keys, ssh-add keys and open approvals.
 	gate.OnLock(core.Invalidate)
 
 	deps := service.AgentDeps{

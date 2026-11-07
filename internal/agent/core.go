@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"strings"
 	"sync"
 	"time"
 
@@ -14,8 +13,8 @@ import (
 	"github.com/salawat/sshmgr/internal/domain"
 )
 
-// ClientInfo describes who asked for a signature. It is informational only and
-// never an authorization input.
+// ClientInfo describes who asked for a signature. It is display-only, except
+// Holder, which an approval (Grant) is bound to.
 type ClientInfo struct {
 	PID       int      `json:"pid"`
 	Name      string   `json:"name"`      // "ssh"
@@ -24,23 +23,49 @@ type ClientInfo struct {
 	App       string   `json:"app"`       // "Ghostty"
 	InProcess bool     `json:"inProcess"` // Zish's own Go client
 	Purpose   string   `json:"purpose"`   // in-process only: "tunnel", "test connection"
-	// Destination is the server an in-process dial targets.
-	Destination string `json:"destination"`
+	// Target is the server an in-process dial goes to.
+	Target Host   `json:"target"`
+	Holder Holder `json:"holder"`
+	// holderAt is Holder's index in Chain.
+	holderAt int
+	// procs pins the client and its ancestors, nearest first.
+	procs []procID
+}
+
+// Host is the Zish server a signature is for, as far as the agent can tell.
+type Host struct {
+	Name    string   `json:"name"`
+	Address string   `json:"address"` // user@host[:port]
+	Env     string   `json:"env"`     // domain.Environment, "" when not a Zish server
+	Via     []string `json:"via"`     // jump hosts, the one nearest the Mac first
 }
 
 // ConfirmRequest is what the confirmation prompt shows.
 type ConfirmRequest struct {
 	KeyName, Fingerprint string
 	Client               ClientInfo
-	Destination          string // from session-bind; "" if unknown
+	Destination          string // display name; "" if unknown
+	Host                 Host
 	Forwarded            bool
 	Locked               bool // app locked → device-owner authentication only
+	// Grantable: the answer may open an approval for this app and key (not
+	// locked, the app is known, not a production server kept out of approvals).
+	Grantable bool
+	// Launch is set when the request is one approval for a whole stack.
+	Launch *LaunchPrompt
+}
+
+// Decision is the user's answer to one prompt. Length matters only when the
+// request was Grantable.
+type Decision struct {
+	Allow  bool
+	Length GrantLength
 }
 
 // Confirmer asks the user to approve one signature. It must return by the
 // context's deadline.
 type Confirmer interface {
-	Confirm(ctx context.Context, req ConfirmRequest) (bool, error)
+	Confirm(ctx context.Context, req ConfirmRequest) (Decision, error)
 }
 
 // KeySource is the stored keys: metadata rows plus Keychain private keys.
@@ -58,9 +83,11 @@ type SignLogger interface {
 	Record(ev domain.AgentSignEvent)
 }
 
-// HostResolver names the Zish server a host key belongs to; "" if unknown.
+// HostResolver names the Zish server a host key belongs to (zero Host if
+// none) and tells whether a key signs in to a production server.
 type HostResolver interface {
-	Resolve(hostKey ssh.PublicKey) string
+	Resolve(hostKey ssh.PublicKey) Host
+	KeyOnProd(keyID string) bool
 }
 
 // ConfirmTimeout bounds one confirmation prompt.
@@ -94,13 +121,16 @@ type Core struct {
 	pending chan struct{}
 	turn    chan struct{}
 
-	mu       sync.Mutex
-	hosts    HostResolver
-	cache    map[string]ssh.Signer
-	gen      uint64
-	temp     map[string]*tempKey
-	plock    []byte
-	onChange []func()
+	mu        sync.Mutex
+	hosts     HostResolver
+	neverProd func() bool
+	cache     map[string]ssh.Signer
+	gen       uint64
+	temp      map[string]*tempKey
+	grants    []*Grant
+	launches  []*launchGrant
+	plock     []byte
+	onChange  []func()
 }
 
 // NewCore builds the agent core. conf, lock and log may be nil (no prompts:
@@ -127,8 +157,15 @@ func (c *Core) SetHostResolver(h HostResolver) {
 	c.mu.Unlock()
 }
 
-// OnChange registers fn to run after the protocol lock or the temporary keys
-// change.
+// SetNeverProd wires the "Always ask again for production servers" setting.
+func (c *Core) SetNeverProd(fn func() bool) {
+	c.mu.Lock()
+	c.neverProd = fn
+	c.mu.Unlock()
+}
+
+// OnChange registers fn to run after the protocol lock, the temporary keys or
+// the open approvals change.
 func (c *Core) OnChange(fn func()) {
 	c.mu.Lock()
 	c.onChange = append(c.onChange, fn)
@@ -144,25 +181,32 @@ func (c *Core) changed() {
 	}
 }
 
-// Invalidate wipes cached signers and temporary keys: on App Lock, agent
-// disable and quit.
+// Invalidate wipes cached signers, temporary keys and open approvals: on App
+// Lock, agent disable and quit.
 func (c *Core) Invalidate() {
 	c.mu.Lock()
 	c.cache = map[string]ssh.Signer{}
 	c.gen++
-	hadTemp := len(c.temp) > 0
+	had := len(c.temp) > 0 || len(c.grants) > 0
 	c.temp = map[string]*tempKey{}
+	c.grants = nil
+	c.launches = nil
 	c.mu.Unlock()
-	if hadTemp {
+	if had {
 		c.changed()
 	}
 }
 
-// Forget drops one stored key's cached signer (key deleted).
+// Forget drops one stored key's cached signer and approvals (key deleted, or
+// its confirmation switched).
 func (c *Core) Forget(keyID string) {
 	c.mu.Lock()
 	delete(c.cache, keyID)
+	dropped := c.dropGrantsLocked(keyID)
 	c.mu.Unlock()
+	if dropped {
+		c.changed()
+	}
 }
 
 // target is the key a sign request resolved to.
@@ -193,109 +237,6 @@ func (c *Core) find(pub ssh.PublicKey) (target, error) {
 		}
 	}
 	return target{}, errUnknownKey
-}
-
-// signRequest is one signature request with its context.
-type signRequest struct {
-	pub       ssh.PublicKey
-	data      []byte
-	flags     sshagent.SignatureFlags
-	client    ClientInfo
-	dest      string
-	forwarded bool
-}
-
-func (c *Core) sign(r signRequest) (*ssh.Signature, error) {
-	t, err := c.find(r.pub)
-	if err != nil {
-		return nil, err
-	}
-	ev := c.event(t, r)
-	if c.protoLocked() {
-		ev.Outcome, ev.Detail = domain.SignDenied, "Agent locked with ssh-add -x"
-		c.record(ev)
-		return nil, errAgentLocked
-	}
-	appLocked := c.lock != nil && c.lock.Locked()
-	ev.Outcome = domain.SignAllowed
-	if appLocked || t.confirm {
-		ok, detail := c.confirm(ConfirmRequest{
-			KeyName: t.name, Fingerprint: t.fp, Client: r.client,
-			Destination: r.dest, Forwarded: r.forwarded, Locked: appLocked,
-		})
-		if !ok {
-			ev.Outcome, ev.Detail = domain.SignDenied, detail
-			if appLocked {
-				ev.Outcome = domain.SignLocked
-			}
-			c.record(ev)
-			return nil, errRefused
-		}
-		ev.Outcome = domain.SignConfirmed
-	}
-	signer, err := c.signerFor(t, appLocked)
-	if err == nil {
-		var sig *ssh.Signature
-		if sig, err = signWithFlags(signer, r.data, r.flags); err == nil {
-			c.record(ev)
-			if t.keyID != "" {
-				_ = c.src.Touch(t.keyID, c.now())
-			}
-			return sig, nil
-		}
-	}
-	ev.Outcome, ev.Detail = domain.SignError, err.Error()
-	c.record(ev)
-	return nil, err
-}
-
-func (c *Core) event(t target, r signRequest) domain.AgentSignEvent {
-	ev := domain.AgentSignEvent{
-		KeyID: t.keyID, KeyName: t.name, Fingerprint: t.fp,
-		ClientName: r.client.Name, ClientApp: r.client.App,
-		ClientChain: strings.Join(r.client.Chain, " ← "), ClientPID: r.client.PID,
-		InProcess: r.client.InProcess, Destination: r.dest, Forwarded: r.forwarded,
-		CreatedAt: c.now(),
-	}
-	if r.client.InProcess {
-		ev.ClientName, ev.ClientApp, ev.ClientChain = "Zish", "Zish", r.client.Purpose
-		ev.Destination = r.client.Destination
-	}
-	return ev
-}
-
-func (c *Core) record(ev domain.AgentSignEvent) {
-	if c.log != nil {
-		c.log.Record(ev)
-	}
-}
-
-// confirm runs one prompt at a time; past maxPendingConfirms it denies at once.
-func (c *Core) confirm(req ConfirmRequest) (bool, string) {
-	if c.conf == nil {
-		return false, "No confirmation prompt is available"
-	}
-	select {
-	case c.pending <- struct{}{}:
-	default:
-		return false, "busy"
-	}
-	defer func() { <-c.pending }()
-	c.turn <- struct{}{}
-	defer func() { <-c.turn }()
-
-	ctx, cancel := context.WithTimeout(context.Background(), c.confirmTimeout)
-	defer cancel()
-	ok, err := c.conf.Confirm(ctx, req)
-	switch {
-	case ctx.Err() != nil:
-		return false, "timed out"
-	case err != nil:
-		return false, err.Error()
-	case !ok:
-		return false, "denied"
-	}
-	return true, ""
 }
 
 // signerFor loads a stored key, caching it only while the app is unlocked.
@@ -391,6 +332,7 @@ func (c *Core) Signer(keyID string, client ClientInfo) (ssh.Signer, error) {
 			return nil, ErrKeyMissing
 		}
 		client.InProcess = true
+		client.Holder = Holder{Zish: true, Name: "Zish"}
 		return &inProcessSigner{core: c, pub: pub, client: client}, nil
 	}
 	return nil, ErrKeyMissing

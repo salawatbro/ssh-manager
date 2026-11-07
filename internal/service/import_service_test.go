@@ -105,3 +105,47 @@ func TestPreviewMarksDuplicate(t *testing.T) {
 		}
 	}
 }
+
+// ConfirmGroups puts each host in its group and gives it the look Settings ›
+// Appearance picks for new servers.
+func TestConfirmGroupsSetsGroupAndLook(t *testing.T) {
+	svc, repo := newImportService(t, cfg)
+	db, err := store.Open(filepath.Join(t.TempDir(), "settings.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := store.NewSettingsRepo(db)
+	s, err := settings.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.IconStyle, s.ColorBy = domain.IconStyleLetters, domain.ColorByNone
+	if err := settings.Save(s); err != nil {
+		t.Fatal(err)
+	}
+	SetImportSettings(svc, settings)
+
+	n, err := svc.ConfirmGroups([]ImportPick{{Alias: "bastion", Group: " Production "}, {Alias: "web-01"}})
+	if err != nil || n != 2 {
+		t.Fatalf("ConfirmGroups = %d, %v", n, err)
+	}
+	all, _ := repo.List()
+	for _, srv := range all {
+		want := map[string]string{"bastion": "Production", "web-01": ""}[srv.Name]
+		if srv.GroupName != want || srv.Icon != "" || srv.Color != "gray" {
+			t.Fatalf("%s = group %q icon %q colour %q", srv.Name, srv.GroupName, srv.Icon, srv.Color)
+		}
+	}
+}
+
+// Without settings wired, imports get the defaults: an icon and the group's colour.
+func TestConfirmUsesDefaultLook(t *testing.T) {
+	svc, repo := newImportService(t, cfg)
+	if _, err := svc.Confirm([]string{"bastion"}); err != nil {
+		t.Fatal(err)
+	}
+	all, _ := repo.List()
+	if len(all) != 1 || all[0].Icon != domain.NewServerIcon || all[0].Color != "" {
+		t.Fatalf("imported = %+v", all)
+	}
+}

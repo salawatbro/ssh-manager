@@ -7,6 +7,9 @@ import type { Events } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import type * as agent$0 from "../../../../salawat/sshmgr/internal/agent/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import type * as domain$0 from "../../../../salawat/sshmgr/internal/domain/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -18,12 +21,23 @@ import type * as service$0 from "../../../../salawat/sshmgr/internal/service/mod
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "agent:grants": agent$0.Grant[] | null;
             "agent:sign": domain$0.AgentSignEvent;
             "agent:status": service$0.AgentStatus;
+            "approval:close": string;
+            "approval:request": service$0.ApprovalRequest;
+            "backup:status": service$0.BackupStatus;
             "code:request": service$0.CodeRequest;
+            "forward:stats": forward$0.TrafficReport;
             "forward:status": forward$0.Status;
             "hostkey:request": service$0.HostKeyRequest;
-            "tray:connect": service$0.TrayConnect;
+            "launcher:show": void;
+            "lock:changed": boolean;
+            "servers:changed": string;
+            "settings:open": void;
+            "stack:launched": service$0.StackLaunched;
+            "theme:changed": string;
+            "tray:show": void;
         }
     }
 }

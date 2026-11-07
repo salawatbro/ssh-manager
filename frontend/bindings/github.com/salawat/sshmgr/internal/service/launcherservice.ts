@@ -23,6 +23,15 @@ export function Open(serverID: string): $CancellablePromise<$models.OpenResult> 
 }
 
 /**
+ * OpenInTab is Open in a new tab of the terminal's front window, whatever the
+ * "Open in a new tab" setting says (the launcher's ⌘↵). A terminal without
+ * tabs opens a window.
+ */
+export function OpenInTab(serverID: string): $CancellablePromise<$models.OpenResult> {
+    return $Call.ByID(63317241, serverID);
+}
+
+/**
  * Terminals lists the terminal apps for the Settings picker.
  */
 export function Terminals(): $CancellablePromise<$models.TerminalOption[] | null> {

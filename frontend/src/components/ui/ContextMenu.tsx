@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Check } from 'lucide-react'
 
 export interface MenuItem {
   label: string
@@ -8,6 +9,8 @@ export interface MenuItem {
   // keepOpen: after run(), leave the menu open (a two-step arm, e.g. Delete).
   // Default: run() then close.
   keepOpen?: boolean
+  // Draws a check on the right, for a menu that picks one of several modes.
+  checked?: boolean
 }
 export type MenuEntry = MenuItem | 'separator'
 
@@ -52,12 +55,12 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
         }}
       />
       <div
-        className="fixed z-50 rounded-[6px] border border-border bg-bg2 py-[4px] shadow-[0_12px_32px_rgba(0,0,0,.45)]"
+        className="fixed z-50 rounded-[8px] border border-line2 bg-s2 p-[4px] shadow-pop"
         style={{ left, top, width: MENU_WIDTH }}
       >
         {items.map((item, i) =>
           item === 'separator' ? (
-            <div key={`sep-${i}`} className="my-[4px] h-px bg-border" />
+            <div key={`sep-${i}`} className="mx-[4px] my-[4px] h-px bg-line" />
           ) : (
             <button
               key={item.label}
@@ -71,11 +74,12 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
               // ("Upload 3 items to /srv/cbs/releases") and must not spill out
               // of the menu box.
               title={item.label}
-              className={`flex h-[28px] w-full items-center truncate whitespace-nowrap px-[12px] text-left text-[12.5px] disabled:opacity-40 enabled:hover:bg-bgSel ${
-                item.danger ? 'text-stFailed' : 'text-text'
+              className={`flex h-[28px] w-full items-center gap-[8px] whitespace-nowrap rounded-[6px] px-[8px] text-left text-[12.5px] disabled:opacity-40 enabled:hover:bg-s3 ${
+                item.danger ? 'text-bad-tx' : 'text-tx'
               }`}
             >
-              {item.label}
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {item.checked && <Check size={13} strokeWidth={2.4} className="shrink-0 text-acc-tx" />}
             </button>
           ),
         )}

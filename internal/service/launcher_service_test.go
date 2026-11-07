@@ -40,6 +40,7 @@ type launcherFixture struct {
 	svc      *LauncherService
 	repo     *store.ServerRepo
 	settings *store.SettingsRepo
+	commands *store.CommandRepo
 	broker   *askpass.Broker
 	runner   *fakeRunner
 	locator  fakeLocator
@@ -61,6 +62,7 @@ func newLauncherFixture(t *testing.T, loc fakeLocator) *launcherFixture {
 	f := &launcherFixture{
 		repo:     store.NewServerRepo(db),
 		settings: store.NewSettingsRepo(db),
+		commands: store.NewCommandRepo(db),
 		runner:   &fakeRunner{},
 		locator:  loc,
 		root:     t.TempDir(),

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -51,7 +52,127 @@ type Settings struct {
 	// AgentEnabled serves Zish's ssh-agent socket to other programs. In-process
 	// signing (tunnels, Test connection) works either way.
 	AgentEnabled bool `gorm:"not null;default:true" json:"agentEnabled"`
+
+	// GrantDefault is the approval length the approval window picks first.
+	GrantDefault string `gorm:"not null;default:'15m'" json:"grantDefault"`
+	// GrantNeverProd keeps production servers out of approvals: each signature
+	// for one asks again.
+	GrantNeverProd bool `gorm:"not null;default:true" json:"grantNeverProd"`
+
+	// RotateReminderDays is the key age the Security check flags; 0 = never.
+	RotateReminderDays int `gorm:"not null;default:365" json:"rotateReminderDays"`
+	// SecurityIgnored lists the Security check ids the user chose to ignore,
+	// comma-separated.
+	SecurityIgnored string `gorm:"not null;default:''" json:"securityIgnored"`
+
+	// LauncherHotkey opens the launcher from any app, in canonical shortcut
+	// form ("alt+space"); "" turns it off.
+	LauncherHotkey string `gorm:"not null;default:'alt+space'" json:"launcherHotkey"`
+
+	// LockOnSleep engages the App Lock when the Mac sleeps, its display
+	// sleeps or the screen locks. Only with Require unlock on and a PIN set.
+	LockOnSleep bool `gorm:"not null;default:true" json:"lockOnSleep"`
+
+	// Appearance. Theme drives the pages' palette and NSApp's appearance.
+	Theme     string `gorm:"not null;default:'night'" json:"theme"`
+	Density   string `gorm:"not null;default:'comfortable'" json:"density"`
+	IconStyle string `gorm:"not null;default:'icon'" json:"iconStyle"`
+	ColorBy   string `gorm:"not null;default:'group'" json:"colorBy"`
+	// MenuIcons shows icon tiles in the launcher.
+	MenuIcons bool `gorm:"not null;default:true" json:"menuIcons"`
+
+	// Tunnels. TunnelsReconnect is the master switch over every tunnel's
+	// own Reconnect; TunnelsKeepWhileLocked off stops every tunnel on lock.
+	TunnelsAutoStart       bool `gorm:"not null;default:true" json:"tunnelsAutoStart"`
+	TunnelsReconnect       bool `gorm:"not null;default:true" json:"tunnelsReconnect"`
+	TunnelsKeepWhileLocked bool `gorm:"not null;default:true" json:"tunnelsKeepWhileLocked"`
+	TunnelsNotify          bool `gorm:"not null;default:true" json:"tunnelsNotify"`
+	TunnelsSuggestPort     bool `gorm:"not null;default:true" json:"tunnelsSuggestPort"`
+
+	// OpenAgain is what opening an already-open server should do.
+	OpenAgain string `gorm:"not null;default:'ask'" json:"openAgain"`
+
+	// BackupFolder holds the encrypted backups; "" is iCloud Drive. Whether
+	// backups are on is whether their password is in the Keychain.
+	BackupFolder string `gorm:"not null;default:''" json:"backupFolder"`
 }
+
+// Theme values accepted in Settings.Theme.
+const (
+	ThemeNight = "night"
+	ThemeDay   = "day"
+	ThemeAuto  = "auto"
+)
+
+// ThemeIDs lists every accepted Settings.Theme value.
+var ThemeIDs = []string{ThemeNight, ThemeDay, ThemeAuto}
+
+// Density values accepted in Settings.Density.
+const (
+	DensityComfortable = "comfortable"
+	DensityCompact     = "compact"
+)
+
+// DensityIDs lists every accepted Settings.Density value.
+var DensityIDs = []string{DensityComfortable, DensityCompact}
+
+// What a new server's tile shows (Settings.IconStyle).
+const (
+	IconStyleLetters = "letters"
+	IconStyleIcon    = "icon"
+)
+
+// IconStyleIDs lists every accepted Settings.IconStyle value.
+var IconStyleIDs = []string{IconStyleLetters, IconStyleIcon}
+
+// How a new server's tile is tinted (Settings.ColorBy).
+const (
+	ColorByGroup = "group"
+	ColorByNone  = "none"
+)
+
+// ColorByIDs lists every accepted Settings.ColorBy value.
+var ColorByIDs = []string{ColorByGroup, ColorByNone}
+
+// What opening an already-open server does (Settings.OpenAgain).
+const (
+	OpenAgainAsk   = "ask"
+	OpenAgainFocus = "focus"
+	OpenAgainNew   = "new"
+)
+
+// OpenAgainIDs lists every accepted Settings.OpenAgain value.
+var OpenAgainIDs = []string{OpenAgainAsk, OpenAgainFocus, OpenAgainNew}
+
+// NewServerIcon is the icon a new server gets with IconStyle "icon".
+const NewServerIcon = "server"
+
+// NewServerLook is the icon and colour a server created outside the server
+// sheet (import, quick connect) starts with. "" keeps letters / the group's
+// colour; the frontend's lib/look.ts newServerLook mirrors it.
+func (s Settings) NewServerLook() (icon, color string) {
+	if s.IconStyle == IconStyleIcon {
+		icon = NewServerIcon
+	}
+	if s.ColorBy == ColorByNone {
+		color = "gray"
+	}
+	return icon, color
+}
+
+// RotateReminderChoices are the accepted Settings.RotateReminderDays values.
+var RotateReminderChoices = []int{0, 180, 365, 730}
+
+// Approval lengths accepted in Settings.GrantDefault; agent.GrantLength uses
+// the same strings.
+const (
+	GrantOnce      = "once"
+	GrantFor15Min  = "15m"
+	GrantUntilLock = "lock"
+)
+
+// GrantLengthIDs lists every accepted Settings.GrantDefault value.
+var GrantLengthIDs = []string{GrantOnce, GrantFor15Min, GrantUntilLock}
 
 // Terminal app ids accepted in Settings.Terminal. The launcher's catalog uses
 // the same strings.
@@ -62,13 +183,14 @@ const (
 	TerminalWezTerm   = "wezterm"
 	TerminalKitty     = "kitty"
 	TerminalAlacritty = "alacritty"
+	TerminalWarp      = "warp"
 	TerminalCustom    = "custom"
 )
 
 // TerminalIDs lists every accepted Settings.Terminal value.
 var TerminalIDs = []string{
 	TerminalApple, TerminalITerm2, TerminalGhostty, TerminalWezTerm,
-	TerminalKitty, TerminalAlacritty, TerminalCustom,
+	TerminalKitty, TerminalAlacritty, TerminalWarp, TerminalCustom,
 }
 
 // MaxCustomCommandBytes caps Settings.TerminalCustomCommand.
@@ -90,6 +212,23 @@ func DefaultSettings() Settings {
 		AutoFillSecrets:    true,
 		KeepAlive:          true,
 		AgentEnabled:       true,
+		GrantDefault:       GrantFor15Min,
+		GrantNeverProd:     true,
+		RotateReminderDays: 365,
+		LauncherHotkey:     DefaultLauncherShortcut,
+		LockOnSleep:        true,
+		Theme:              ThemeNight,
+		Density:            DensityComfortable,
+		IconStyle:          IconStyleIcon,
+		ColorBy:            ColorByGroup,
+		MenuIcons:          true,
+		TunnelsAutoStart:   true,
+		TunnelsReconnect:   true,
+		// Running tunnels have always outlived the lock.
+		TunnelsKeepWhileLocked: true,
+		TunnelsNotify:          true,
+		TunnelsSuggestPort:     true,
+		OpenAgain:              OpenAgainAsk,
 	}
 }
 
@@ -106,8 +245,41 @@ func (s *Settings) Sanitise() {
 	if !slices.Contains(TerminalIDs, s.Terminal) {
 		s.Terminal = TerminalApple
 	}
+	if !slices.Contains(GrantLengthIDs, s.GrantDefault) {
+		s.GrantDefault = GrantFor15Min
+	}
+	if !slices.Contains(RotateReminderChoices, s.RotateReminderDays) {
+		s.RotateReminderDays = 365
+	}
+	s.Theme = oneOf(s.Theme, ThemeIDs, ThemeNight)
+	s.Density = oneOf(s.Density, DensityIDs, DensityComfortable)
+	s.IconStyle = oneOf(s.IconStyle, IconStyleIDs, IconStyleIcon)
+	s.ColorBy = oneOf(s.ColorBy, ColorByIDs, ColorByGroup)
+	s.OpenAgain = oneOf(s.OpenAgain, OpenAgainIDs, OpenAgainAsk)
+	if sc, err := ParseLauncherShortcut(s.LauncherHotkey); err == nil {
+		s.LauncherHotkey = sc
+	} else {
+		s.LauncherHotkey = DefaultLauncherShortcut
+	}
+	s.SecurityIgnored = JoinCheckIDs(SplitCheckIDs(s.SecurityIgnored))
 	s.TerminalCustomCommand = sanitiseCustomCommand(s.TerminalCustomCommand)
+	s.BackupFolder = sanitiseBackupFolder(s.BackupFolder)
 	s.ID = 1
+}
+
+// A relative folder would put backups wherever the app happens to run from.
+func sanitiseBackupFolder(dir string) string {
+	if !filepath.IsAbs(dir) {
+		return ""
+	}
+	return filepath.Clean(dir)
+}
+
+func oneOf(v string, allowed []string, fallback string) string {
+	if slices.Contains(allowed, v) {
+		return v
+	}
+	return fallback
 }
 
 func sanitiseCustomCommand(cmd string) string {

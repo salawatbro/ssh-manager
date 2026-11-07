@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -128,50 +129,98 @@ func launchErr(format string, a ...any) error {
 
 // Open starts an ssh session for the server in the chosen terminal app.
 func (s *LauncherService) Open(serverID string) (OpenResult, error) {
+	note, err := s.open(serverID, stepOpen{})
+	return OpenResult{Note: note}, err
+}
+
+// OpenInTab is Open in a new tab of the terminal's front window, whatever the
+// "Open in a new tab" setting says (the launcher's ⌘↵). A terminal without
+// tabs opens a window.
+func (s *LauncherService) OpenInTab(serverID string) (OpenResult, error) {
+	note, err := s.open(serverID, stepOpen{inTab: true})
+	return OpenResult{Note: note}, err
+}
+
+// stepOpen is how a stack step opens its server; the zero value is a plain
+// Open.
+type stepOpen struct {
+	placement domain.Placement
+	// first: the stack's first server, with nothing of its own to split.
+	first      bool
+	runCommand string
+	onRedeem   func(pid int)
+	inTab      bool
+}
+
+func (s *LauncherService) open(serverID string, o stepOpen) (string, error) {
 	if err := s.ready(); err != nil {
-		return OpenResult{}, err
+		return "", err
 	}
 	// The frontend's no-op-while-locked can lag the backend (e.g. a tray click
 	// before boot sync), and a launch issued while locked would auto-fill.
-	if s.deps.Locked != nil && s.deps.Locked() {
-		return OpenResult{}, ErrLauncherLocked
+	if s.locked() {
+		return "", ErrLauncherLocked
 	}
 	srv, err := s.repo.Get(serverID)
 	if err != nil {
-		return OpenResult{}, err
+		return "", err
+	}
+	if o.runCommand != "" {
+		srv.RunAfterConnect = o.runCommand
 	}
 	chain, err := resolveServers(s.repo, srv)
 	if err != nil {
-		return OpenResult{}, err
+		return "", err
 	}
 	if err := s.checkAgentKeys(chain); err != nil {
-		return OpenResult{}, err
+		return "", err
 	}
 	set, err := s.currentSettings()
 	if err != nil {
-		return OpenResult{}, err
+		return "", err
+	}
+	// A stack keeps one terminal app so its tabs and splits land together.
+	if o.placement == "" {
+		set = withServerTerminal(set, srv)
+	}
+	if o.inTab {
+		tab := *set
+		tab.TerminalOpenInTab = true
+		set = &tab
 	}
 	dir, err := s.newLaunchDir()
 	if err != nil {
-		return OpenResult{}, err
+		return "", err
 	}
-	token, err := s.prepare(chain, srv.Name, set, dir)
+	token, err := s.prepare(chain, srv.Name, set, dir, o.onRedeem)
 	if err != nil {
 		_ = os.RemoveAll(dir)
-		return OpenResult{}, err
+		return "", err
 	}
-	note, err := s.run(set, filepath.Join(dir, "connect.command"), false)
+	note, err := s.run(set, filepath.Join(dir, "connect.command"), false, o)
 	if err != nil {
 		s.deps.Broker.Revoke(token)
-		return OpenResult{}, err
+		return "", err
 	}
 	_ = s.repo.BumpUsage(serverID)
-	return OpenResult{Note: note}, nil
+	return note, nil
+}
+
+func (s *LauncherService) locked() bool { return s.deps.Locked != nil && s.deps.Locked() }
+
+// withServerTerminal returns a copy of set using the server's terminal, if it
+// names a known one; an empty or unknown value keeps the Settings default.
+func withServerTerminal(set *domain.Settings, srv *domain.Server) *domain.Settings {
+	out := *set
+	if slices.Contains(domain.TerminalIDs, srv.Terminal) {
+		out.Terminal = srv.Terminal
+	}
+	return &out
 }
 
 // prepare writes ssh_config and connect.command into dir and registers the
 // launch; it returns the launch token.
-func (s *LauncherService) prepare(chain []domain.Server, title string, set *domain.Settings, dir string) (string, error) {
+func (s *LauncherService) prepare(chain []domain.Server, title string, set *domain.Settings, dir string, onRedeem func(int)) (string, error) {
 	plan, err := launcher.BuildPlan(chain, launcher.Options{
 		SSHPath:        launcher.SSHPath,
 		HomeDir:        s.deps.HomeDir,
@@ -188,7 +237,7 @@ func (s *LauncherService) prepare(chain []domain.Server, title string, set *doma
 		}
 	}
 	token, err := s.deps.Broker.Issue(askpass.Launch{
-		Argv: plan.Argv, Hops: plan.Hops, Dir: dir, Title: title, AutoFill: set.AutoFillSecrets,
+		Argv: plan.Argv, Hops: plan.Hops, Dir: dir, Title: title, AutoFill: set.AutoFillSecrets, OnRedeem: onRedeem,
 	})
 	if err != nil {
 		return "", err
@@ -244,7 +293,7 @@ func writeNew(path string, data []byte, mode os.FileMode) error {
 
 // run opens script in the configured terminal. strict (TestTerminal) refuses
 // to substitute Terminal.app for a missing app.
-func (s *LauncherService) run(set *domain.Settings, script string, strict bool) (string, error) {
+func (s *LauncherService) run(set *domain.Settings, script string, strict bool, o stepOpen) (string, error) {
 	if set.Terminal == domain.TerminalCustom {
 		argv, err := launcher.CustomCommand(set.TerminalCustomCommand, script)
 		if err != nil {
@@ -257,6 +306,7 @@ func (s *LauncherService) run(set *domain.Settings, script string, strict bool) 
 	}
 	term, _ := launcher.Lookup(set.Terminal)
 	note := ""
+	var err error
 	app, ok := s.deps.Locator.Locate(term.BundleID)
 	if !ok {
 		apple, _ := launcher.Lookup(domain.TerminalApple)
@@ -269,7 +319,13 @@ func (s *LauncherService) run(set *domain.Settings, script string, strict bool) 
 		note = term.Name + " isn't installed — opened in Terminal."
 		term = apple
 	}
-	attempts, err := launcher.OpenCommands(term.ID, app, script, set.TerminalOpenInTab)
+	var attempts []launcher.Attempt
+	if o.placement == "" {
+		attempts, err = launcher.OpenCommands(term.ID, app, script, set.TerminalOpenInTab)
+	} else {
+		mode := launcher.StepMode(term.ID, launcher.TabSupported(term, app), o.placement, o.first)
+		attempts, err = launcher.StackCommands(term.ID, app, script, mode)
+	}
 	if err != nil {
 		return "", launchErr("%v", err)
 	}
@@ -349,6 +405,6 @@ func (s *LauncherService) TestTerminal() error {
 	if err := writeNew(script, []byte(testScript), 0o700); err != nil {
 		return err
 	}
-	_, err = s.run(set, script, true)
+	_, err = s.run(set, script, true, stepOpen{})
 	return err
 }

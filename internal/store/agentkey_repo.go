@@ -64,7 +64,19 @@ func (r *AgentKeyRepo) first(query string, arg any) (*domain.AgentKey, error) {
 
 // Create inserts a key. The caller supplies the ID.
 func (r *AgentKeyRepo) Create(k *domain.AgentKey) error {
-	if err := r.db.Create(k).Error; err != nil {
+	confirm := k.RequireConfirm
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(k).Error; err != nil {
+			return err
+		}
+		if confirm {
+			return nil
+		}
+		// GORM inserts the column default (true) in place of a false.
+		k.RequireConfirm = false
+		return tx.Model(&domain.AgentKey{}).Where("id = ?", k.ID).UpdateColumn("require_confirm", false).Error
+	})
+	if err != nil {
 		return fmt.Errorf("cannot save key %s: %w", k.ID, err)
 	}
 	return nil

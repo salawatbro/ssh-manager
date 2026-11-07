@@ -1,0 +1,70 @@
+/* lib/theme.ts sets data-theme on every window; Match macOS resolves to day
+   or night through prefers-color-scheme. Values are the Palette board's, except
+   ok, ok-tx, warn and idle, darkened slightly to reach 3:1 (fills) and 4.5:1
+   (text) on bg and s1–s3. */
+:root[data-theme='day'] {
+  color-scheme: light;
+  --sheet-shadow: rgb(20 22 30 / 0.18);
+  --pop-shadow: rgb(20 22 30 / 0.14);
+
+  --color-bg: #f6f6f8;
+  --color-side: #ececf0;
+  --color-s1: #ffffff;
+  --color-s2: #f3f3f6;
+  --color-s3: #e6e6ec;
+  --color-line: #e3e3ea;
+  --color-line2: #cfd0d8;
+  --color-scrim: rgb(20 22 30 / 0.28);
+
+  --color-tx: #15161a;
+  --color-tx2: #474c58;
+  --color-tx3: #5f6472;
+
+  --color-acc: #d4245f;
+  --color-acc-on: #ffffff;
+  --color-acc-soft: rgb(212 36 95 / 0.1);
+  --color-acc-tx: #b81d52;
+
+  --color-ok: #13a159;
+  --color-ok-tx: #0b7740;
+  --color-ok-soft: rgb(20 168 93 / 0.11);
+  --color-warn: #bf7f11;
+  --color-warn-tx: #8a5a00;
+  --color-warn-soft: rgb(208 138 18 / 0.13);
+  --color-bad: #e0383e;
+  --color-bad-tx: #c0262c;
+  --color-bad-soft: rgb(224 56 62 / 0.1);
+  --color-idle: #888d97;
+
+  --color-prod: #b4470f;
+  --color-prod-soft: rgb(180 71 15 / 0.1);
+  --color-stg: #6d4fe0;
+  --color-stg-soft: rgb(109 79 224 / 0.1);
+  --color-dev: #0569b3;
+  --color-dev-soft: rgb(5 105 179 / 0.1);
+
+  --color-t-gray: #474c58;
+  --color-t-gray-bg: rgb(71 76 88 / 0.1);
+  --color-t-red: #c0262c;
+  --color-t-red-bg: rgb(224 56 62 / 0.1);
+  --color-t-orange: #b4470f;
+  --color-t-orange-bg: rgb(220 100 30 / 0.11);
+  --color-t-amber: #8a5a00;
+  --color-t-amber-bg: rgb(208 138 18 / 0.13);
+  --color-t-lime: #4b7300;
+  --color-t-lime-bg: rgb(110 170 0 / 0.13);
+  --color-t-green: #0b7a42;
+  --color-t-green-bg: rgb(20 168 93 / 0.11);
+  --color-t-teal: #00756b;
+  --color-t-teal-bg: rgb(0 150 135 / 0.11);
+  --color-t-sky: #0569b3;
+  --color-t-sky-bg: rgb(5 105 179 / 0.1);
+  --color-t-blue: #2f55d4;
+  --color-t-blue-bg: rgb(47 85 212 / 0.1);
+  --color-t-violet: #6d4fe0;
+  --color-t-violet-bg: rgb(109 79 224 / 0.1);
+  --color-t-pink: #b81d52;
+  --color-t-pink-bg: rgb(212 36 95 / 0.1);
+  --color-t-fuchsia: #a020b8;
+  --color-t-fuchsia-bg: rgb(160 32 184 / 0.1);
+}

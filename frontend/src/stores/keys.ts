@@ -14,8 +14,11 @@ interface KeysState {
   keys: AgentKey[]
   status: AgentStatus | null
   selectedId: string | null
+  // The key whose sheet is open on the Keys page.
+  sheetId: string | null
   refresh: () => Promise<void>
   select: (id: string | null) => void
+  openSheet: (id: string | null) => void
   generate: (input: GenerateKeyInput) => Promise<AgentKey | string>
   importKey: (input: ImportKeyInput) => Promise<AgentKey | string>
   rename: (id: string, name: string) => Promise<string | null>
@@ -37,6 +40,7 @@ export const useKeys = create<KeysState>((set, get) => {
     keys: [],
     status: null,
     selectedId: null,
+    sheetId: null,
 
     refresh: async () => {
       try {
@@ -50,6 +54,7 @@ export const useKeys = create<KeysState>((set, get) => {
     },
 
     select: (id) => set({ selectedId: id }),
+    openSheet: (id) => set({ sheetId: id }),
 
     generate: async (input) => {
       try {

@@ -12,6 +12,7 @@ type Fake struct {
 	totp    map[string]string
 	fail    error
 	appLock *string    // nil means unset
+	backup  *string    // nil means unset
 	agentMu sync.Mutex // the agent reads keys from its own goroutines
 	agent   map[string][]byte
 }
@@ -181,4 +182,33 @@ func (f *Fake) AgentKeyCount() int {
 	f.agentMu.Lock()
 	defer f.agentMu.Unlock()
 	return len(f.agent)
+}
+
+// SetBackupPassword stores the backup password in the fake.
+func (f *Fake) SetBackupPassword(password string) error {
+	if f.fail != nil {
+		return f.fail
+	}
+	f.backup = &password
+	return nil
+}
+
+// GetBackupPassword returns the backup password, or ErrNotStored.
+func (f *Fake) GetBackupPassword() (string, error) {
+	if f.fail != nil {
+		return "", f.fail
+	}
+	if f.backup == nil {
+		return "", ErrNotStored
+	}
+	return *f.backup, nil
+}
+
+// DeleteBackupPassword clears the fake's backup password.
+func (f *Fake) DeleteBackupPassword() error {
+	if f.fail != nil {
+		return f.fail
+	}
+	f.backup = nil
+	return nil
 }

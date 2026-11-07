@@ -72,6 +72,7 @@ var updatableColumns = []string{
 	"name", "host", "port", "user",
 	"auth_type", "key_path", "agent_key_id", "two_factor", "jump_id",
 	"group_name", "environment", "tags", "notes",
+	"icon", "color", "run_after_connect", "terminal",
 	"updated_at",
 }
 
@@ -145,6 +146,22 @@ func (r *ServerRepo) SetPinned(id string, pinned bool) error {
 	if res.Error != nil {
 		return fmt.Errorf(
 			"cannot update the pin state for server %s; check the database file is writable and not locked by another instance: %w", id, res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// SetLook writes ONLY the icon and color columns, so restyling a server from
+// the sidebar never races a form Update (same isolation as SetPinned).
+func (r *ServerRepo) SetLook(id, icon, color string) error {
+	res := r.db.Model(&domain.Server{}).
+		Where("id = ?", id).
+		UpdateColumns(map[string]any{"icon": icon, "color": color})
+	if res.Error != nil {
+		return fmt.Errorf(
+			"cannot update the icon for server %s; check the database file is writable and not locked by another instance: %w", id, res.Error)
 	}
 	if res.RowsAffected == 0 {
 		return domain.ErrNotFound

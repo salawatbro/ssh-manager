@@ -23,7 +23,12 @@ type Runner interface {
 // shell, and a bounded capture of their error output.
 type ExecRunner struct{}
 
-const maxCapture = 4 << 10
+const (
+	maxCapture = 4 << 10
+	// How long Wait waits for the output pipes after the command exits; a
+	// child it left behind may hold them open indefinitely.
+	pipeGrace = time.Second
+)
 
 type capBuffer struct{ bytes.Buffer }
 
@@ -43,6 +48,7 @@ func (ExecRunner) Run(a Attempt) error {
 	var out capBuffer
 	if !a.KeepRunning {
 		cmd.Stdout, cmd.Stderr = &out, &out
+		cmd.WaitDelay = pipeGrace
 	}
 	if err := cmd.Start(); err != nil {
 		return err
@@ -51,7 +57,7 @@ func (ExecRunner) Run(a Attempt) error {
 	go func() { done <- cmd.Wait() }()
 	select {
 	case err := <-done:
-		if err == nil {
+		if err == nil || errors.Is(err, exec.ErrWaitDelay) {
 			return nil
 		}
 		text := strings.TrimSpace(out.String())
