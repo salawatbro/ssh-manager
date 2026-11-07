@@ -1,12 +1,16 @@
 import { useState } from 'react'
-import { ArrowUpDown, Plus } from 'lucide-react'
+import { ArrowDownAZ, ArrowUpDown, Clock, GripVertical, Plus, type LucideIcon } from 'lucide-react'
 import { useServers } from '../../stores/servers'
 import { useSidebar } from '../../stores/sidebar'
 import { inScope, scopeTitle, SORT_LABEL, type SortMode } from '../../lib/serverList'
 import { Button } from '../ui/Button'
 import { ContextMenu } from '../ui/ContextMenu'
 
-const SORTS: SortMode[] = ['manual', 'recent', 'name']
+const SORTS: { mode: SortMode; icon: LucideIcon }[] = [
+  { mode: 'manual', icon: GripVertical },
+  { mode: 'recent', icon: Clock },
+  { mode: 'name', icon: ArrowDownAZ },
+]
 
 // The list column's title band, also the window's drag handle.
 export function ListHeader({ onAdd }: { onAdd: () => void }) {
@@ -27,7 +31,7 @@ export function ListHeader({ onAdd }: { onAdd: () => void }) {
         aria-haspopup="menu"
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect()
-          setMenu({ x: r.right - 190, y: r.bottom + 4 })
+          setMenu({ x: r.right, y: r.bottom + 4 })
         }}
       >
         <ArrowUpDown size={13} strokeWidth={1.9} />
@@ -41,8 +45,15 @@ export function ListHeader({ onAdd }: { onAdd: () => void }) {
         <ContextMenu
           x={menu.x}
           y={menu.y}
+          align="end"
+          width={170}
           onClose={() => setMenu(null)}
-          items={SORTS.map((m) => ({ label: SORT_LABEL[m], checked: m === sort, run: () => useSidebar.getState().setSort(m) }))}
+          items={SORTS.map(({ mode, icon }) => ({
+            label: SORT_LABEL[mode],
+            icon,
+            checked: mode === sort,
+            run: () => useSidebar.getState().setSort(mode),
+          }))}
         />
       )}
     </header>

@@ -1,16 +1,15 @@
 import { useState } from 'react'
 import { MoreHorizontal, RotateCcw } from 'lucide-react'
-import { Browser } from '@wailsio/runtime'
 import type { PortForward } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { localUrl, rowState, TYPE_FLAG, tunnelRoute, wanted, type RowState } from '../../lib/tunnels'
+import type { MenuAlign } from '../../lib/menuPosition'
+import { rowState, TYPE_FLAG, tunnelRoute, wanted, type RowState } from '../../lib/tunnels'
 import { useForwards, type ForwardStatus } from '../../stores/forwards'
-import { useView } from '../../stores/view'
 import { toastError } from '../../stores/toasts'
-import { ContextMenu, type MenuEntry } from '../ui/ContextMenu'
 import { IconTile, type DotTone } from '../ui/IconTile'
 import { Switch } from '../ui/Switch'
 import { FailedNotice } from './FailedNotice'
 import { TrafficCell } from './TrafficCell'
+import { TunnelMenu } from './TunnelMenu'
 
 const DOT: Record<RowState, { tone: DotTone; label: string }> = {
   running: { tone: 'ok', label: 'Running' },
@@ -35,22 +34,20 @@ async function run(action: Promise<string | null>) {
 }
 
 export function TunnelTableRow({ forward: f, serverLine, status, buckets, first, onEdit, onStyle }: Props) {
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; align: MenuAlign } | null>(null)
   const state = rowState(status?.state)
   const on = wanted(state)
   const fw = useForwards.getState
-  const url = localUrl(f)
-
-  const items: MenuEntry[] = [
-    { label: 'Edit…', run: onEdit },
-    { label: 'Icon and colour…', run: onStyle },
-    ...(url ? [{ label: 'Open in browser', run: () => void Browser.OpenURL(url), disabled: state !== 'running' }] : []),
-    'separator',
-    { label: 'Show server', run: () => useView.getState().showDetail(f.serverId) },
-  ]
 
   return (
-    <div role="row" className={`flex flex-col ${first ? '' : 'border-t border-line'} ${state === 'failed' ? 'bg-bad-soft' : ''}`}>
+    <div
+      role="row"
+      onContextMenu={(e) => {
+        e.preventDefault()
+        setMenu({ x: e.clientX, y: e.clientY, align: 'start' })
+      }}
+      className={`flex flex-col ${first ? '' : 'border-t border-line'} ${state === 'failed' ? 'bg-bad-soft' : ''}`}
+    >
       <div className="flex h-[54px] items-center gap-[14px] px-[14px]">
         <span role="cell" className="flex w-[30px] shrink-0">
           <Switch
@@ -94,7 +91,7 @@ export function TunnelTableRow({ forward: f, serverLine, status, buckets, first,
             aria-haspopup="menu"
             onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect()
-              setMenu({ x: r.right - 190, y: r.bottom + 4 })
+              setMenu({ x: r.right, y: r.bottom + 4, align: 'end' })
             }}
             className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-tx3 hover:bg-s2 hover:text-tx"
           >
@@ -111,7 +108,18 @@ export function TunnelTableRow({ forward: f, serverLine, status, buckets, first,
           onRetry={() => void run(fw().start(f.id))}
         />
       )}
-      {menu && <ContextMenu x={menu.x} y={menu.y} items={items} onClose={() => setMenu(null)} />}
+      {menu && (
+        <TunnelMenu
+          forward={f}
+          running={state === 'running'}
+          x={menu.x}
+          y={menu.y}
+          align={menu.align}
+          onClose={() => setMenu(null)}
+          onEdit={onEdit}
+          onStyle={onStyle}
+        />
+      )}
     </div>
   )
 }

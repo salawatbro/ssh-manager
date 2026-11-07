@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
 import { AppWindow, AtSign, Copy, CopyPlus, Palette, Pencil, Pin, PlugZap, SquareTerminal, Trash2 } from 'lucide-react'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useServers } from '../../stores/servers'
 import { useSettings } from '../../stores/settings'
 import { useLookPicker } from '../../stores/lookPicker'
 import { toastError, toastInfo, toastSuccess } from '../../stores/toasts'
+import { useArmed } from '../../hooks/useArmed'
 import { useTerminals } from '../../hooks/useTerminals'
+import { copyText } from '../../lib/clipboard'
 import { openServer, openServerInTab } from '../../lib/launch'
 import type { MenuAlign } from '../../lib/menuPosition'
 import { canOpenInTab, serverAddress, testOutcome } from '../../lib/serverMenu'
@@ -22,9 +23,6 @@ interface Props {
   align?: MenuAlign
 }
 
-// An armed Delete that is not confirmed goes back to plain Delete.
-const DISARM_MS = 3000
-
 async function testConnection(server: Server) {
   toastInfo(`Testing ${server.name}…`)
   const out = testOutcome(server.name, await useServers.getState().testConnection(server.id))
@@ -32,18 +30,7 @@ async function testConnection(server: Server) {
   else toastError(out.text)
 }
 
-async function copyAddress(server: Server) {
-  try {
-    await navigator.clipboard.writeText(serverAddress(server))
-    toastSuccess('Address copied.')
-  } catch {
-    // best-effort, like Copy SSH command
-  }
-}
-
-// A server row's right-click menu (and the inspector's More actions). Delete
-// is the inline two-step (window.confirm is banned): the first click arms it,
-// the second deletes.
+// A server row's right-click menu (and the inspector's More actions).
 export function ServerContextMenu({ server, x, y, onClose, onEdit, align }: Props) {
   const duplicate = useServers((s) => s.duplicate)
   const copySSHCommand = useServers((s) => s.copySSHCommand)
@@ -51,13 +38,7 @@ export function ServerContextMenu({ server, x, y, onClose, onEdit, align }: Prop
   const setPinned = useServers((s) => s.setPinned)
   const settings = useSettings((s) => s.settings)
   const terminals = useTerminals()
-  const [armed, setArmed] = useState(false)
-
-  useEffect(() => {
-    if (!armed) return
-    const t = window.setTimeout(() => setArmed(false), DISARM_MS)
-    return () => window.clearTimeout(t)
-  }, [armed])
+  const { armed, arm } = useArmed()
 
   const items: MenuEntry[] = [
     { label: 'Connect', icon: SquareTerminal, hint: '↵', run: () => openServer(server.id) },
@@ -67,7 +48,7 @@ export function ServerContextMenu({ server, x, y, onClose, onEdit, align }: Prop
     { label: 'Test connection', icon: PlugZap, run: () => void testConnection(server) },
     'separator',
     { label: 'Copy SSH command', icon: Copy, run: () => void copySSHCommand(server.id) },
-    { label: 'Copy address', icon: AtSign, run: () => void copyAddress(server) },
+    { label: 'Copy address', icon: AtSign, run: () => void copyText(serverAddress(server), 'Address copied.') },
     'separator',
     { label: 'Edit…', icon: Pencil, run: onEdit },
     { label: 'Icon and colour…', icon: Palette, run: () => useLookPicker.getState().open(server.id) },
@@ -76,7 +57,7 @@ export function ServerContextMenu({ server, x, y, onClose, onEdit, align }: Prop
     'separator',
     armed
       ? { label: `Delete ${server.name}?`, icon: Trash2, danger: true, armed: true, run: () => void remove(server.id) }
-      : { label: 'Delete…', icon: Trash2, danger: true, keepOpen: true, run: () => setArmed(true) },
+      : { label: 'Delete…', icon: Trash2, danger: true, keepOpen: true, run: arm },
   ]
 
   const header = (

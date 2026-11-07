@@ -88,11 +88,19 @@ export function tunnelCounts(ids: string[], stateOf: (id: string) => string | un
   return { running, failed, total: ids.length }
 }
 
+const macHost = (bindAddr: string) => (!bindAddr || bindAddr === '0.0.0.0' || bindAddr === '127.0.0.1' ? 'localhost' : bindAddr)
+
 // The page a -L tunnel serves, for "Open in browser".
 export function localUrl(f: PortForward): string | null {
   if (f.type !== ForwardType.ForwardLocal) return null
-  const host = !f.bindAddr || f.bindAddr === '0.0.0.0' || f.bindAddr === '127.0.0.1' ? 'localhost' : f.bindAddr
-  return `http://${host}:${f.bindPort}`
+  return `http://${macHost(f.bindAddr)}:${f.bindPort}`
+}
+
+// Where a tunnel listens on this Mac, for Copy address; a -R tunnel listens
+// on the server instead.
+export function localAddress(f: PortForward): string | null {
+  if (f.type === ForwardType.ForwardRemote) return null
+  return `${macHost(f.bindAddr)}:${f.bindPort}`
 }
 
 // The busy-port line: "Port 6379 on this Mac is held by redis-server (pid 4121)."

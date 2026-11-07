@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Check, Copy, MoreHorizontal } from 'lucide-react'
+import { Check, Copy, FileCode, MoreHorizontal, Power, Settings } from 'lucide-react'
 import { AgentService, type AgentSnippet } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { agentBand, exportLine, socketVar, type BandTone } from '../../lib/agentBand'
+import { copyText } from '../../lib/clipboard'
 import { useKeys } from '../../stores/keys'
 import { useSettings } from '../../stores/settings'
 import { Button } from '../ui/Button'
@@ -43,12 +44,16 @@ export function AgentBand() {
   }, [status?.socketPath])
 
   const line = snippet ? exportLine(snippet.shellExport) : ''
-  const items: MenuEntry[] = [
-    { label: 'Copy ~/.ssh/config block', run: () => void copy(snippet?.sshConfig ?? '', () => {}), disabled: !snippet },
-    ...(enabled && settings && !settings.startAtLogin
-      ? [{ label: 'Start Zish at login', run: () => void update({ startAtLogin: true }) }]
-      : []),
-  ]
+  const items: MenuEntry[] = []
+  if (snippet) {
+    const block = snippet.sshConfig
+    items.push({ label: 'Copy ~/.ssh/config block', icon: FileCode, run: () => void copyText(block, 'Config block copied.') })
+  }
+  if (enabled && settings && !settings.startAtLogin) {
+    items.push({ label: 'Start Zish at login', icon: Power, run: () => void update({ startAtLogin: true }) })
+  }
+  if (items.length > 0) items.push('separator')
+  items.push({ label: 'Agent settings…', icon: Settings, run: () => useSettings.getState().show('agent') })
 
   return (
     <div className="flex items-center gap-[12px] rounded-[12px] border border-line bg-s1 px-[14px] py-[12px]">
@@ -78,13 +83,17 @@ export function AgentBand() {
         type="button"
         aria-label="More agent options"
         title="More"
-        onClick={(e) => setMenu({ x: e.clientX, y: e.clientY })}
+        aria-haspopup="menu"
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          setMenu({ x: r.right, y: r.bottom + 4 })
+        }}
         className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-[7px] text-tx2 hover:bg-s2 hover:text-tx"
       >
         <MoreHorizontal size={15} strokeWidth={1.8} />
       </button>
       <Switch checked={enabled} label="Zish agent" disabled={!settings} onChange={(v) => void update({ agentEnabled: v })} />
-      {menu && <ContextMenu x={menu.x} y={menu.y} items={items} onClose={() => setMenu(null)} />}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={items} onClose={() => setMenu(null)} width={220} align="end" />}
     </div>
   )
 }

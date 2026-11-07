@@ -4,6 +4,7 @@ import type { PortForward, Server } from '@bindings/github.com/salawat/sshmgr/in
 import {
   busyText,
   formatBytes,
+  localAddress,
   localUrl,
   rowState,
   serverLine,
@@ -125,6 +126,18 @@ describe('localUrl', () => {
     expect(localUrl(fwd({ bindPort: 8080 }))).toBe('http://localhost:8080')
     expect(localUrl(fwd({ bindAddr: '192.168.1.4', bindPort: 8080 }))).toBe('http://192.168.1.4:8080')
     expect(localUrl(fwd({ type: ForwardType.ForwardDynamic }))).toBeNull()
+  })
+})
+
+describe('localAddress', () => {
+  it('gives the port a tunnel listens on here', () => {
+    expect(localAddress(fwd({ bindPort: 5432 }))).toBe('localhost:5432')
+    expect(localAddress(fwd({ bindAddr: '0.0.0.0', bindPort: 5432 }))).toBe('localhost:5432')
+    expect(localAddress(fwd({ type: ForwardType.ForwardDynamic, bindAddr: '192.168.1.4', bindPort: 1080 }))).toBe('192.168.1.4:1080')
+  })
+
+  it('has none for a tunnel that listens on the server', () => {
+    expect(localAddress(fwd({ type: ForwardType.ForwardRemote }))).toBeNull()
   })
 })
 
