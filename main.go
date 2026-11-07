@@ -370,6 +370,9 @@ func main() {
 			// band (52px, tuned to where Tahoe draws the lights).
 			TitleBar:                application.MacTitleBarHiddenInset,
 			InvisibleTitleBarHeight: 52,
+			// Esc closes Settings, sheets, menus and lists here; left on, the
+			// same press also took the window out of fullscreen.
+			DisableEscapeExitsFullscreen: true,
 			// No Appearance: the window inherits NSApp's, which applyTheme sets.
 		},
 		// What shows before the webview paints, so it must match the page.
