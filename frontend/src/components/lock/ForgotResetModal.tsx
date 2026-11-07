@@ -19,6 +19,7 @@ export function ForgotResetModal({ onClose }: { onClose: () => void }) {
       // so without intercepting during capture this would also close/affect
       // whatever is rendered below the modal.
       e.stopImmediatePropagation()
+      e.preventDefault() // taken: unhandled, macOS would leave fullscreen too
       onClose()
     }
     document.addEventListener('keydown', onKey, true)

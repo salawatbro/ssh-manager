@@ -59,6 +59,7 @@ export function TagsEditor({ form, setForm }: Props) {
               if (e.key === 'Escape') {
                 // Cancels the tag only; the sheet stays open.
                 e.stopPropagation()
+                e.preventDefault() // taken: unhandled, macOS would leave fullscreen too
                 setDraft('')
                 setAdding(false)
               }

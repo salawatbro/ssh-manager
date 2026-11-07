@@ -41,7 +41,8 @@ export function Sheet({ title, onClose, width = 640, actions, footer, onSubmit, 
     function onKeyDown(e: KeyboardEvent) {
       if (e.isComposing || openSheets[openSheets.length - 1] !== me) return
       if (e.key === 'Escape') {
-        // Taken: the page under the sheet (Settings) must not close too.
+        // Taken: the page under the sheet (Settings) must not close too, nor
+        // macOS take a fullscreen window out of fullscreen.
         e.preventDefault()
         closeRef.current()
       } else if (e.key === 'Enter' && e.metaKey && submitRef.current) {

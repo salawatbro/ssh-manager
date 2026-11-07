@@ -19,6 +19,7 @@ export function UninstallModal({ onClose }: Props) {
       // Caught in the capture phase and stopped there, so the settings
       // page's own Escape (a bubble listener) does not close Settings too.
       e.stopImmediatePropagation()
+      e.preventDefault() // taken: unhandled, macOS would leave fullscreen too
       onClose()
     }
     document.addEventListener('keydown', onKey, true)

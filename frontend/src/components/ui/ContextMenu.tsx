@@ -41,7 +41,10 @@ export function ContextMenu({ x, y, items, onClose, header, width = 190, align =
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !e.isComposing) onClose()
+      if (e.key === 'Escape' && !e.isComposing) {
+        e.preventDefault() // taken: unhandled, macOS would leave fullscreen too
+        onClose()
+      }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)

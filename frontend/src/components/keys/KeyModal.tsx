@@ -18,6 +18,7 @@ export function KeyModal({ title, onClose, children, footer, width = 460, raised
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape' || e.isComposing) return
       e.stopImmediatePropagation()
+      e.preventDefault() // taken: unhandled, macOS would leave fullscreen too
       onClose()
     }
     document.addEventListener('keydown', onKey, true)

@@ -41,6 +41,9 @@ export function SettingsPage() {
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape' || e.isComposing || e.defaultPrevented) return
       if (usePalette.getState().open || useLock.getState().locked) return
+      // Taken: an Escape the page leaves unhandled goes on to macOS, which
+      // takes a fullscreen window out of fullscreen.
+      e.preventDefault()
       close()
     }
     window.addEventListener('keydown', onKey)

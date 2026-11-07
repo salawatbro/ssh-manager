@@ -67,6 +67,7 @@ export function Select<T extends string | number>({ value, options, onChange, ar
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape' && !e.isComposing) {
         e.stopPropagation() // don't also close the surrounding form modal
+        e.preventDefault() // taken: unhandled, macOS would leave fullscreen too
         close()
       }
     }
