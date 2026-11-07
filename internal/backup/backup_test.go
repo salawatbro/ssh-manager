@@ -26,7 +26,7 @@ func samplePayload() Payload {
 }
 
 func TestSealOpenRoundTrip(t *testing.T) {
-	meta := Meta{Created: time.Date(2026, 11, 6, 14, 20, 0, 0, time.UTC), Mac: "Studio", App: "2.0.0"}
+	meta := Meta{Created: time.Date(2026, 11, 6, 14, 20, 0, 0, time.UTC), Mac: "Studio", App: "dev-build"}
 	b, err := Seal(samplePayload(), "correct horse", meta)
 	if err != nil {
 		t.Fatal(err)
@@ -38,7 +38,7 @@ func TestSealOpenRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if h.Mac != "Studio" || h.App != "2.0.0" || !h.Created.Equal(meta.Created) {
+	if h.Mac != "Studio" || h.App != "dev-build" || !h.Created.Equal(meta.Created) {
 		t.Fatalf("header = %+v", h)
 	}
 	want := samplePayload()
