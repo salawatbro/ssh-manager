@@ -19,12 +19,12 @@ export function TunnelSwitches({ draft, setDraft, stack }: Props) {
   return (
     <div className="grid grid-cols-2 gap-x-[18px] border-t border-line pt-[4px]">
       {OPTIONS.map((o) => (
-        <label key={o.key} className="flex h-[34px] cursor-pointer items-center gap-[10px] border-b border-line">
+        <label key={o.key} className="flex h-[44px] cursor-pointer items-center gap-[10px] border-b border-line">
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-tx">{o.label}</span>
           <Switch checked={draft[o.key]} label={o.label} onChange={(v) => setDraft({ ...draft, [o.key]: v })} />
         </label>
       ))}
-      <div className="flex h-[34px] items-center gap-[8px] border-b border-line">
+      <div className="flex h-[44px] items-center gap-[8px] border-b border-line">
         <span className="min-w-0 flex-1 truncate text-[12.5px] text-tx">Add to a stack</span>
         <div className="w-[150px] shrink-0">
           <Select ariaLabel="Add to a stack" value={stack.value} options={stack.options} onChange={stack.onChange} />
