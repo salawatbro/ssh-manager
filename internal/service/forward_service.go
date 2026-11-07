@@ -79,6 +79,8 @@ type ForwardService struct {
 	agent    *AgentService
 	keeper   *tunnelKeeper
 	settings *store.SettingsRepo
+	notifier TunnelNotifier
+	alerts   tunnelAlerts
 }
 
 // SetForwardSettings lets the tunnel runtime follow Settings › Tunnels.

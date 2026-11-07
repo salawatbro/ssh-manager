@@ -128,6 +128,8 @@ func main() {
 	})
 	forwardService = service.NewForwardService(forwardRepo, repo, kr, dialer, forwardMgr)
 	service.SetForwardSettings(forwardService, settingsRepo)
+	notifier := &macNotifier{}
+	service.SetTunnelNotifier(forwardService, notifier)
 
 	uninstallDataDir, _ := platform.DataDir()
 	uninstallLogDir, _ := platform.LogDir()
@@ -196,6 +198,9 @@ func main() {
 		if prev.Theme != next.Theme {
 			applyTheme(next.Theme)
 			application.Get().Event.Emit("theme:changed", next.Theme)
+		}
+		if next.TunnelsNotify && !prev.TunnelsNotify {
+			go notifier.authorize()
 		}
 	})
 
@@ -380,6 +385,12 @@ func main() {
 	// and is re-applied on every show so it survives Wails re-styling the button.
 	mainWindow.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) {
 		interceptCloseButton()
+	})
+	mainWindow.OnWindowEvent(events.Common.WindowFocus, func(*application.WindowEvent) {
+		notifier.inFront.Store(true)
+	})
+	mainWindow.OnWindowEvent(events.Common.WindowLostFocus, func(*application.WindowEvent) {
+		notifier.inFront.Store(false)
 	})
 
 	mainWindow.OnWindowEvent(events.Mac.WindowDidEnterFullScreen, func(*application.WindowEvent) {

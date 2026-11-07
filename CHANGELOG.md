@@ -71,6 +71,10 @@ existing database and older backups open unchanged.
   reconnect on their own after a drop, after sleep and when the network
   changes. A tunnel whose port is taken says which app holds it and offers a
   free one.
+- **Tunnel notifications** — Settings → Tunnels → "Notify me when a tunnel
+  drops" shows a macOS notification when a tunnel drops, comes back, stops
+  reconnecting or can't start because its port is taken; none while the Zish
+  window is in front.
 - **New server and New tunnel sheets** — paste an `ssh` command to fill the
   form, pick how to sign in from tiles, put a Zish key on the server while
   saving, see the route through jump hosts; tunnel presets (Postgres, MySQL,

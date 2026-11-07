@@ -14,11 +14,13 @@ const TrafficInterval = 50 * time.Second
 // The functions below are package-level, not methods, so they never become
 // frontend bindings (see SetForwardDeps).
 
-// ObserveForward feeds a Manager status to the reconnect keeper. main.go
-// calls it from the Manager's emit, after the event went to the frontend.
+// ObserveForward feeds a Manager status to the reconnect keeper and the
+// tunnel alerts. main.go calls it from the Manager's emit, after the event
+// went to the frontend.
 func ObserveForward(s *ForwardService, st forward.Status) {
 	if s != nil {
 		s.keeper.observe(st)
+		s.alert(st)
 	}
 }
 

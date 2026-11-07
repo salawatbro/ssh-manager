@@ -29,8 +29,11 @@ export function TunnelsSection() {
             onChange={(v) => void update({ tunnelsKeepWhileLocked: v })}
           />
         </Row>
-        <Row label="Notify me when a tunnel drops" hint="Not available yet: macOS notifications come in a later update.">
-          <Toggle label="Notify me when a tunnel drops" on={s.tunnelsNotify} disabled onChange={() => {}} />
+        <Row
+          label="Notify me when a tunnel drops"
+          hint="A macOS notification when a tunnel drops, comes back, or can’t start because its port is taken. None while the Zish window is in front."
+        >
+          <Toggle label="Notify me when a tunnel drops" on={s.tunnelsNotify} onChange={(v) => void update({ tunnelsNotify: v })} />
         </Row>
       </Group>
       <Group title="Ports">

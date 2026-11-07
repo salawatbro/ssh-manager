@@ -124,6 +124,8 @@ forward, keep confirmation on so a remote server can't sign unnoticed.
   their own after a drop, after sleep or a network change. A busy port shows
   which app holds it and offers a free one; presets cover Postgres, MySQL,
   Redis, web and Kubernetes.
+- **Tunnel notifications** — an optional macOS notification when a tunnel
+  drops, comes back or can't get its port (Settings → Tunnels).
 - **Stacks** — open several servers and tunnels in one go: tunnels first, then
   servers in tabs, windows or iTerm2 split panes, under one Touch ID. A stack
   can sit in the menu bar and have its own global shortcut.
