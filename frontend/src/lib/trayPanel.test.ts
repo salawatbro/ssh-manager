@@ -24,7 +24,7 @@ const tunnel = (id: string, state: string): TunnelRow =>
     status: { forwardId: id, state, detail: '', portBusy: false },
   }) as unknown as TunnelRow
 
-const data = (over: Partial<LauncherData> = {}): LauncherData => ({ servers: [], stacks: [], tunnels: [], states: {}, ...over })
+const data = (over: Partial<LauncherData> = {}): LauncherData => ({ servers: [], commands: [], stacks: [], tunnels: [], states: {}, ...over })
 
 const agent = (over: Partial<AgentStatus> = {}): AgentStatus =>
   ({ enabled: true, running: true, socketPath: '', error: '', clientLocked: false, tempKeys: [], ...over }) as AgentStatus

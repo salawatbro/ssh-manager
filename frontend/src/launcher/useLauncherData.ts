@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Events } from '@wailsio/runtime'
 import { BiometricService } from '@bindings/github.com/salawat/sshmgr'
 import {
+  CommandService,
   ForwardService,
   LockService,
   ServerService,
@@ -11,7 +12,7 @@ import {
 import type { LauncherData } from '../lib/launcherRows'
 import { newServerLook } from '../lib/look'
 
-const EMPTY: LauncherData = { servers: [], stacks: [], tunnels: [], states: {} }
+const EMPTY: LauncherData = { servers: [], commands: [], stacks: [], tunnels: [], states: {} }
 
 // Settings › Appearance, as the launcher uses it.
 export interface LauncherPrefs {
@@ -36,8 +37,13 @@ export function useLauncherData(showEvent: 'launcher:show' | 'tray:show' = 'laun
 
   const loadLists = useCallback(async () => {
     try {
-      const [servers, stacks, tunnels] = await Promise.all([ServerService.List(), StackService.List(), ForwardService.ListAll()])
-      setData({ servers: servers ?? [], stacks: stacks ?? [], tunnels: tunnels ?? [], states: {} })
+      const [servers, commands, stacks, tunnels] = await Promise.all([
+        ServerService.List(),
+        CommandService.List(),
+        StackService.List(),
+        ForwardService.ListAll(),
+      ])
+      setData({ servers: servers ?? [], commands: commands ?? [], stacks: stacks ?? [], tunnels: tunnels ?? [], states: {} })
     } catch {
       // Keep what was there; the next show reads again.
     }

@@ -43,6 +43,14 @@ export function LaunchStack(id: string): $CancellablePromise<service$0.StackLaun
 }
 
 /**
+ * RunCommand runs a saved command like Connect opens its server; the main
+ * window reloads on servers:changed.
+ */
+export function RunCommand(id: string, inTab: boolean): $CancellablePromise<service$0.OpenResult> {
+    return $Call.ByID(4224674611, id, inTab);
+}
+
+/**
  * ShowMain brings the main window forward, e.g. to unlock with the PIN.
  */
 export function ShowMain(): $CancellablePromise<void> {

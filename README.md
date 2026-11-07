@@ -129,6 +129,9 @@ forward, keep confirmation on so a remote server can't sign unnoticed.
 - **Stacks** — open several servers and tunnels in one go: tunnels first, then
   servers in tabs, windows or iTerm2 split panes, under one Touch ID. A stack
   can sit in the menu bar and have its own global shortcut.
+- **Saved commands** — named commands per server ("Tail logs", "Backup"),
+  run in your terminal app from the inspector, the launcher or the menu-bar
+  panel; the shell stays open afterwards.
 
 ### Productivity
 - **Command palette** (`⌘K`) — fuzzy-search servers and actions

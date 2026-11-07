@@ -1,9 +1,10 @@
 import type { AgentStatus } from '@bindings/github.com/salawat/sshmgr/internal/service'
+import { commandRows, MAX_MENU_COMMANDS } from './commandRows'
 import { serverRow, stackRow, tunnelRow, type LauncherData, type LauncherRow, type Tone } from './launcherRows'
 import { shortcutLabel } from './stackShortcut'
 
-// The menu-bar panel (tray.html): pinned servers, the stacks shown in the
-// menu bar and every tunnel, built from the same rows as the launcher.
+// The menu-bar panel (tray.html): pinned servers, the saved commands and
+// stacks shown in the menu bar, and every tunnel, built from the same rows as the launcher.
 
 // SetPinned refuses a sixth pin; a hand-edited database must still not
 // flood the panel.
@@ -16,6 +17,7 @@ export interface TrayRow extends LauncherRow {
 
 export interface TraySections {
   pinned: TrayRow[]
+  commands: TrayRow[]
   stacks: TrayRow[]
   tunnels: TrayRow[]
 }
@@ -26,6 +28,7 @@ const plain = (row: LauncherRow): TrayRow => ({ ...row, shortcut: '' })
 export function traySections(data: LauncherData): TraySections {
   return {
     pinned: data.servers.filter((s) => s.pinned).slice(0, MAX_PINNED).map((s) => plain(serverRow(s, data))),
+    commands: commandRows(data, (c) => c.inMenuBar).slice(0, MAX_MENU_COMMANDS).map(plain),
     stacks: data.stacks
       .filter((st) => st.inMenuBar && (st.steps?.length ?? 0) > 0)
       .map((st) => ({ ...stackRow(st, data), shortcut: shortcutLabel(st.shortcut) })),
@@ -35,7 +38,7 @@ export function traySections(data: LauncherData): TraySections {
 
 // Every row in panel order, as the arrow keys walk them.
 export function trayOrder(s: TraySections): TrayRow[] {
-  return [...s.pinned, ...s.stacks, ...s.tunnels]
+  return [...s.pinned, ...s.commands, ...s.stacks, ...s.tunnels]
 }
 
 // "1 of 2 on"

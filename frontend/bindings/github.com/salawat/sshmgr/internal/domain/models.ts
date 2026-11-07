@@ -234,6 +234,27 @@ export interface Server {
 }
 
 /**
+ * ServerCommand is a saved command for one server: running it opens the
+ * server in the terminal with Command in place of RunAfterConnect. The table
+ * is server_commands; the legacy snippets table belongs to a removed feature.
+ */
+export interface ServerCommand {
+    "id": string;
+    "serverId": string;
+    "name": string;
+    "command": string;
+
+    /**
+     * InMenuBar lists the command in the menu-bar panel.
+     */
+    "inMenuBar": boolean;
+    "position": number;
+    "lastRunAt": string | null;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
  * Settings is the single-row app configuration table (FR-12.1: settings live
  * in the database, never localStorage). ID is always 1. Defaults come from
  * DefaultSettings() and the gorm column defaults, applied on first run.

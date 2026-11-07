@@ -31,7 +31,7 @@ function fixture(): LauncherData {
     { id: 'empty', name: 'Nothing yet', description: '', icon: '', color: '', lastLaunchedAt: null, steps: [] } as unknown as Stack,
   ]
   const tunnels = [tunnel(forward('pg', 'db', 'postgres'), 'db-primary', 'running')]
-  return { servers, stacks, tunnels, states: {} }
+  return { servers, commands: [], stacks, tunnels, states: {} }
 }
 
 describe('launcherRows', () => {

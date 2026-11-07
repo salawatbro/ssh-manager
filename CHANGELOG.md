@@ -91,6 +91,10 @@ existing database and older backups open unchanged.
 - **Launcher** — ⌥Space from any app finds servers, stacks and tunnels, or
   connects to a typed `user@host`. The shortcut can be changed or turned off;
   while Zish is locked it offers Touch ID first.
+- **Saved commands** — up to 20 named commands per server ("Tail logs",
+  "Backup") in its inspector. Running one connects in your terminal app, runs
+  it and leaves the shell open. They show up in the launcher, and the ones
+  marked "Show in the menu bar" in the menu-bar panel; exports carry them.
 - **Menu-bar panel** — the Zish bolt in the menu bar opens a panel instead of
   a plain menu: pinned servers, the stacks shown in the menu bar and every
   tunnel with an on/off switch, plus the agent's state, a Search button for the

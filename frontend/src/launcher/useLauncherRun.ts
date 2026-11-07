@@ -23,7 +23,7 @@ interface Deps {
   look: { icon: string; color: string }
 }
 
-// What a launcher row does. Connect and Launch hide the window first — the
+// What a launcher row does. Connect, Run and Launch hide the window first — the
 // terminal is where the user is going — and bring it back only to show a
 // failure. A tunnel toggles in place.
 export function useLauncherRun({ data, notify, hide, holdOpen, onUnlocked, look }: Deps) {
@@ -39,6 +39,15 @@ export function useLauncherRun({ data, notify, hide, holdOpen, onUnlocked, look 
     hide()
     try {
       await LauncherWindowService.Connect(serverId, inTab)
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  async function runCommand(id: string, inTab: boolean) {
+    hide()
+    try {
+      await LauncherWindowService.RunCommand(id, inTab)
     } catch (e) {
       fail(e)
     }
@@ -83,6 +92,7 @@ export function useLauncherRun({ data, notify, hide, holdOpen, onUnlocked, look 
     if (busyKey) return
     notify(null)
     if (row.kind === 'server') void connect(row.id, inTab)
+    else if (row.kind === 'command') void runCommand(row.id, inTab)
     else if (row.kind === 'quick' && row.target) void connectOnce(row.target, inTab)
     else if (row.kind === 'stack') void launchStack(row.id)
     else if (row.kind === 'tunnel') void toggleTunnel(row)

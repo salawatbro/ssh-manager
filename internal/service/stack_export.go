@@ -22,6 +22,8 @@ type ExportFile struct {
 	Servers  []domain.Server      `json:"servers"`
 	Forwards []domain.PortForward `json:"forwards"`
 	Stacks   []domain.Stack       `json:"stacks"`
+	// Commands came after version 2; a file without them imports none.
+	Commands []domain.ServerCommand `json:"commands,omitempty"`
 }
 
 // SetStackDeps lets the JSON export and import carry stacks; onImported runs
@@ -44,6 +46,11 @@ func (s *ServerService) exportFile() (ExportFile, error) {
 	}
 	if s.stacks != nil {
 		if out.Stacks, err = s.stacks.List(); err != nil {
+			return out, err
+		}
+	}
+	if s.commands != nil {
+		if out.Commands, err = s.commands.List(); err != nil {
 			return out, err
 		}
 	}
@@ -73,6 +80,11 @@ func ParseExportJSON(b []byte) (ExportFile, error) {
 	}
 	for i := range f.Stacks {
 		if err := f.Stacks[i].Validate(); err != nil {
+			return ExportFile{}, err
+		}
+	}
+	for i := range f.Commands {
+		if err := f.Commands[i].Validate(); err != nil {
 			return ExportFile{}, err
 		}
 	}

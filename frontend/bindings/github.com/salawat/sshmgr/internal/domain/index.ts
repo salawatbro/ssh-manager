@@ -14,6 +14,7 @@ export type {
     AgentSignEvent,
     PortForward,
     Server,
+    ServerCommand,
     Settings,
     Stack,
     StackStep

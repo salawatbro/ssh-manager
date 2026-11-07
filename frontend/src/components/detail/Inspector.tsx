@@ -14,6 +14,7 @@ import { IconTile } from '../ui/IconTile'
 import { Kbd } from '../ui/Kbd'
 import { ServerContextMenu } from '../server/ServerContextMenu'
 import { RouteLane } from './RouteLane'
+import { CommandList } from './CommandList'
 import { OnConnectCard } from './OnConnectCard'
 import { TunnelList } from './TunnelList'
 
@@ -115,6 +116,7 @@ export function Inspector() {
 
       <RouteLane nodes={routeNodes(chain)} />
       <OnConnectCard terminal={server.terminal ? termName : `${termName} · default`} run={server.runAfterConnect} autoFill={autoFill} />
+      <CommandList serverId={server.id} serverName={server.name} />
       <TunnelList serverId={server.id} />
 
       {server.notes && (

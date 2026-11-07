@@ -135,7 +135,7 @@ func Open(dbPath string) (*gorm.DB, error) {
 	// session_logs, session_states, terminal settings) are never dropped:
 	// AutoMigrate only adds, so an existing database keeps opening.
 	if err := db.AutoMigrate(&domain.Server{}, &domain.Settings{}, &domain.PortForward{},
-		&domain.AgentKey{}, &domain.AgentSignEvent{}, &domain.Stack{}, &domain.StackStep{}); err != nil {
+		&domain.AgentKey{}, &domain.AgentSignEvent{}, &domain.Stack{}, &domain.StackStep{}, &domain.ServerCommand{}); err != nil {
 		return nil, fmt.Errorf("cannot migrate the schema: %w", err)
 	}
 

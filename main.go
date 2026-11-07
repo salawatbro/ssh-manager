@@ -172,7 +172,9 @@ func main() {
 	// The launcher's shortcut and the stacks' must never be the same keys.
 	service.SetSettingsStacks(settingsService, stackRepo)
 	service.SetStackSettings(stackService, settingsRepo)
-	launcherWindowService := &LauncherWindowService{launcher: launcherService, stacks: stackService}
+	commandRepo := store.NewCommandRepo(db)
+	commandService := service.NewCommandService(commandRepo, repo, launcherService)
+	launcherWindowService := &LauncherWindowService{launcher: launcherService, stacks: stackService, commands: commandService}
 	// Both windows follow the backend lock; the launcher can unlock it too.
 	gate.OnLock(func() { emitLockChanged(true) })
 	gate.OnUnlock(func() { emitLockChanged(false) })
@@ -245,6 +247,7 @@ func main() {
 			application.NewService(securityService),
 			application.NewService(stackService),
 			application.NewService(launcherWindowService),
+			application.NewService(commandService),
 			application.NewService(&TrayPanelService{}),
 			application.NewService(backupService),
 		},
@@ -411,6 +414,7 @@ func main() {
 	}
 	service.SetOnStacksChanged(stackService, refreshStacks)
 	service.SetStackDeps(serverService, stackRepo, refreshStacks)
+	service.SetCommandDeps(serverService, commandRepo)
 
 	// Uninstall wipes the DB/keychain/log dirs and then must quit the app —
 	// there is nothing left for the UI to show once the data is gone.

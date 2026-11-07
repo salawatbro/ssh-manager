@@ -17,11 +17,11 @@ interface Props {
 }
 
 export function TrayList({ sections, activeKey, busyKey, icons, onHover, onRun }: Props) {
-  const { pinned, stacks, tunnels } = sections
-  if (pinned.length + stacks.length + tunnels.length === 0) {
+  const { pinned, commands, stacks, tunnels } = sections
+  if (pinned.length + commands.length + stacks.length + tunnels.length === 0) {
     return (
       <div className="px-[28px] py-[28px] text-center text-[12.5px] leading-[1.5] text-tx2">
-        Pin a server or show a stack in the menu bar, and it waits here one click away.
+        Pin a server, or show a saved command or a stack in the menu bar, and it waits here one click away.
       </div>
     )
   }
@@ -36,11 +36,12 @@ export function TrayList({ sections, activeKey, busyKey, icons, onHover, onRun }
       onRun={(inTab) => onRun(row, inTab)}
     />
   )
-  const top = pinned.length > 0 ? 'Pinned' : stacks.length > 0 ? 'Stacks' : 'Tunnels'
+  const top = pinned.length > 0 ? 'Pinned' : commands.length > 0 ? 'Commands' : stacks.length > 0 ? 'Stacks' : 'Tunnels'
   const heading = (label: string, extra?: string) => <Heading key={label} label={label} extra={extra} first={label === top} />
   return (
     <div className="flex flex-col px-[6px] pb-[6px] pt-[4px]">
       {pinned.length > 0 && [heading('Pinned'), ...pinned.map(item)]}
+      {commands.length > 0 && [heading('Commands'), ...commands.map(item)]}
       {stacks.length > 0 && [heading('Stacks'), ...stacks.map(item)]}
       {tunnels.length > 0 && [heading('Tunnels', tunnelCount(tunnels)), ...tunnels.map(item)]}
     </div>

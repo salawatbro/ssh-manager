@@ -1,18 +1,19 @@
 import Fuse from 'fuse.js'
 import { ForwardType } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import type { PortForward, Server, Stack } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import type { PortForward, Server, ServerCommand, Stack } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { TunnelRow } from '@bindings/github.com/salawat/sshmgr/internal/service'
+import { commandRows } from './commandRows'
 import { FUZZY_MATCH } from './fuzzy'
 import { findExistingServer, formatQuickTarget, parseQuickConnect, type QuickConnectTarget } from './quickConnect'
 import { jumpChain } from './route'
 import { cardMeta, stackEnv } from './stacks'
 import { rowState, wanted, type RowState } from './tunnels'
 
-// The ⌥Space launcher's rows: servers, stacks and tunnels in one fuzzy list,
+// The ⌥Space launcher's rows: servers, saved commands, stacks and tunnels in one fuzzy list,
 // plus an unsaved `user@host[:port]` row. The window keeps no Zustand state;
 // everything here comes from LauncherData, which it reads through services.
 
-export type LauncherKind = 'server' | 'stack' | 'tunnel' | 'quick'
+export type LauncherKind = 'server' | 'command' | 'stack' | 'tunnel' | 'quick'
 export type Tone = 'ok' | 'bad' | 'warn' | 'idle'
 
 export interface LauncherRow {
@@ -34,6 +35,7 @@ export interface LauncherRow {
 
 export interface LauncherData {
   servers: Server[]
+  commands: ServerCommand[]
   stacks: Stack[]
   tunnels: TunnelRow[]
   // forward:status states heard since the tunnels were read, by forward id.
@@ -42,7 +44,7 @@ export interface LauncherData {
 
 export const MAX_ROWS = 50
 
-const KIND_ORDER: Record<LauncherKind, number> = { quick: 0, server: 1, stack: 2, tunnel: 3 }
+const KIND_ORDER: Record<LauncherKind, number> = { quick: 0, server: 1, command: 2, stack: 3, tunnel: 4 }
 
 const TUNNEL_DOT: Record<RowState, { tone: Tone; label: string }> = {
   running: { tone: 'ok', label: 'Running' },
@@ -152,6 +154,7 @@ function quickRow(target: QuickConnectTarget): LauncherRow {
 function allRows(data: LauncherData): LauncherRow[] {
   return [
     ...data.servers.map((s) => serverRow(s, data)),
+    ...commandRows(data),
     // A stack with no steps has nothing to launch.
     ...data.stacks.filter((st) => (st.steps?.length ?? 0) > 0).map((st) => stackRow(st, data)),
     ...data.tunnels.map((t) => tunnelRow(t, data)),

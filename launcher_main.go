@@ -82,6 +82,7 @@ func syncLauncherHotkey(sc string, stacks *service.StackService) {
 type LauncherWindowService struct {
 	launcher *service.LauncherService
 	stacks   *service.StackService
+	commands *service.CommandService
 }
 
 // Connect opens a server through LauncherService, like the main window's
@@ -95,6 +96,14 @@ func (s *LauncherWindowService) Connect(serverID string, inTab bool) (service.Op
 	}
 	res, err := open(serverID)
 	application.Get().Event.Emit("servers:changed", serverID)
+	return res, err
+}
+
+// RunCommand runs a saved command like Connect opens its server; the main
+// window reloads on servers:changed.
+func (s *LauncherWindowService) RunCommand(id string, inTab bool) (service.OpenResult, error) {
+	res, err := s.commands.Run(id, inTab)
+	application.Get().Event.Emit("servers:changed", id)
 	return res, err
 }
 

@@ -106,6 +106,8 @@ type ServerService struct {
 	// stacks is nil until SetStackDeps; the export then carries no stacks.
 	stacks           *store.StackRepo
 	onStacksImported func()
+	// commands is nil until SetCommandDeps; the export then carries none.
+	commands *store.CommandRepo
 
 	// agent signs for Zish-key servers; nil until SetSignerSource.
 	agent *AgentService
@@ -529,6 +531,9 @@ func (s *ServerService) ImportJSON(path string) (int, error) {
 		return count, err
 	}
 	if err := s.importStacks(file.Stacks, ids, forwards); err != nil {
+		return count, err
+	}
+	if err := s.importCommands(file.Commands, ids); err != nil {
 		return count, err
 	}
 	if len(file.Stacks) > 0 && s.onStacksImported != nil {

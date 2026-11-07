@@ -177,6 +177,18 @@ export interface CodeRequest {
 }
 
 /**
+ * CommandInput is what the command form sends. An empty ID creates a command
+ * for ServerID; otherwise ServerID is ignored.
+ */
+export interface CommandInput {
+    "id": string;
+    "serverId": string;
+    "name": string;
+    "command": string;
+    "inMenuBar": boolean;
+}
+
+/**
  * CreateServerInput is what the frontend sends to create or update a server.
  */
 export interface CreateServerInput {

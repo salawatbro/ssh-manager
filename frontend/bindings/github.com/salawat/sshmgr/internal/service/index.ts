@@ -4,6 +4,7 @@
 import * as AgentService from "./agentservice.js";
 import * as AppInfoService from "./appinfoservice.js";
 import * as BackupService from "./backupservice.js";
+import * as CommandService from "./commandservice.js";
 import * as ForwardService from "./forwardservice.js";
 import * as ImportService from "./importservice.js";
 import * as LauncherService from "./launcherservice.js";
@@ -18,6 +19,7 @@ export {
     AgentService,
     AppInfoService,
     BackupService,
+    CommandService,
     ForwardService,
     ImportService,
     LauncherService,
@@ -38,6 +40,7 @@ export type {
     BackupEntry,
     BackupStatus,
     CodeRequest,
+    CommandInput,
     CreateServerInput,
     ForwardInput,
     GenerateKeyInput,
