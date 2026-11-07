@@ -98,7 +98,6 @@ export function ServerList() {
           y={menu.y}
           onClose={() => setMenu(null)}
           onEdit={() => useServerForm.getState().openEdit(menu.server.id)}
-          reorderable={reorderable}
         />
       )}
     </section>

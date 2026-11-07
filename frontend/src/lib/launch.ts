@@ -11,10 +11,16 @@ export function openServer(serverId: string): void {
   void launch(serverId)
 }
 
-export async function launch(serverId: string): Promise<void> {
+// A new tab of the terminal's front window, whatever the "Open in a new tab"
+// setting says.
+export function openServerInTab(serverId: string): void {
+  void launch(serverId, true)
+}
+
+export async function launch(serverId: string, inTab = false): Promise<void> {
   if (useLock.getState().locked) return
   try {
-    const res = await LauncherService.Open(serverId)
+    const res = await (inTab ? LauncherService.OpenInTab(serverId) : LauncherService.Open(serverId))
     if (res?.note) toastInfo(res.note)
     void useServers.getState().load()
   } catch (e) {

@@ -1,10 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { AppWindow, AtSign, Copy, CopyPlus, Palette, Pencil, Pin, PlugZap, SquareTerminal, Trash2 } from 'lucide-react'
 import type { Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useServers } from '../../stores/servers'
-import { openServer } from '../../lib/launch'
-import { moveWithinGroup } from '../../lib/serverOrder'
-import { ContextMenu, type MenuEntry } from '../ui/ContextMenu'
+import { useSettings } from '../../stores/settings'
 import { useLookPicker } from '../../stores/lookPicker'
+import { toastError, toastInfo, toastSuccess } from '../../stores/toasts'
+import { useTerminals } from '../../hooks/useTerminals'
+import { openServer, openServerInTab } from '../../lib/launch'
+import type { MenuAlign } from '../../lib/menuPosition'
+import { canOpenInTab, serverAddress, testOutcome } from '../../lib/serverMenu'
+import { ContextMenu, type MenuEntry } from '../ui/ContextMenu'
+import { EnvChip } from '../ui/EnvChip'
+import { IconTile } from '../ui/IconTile'
 
 interface Props {
   server: Server
@@ -12,45 +19,76 @@ interface Props {
   y: number
   onClose: () => void
   onEdit: () => void
-  // False while the list shows a sorted or partial view: "up" would move the
-  // row past something the user cannot see. Same rule that disables drag.
-  reorderable: boolean
+  align?: MenuAlign
 }
 
-// FR-01.8 right-click menu. Delete uses the same inline two-step as ServerForm
-// (window.confirm is banned): the first click arms it ("Delete server?", red,
-// keepOpen), the second commits and the menu closes.
-export function ServerContextMenu({ server, x, y, onClose, onEdit, reorderable }: Props) {
+// An armed Delete that is not confirmed goes back to plain Delete.
+const DISARM_MS = 3000
+
+async function testConnection(server: Server) {
+  toastInfo(`Testing ${server.name}…`)
+  const out = testOutcome(server.name, await useServers.getState().testConnection(server.id))
+  if (out.ok) toastSuccess(out.text)
+  else toastError(out.text)
+}
+
+async function copyAddress(server: Server) {
+  try {
+    await navigator.clipboard.writeText(serverAddress(server))
+    toastSuccess('Address copied.')
+  } catch {
+    // best-effort, like Copy SSH command
+  }
+}
+
+// A server row's right-click menu (and the inspector's More actions). Delete
+// is the inline two-step (window.confirm is banned): the first click arms it,
+// the second deletes.
+export function ServerContextMenu({ server, x, y, onClose, onEdit, align }: Props) {
   const duplicate = useServers((s) => s.duplicate)
   const copySSHCommand = useServers((s) => s.copySSHCommand)
   const remove = useServers((s) => s.remove)
   const setPinned = useServers((s) => s.setPinned)
-  const servers = useServers((s) => s.servers)
-  const setGroupOrder = useServers((s) => s.setGroupOrder)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const settings = useSettings((s) => s.settings)
+  const terminals = useTerminals()
+  const [armed, setArmed] = useState(false)
 
-  // null means the move is impossible -- already at that edge of the group.
-  const up = !reorderable ? null : moveWithinGroup(servers, server.group, server.id, 'up')
-  const down = !reorderable ? null : moveWithinGroup(servers, server.group, server.id, 'down')
+  useEffect(() => {
+    if (!armed) return
+    const t = window.setTimeout(() => setArmed(false), DISARM_MS)
+    return () => window.clearTimeout(t)
+  }, [armed])
 
   const items: MenuEntry[] = [
-    { label: 'Connect', run: () => openServer(server.id) },
-    { label: server.pinned ? 'Unpin from menu bar' : 'Pin to menu bar', run: () => void setPinned(server.id, !server.pinned) },
-    // moveWithinGroup returns null (already at that edge of the group) or a non-empty reordered
-    // list — never []. This `run` guard is a null guard, redundant with `disabled` only as
-    // defense in depth: written as `!== null` (not truthiness) so it reads identically to
-    // `disabled: up === null` and can't silently diverge if the return type ever changes.
-    { label: 'Move up', disabled: up === null, run: () => { if (up !== null) void setGroupOrder(server.group, up) } },
-    { label: 'Move down', disabled: down === null, run: () => { if (down !== null) void setGroupOrder(server.group, down) } },
-    { label: 'Edit…', run: onEdit },
-    { label: 'Icon and colour…', run: () => useLookPicker.getState().open(server.id) },
-    { label: 'Duplicate', run: () => void duplicate(server.id) },
-    { label: 'Copy SSH command', run: () => void copySSHCommand(server.id) },
+    { label: 'Connect', icon: SquareTerminal, hint: '↵', run: () => openServer(server.id) },
+    ...(canOpenInTab(server, settings, terminals)
+      ? [{ label: 'Connect in new tab', icon: AppWindow, run: () => openServerInTab(server.id) }]
+      : []),
+    { label: 'Test connection', icon: PlugZap, run: () => void testConnection(server) },
     'separator',
-    confirmDelete
-      ? { label: 'Delete server?', run: () => void remove(server.id), danger: true }
-      : { label: 'Delete', run: () => setConfirmDelete(true), danger: true, keepOpen: true },
+    { label: 'Copy SSH command', icon: Copy, run: () => void copySSHCommand(server.id) },
+    { label: 'Copy address', icon: AtSign, run: () => void copyAddress(server) },
+    'separator',
+    { label: 'Edit…', icon: Pencil, run: onEdit },
+    { label: 'Icon and colour…', icon: Palette, run: () => useLookPicker.getState().open(server.id) },
+    { label: 'Duplicate', icon: CopyPlus, run: () => void duplicate(server.id) },
+    { label: 'Pin to menu bar', icon: Pin, checked: server.pinned, run: () => void setPinned(server.id, !server.pinned) },
+    'separator',
+    armed
+      ? { label: `Delete ${server.name}?`, icon: Trash2, danger: true, armed: true, run: () => void remove(server.id) }
+      : { label: 'Delete…', icon: Trash2, danger: true, keepOpen: true, run: () => setArmed(true) },
   ]
 
-  return <ContextMenu x={x} y={y} items={items} onClose={onClose} />
+  const header = (
+    <div className="flex min-w-0 items-center gap-[9px]">
+      <IconTile name={server.name} icon={server.icon} color={server.color} group={server.group} size={26} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-[12.5px] font-semibold text-tx">{server.name}</span>
+        <span className="truncate font-mono text-[11px] text-tx3">{serverAddress(server)}</span>
+      </div>
+      <EnvChip env={server.environment} />
+    </div>
+  )
+
+  return <ContextMenu x={x} y={y} items={items} onClose={onClose} header={header} width={240} align={align} />
 }

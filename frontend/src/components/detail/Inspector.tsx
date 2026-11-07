@@ -105,7 +105,7 @@ export function Inspector() {
             aria-label="More actions"
             onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect()
-              setMenu({ x: r.right - 190, y: r.bottom + 4 })
+              setMenu({ x: r.right, y: r.bottom + 4 })
             }}
             className={`${square} text-tx2 hover:bg-s2 hover:text-tx`}
           >
@@ -133,7 +133,7 @@ export function Inspector() {
           y={menu.y}
           onClose={() => setMenu(null)}
           onEdit={() => useServerForm.getState().openEdit(server.id)}
-          reorderable={false}
+          align="end"
         />
       )}
     </aside>
