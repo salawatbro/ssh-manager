@@ -135,6 +135,16 @@ export function RevokeGrant(id: string): $CancellablePromise<void> {
 }
 
 /**
+ * RotateKeyOnServer moves one server from oldKeyID to newKeyID. Signed in
+ * with the old key it adds the new one; then it signs in with the new key,
+ * switches the server to it and only then takes the old key out of
+ * authorized_keys. Any failure before the switch leaves the server as it was.
+ */
+export function RotateKeyOnServer(oldKeyID: string, newKeyID: string, serverID: string): $CancellablePromise<$models.RotateResult | null> {
+    return $Call.ByID(1403583268, oldKeyID, newKeyID, serverID);
+}
+
+/**
  * SetRequireConfirm switches the per-use confirmation for a key.
  */
 export function SetRequireConfirm(id: string, $require: boolean): $CancellablePromise<domain$0.AgentKey | null> {

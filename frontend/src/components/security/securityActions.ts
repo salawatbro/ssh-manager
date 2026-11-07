@@ -44,13 +44,25 @@ async function updateLock(check: SecurityCheck, patch: Partial<Settings>, text: 
   if (s && Object.entries(patch).every(([k, v]) => s[k as keyof Settings] === v)) done(check, text, toast)
 }
 
-// runFix performs fix.kind; 'move-to-key' needs a sheet, so the page passes
-// how to open it.
-export async function runFix(fix: Fix, check: SecurityCheck, openMove: (check: SecurityCheck) => void) {
+export interface FixSheets {
+  move: (check: SecurityCheck) => void
+  rotate: (check: SecurityCheck) => void
+}
+
+async function rotateKey(check: SecurityCheck, item: SecurityItem, open: FixSheets) {
+  const known = () => useKeys.getState().keys.some((k) => k.id === item.id)
+  if (!known()) await useKeys.getState().refresh()
+  return known() ? open.rotate(check) : openItem(item)
+}
+
+// runFix performs fix.kind; the sheet-based fixes are opened by the page.
+export async function runFix(fix: Fix, check: SecurityCheck, open: FixSheets) {
   const first = (check.items ?? [])[0]
   switch (fix.kind) {
     case 'move-to-key':
-      return openMove(check)
+      return open.move(check)
+    case 'rotate-key':
+      return first && rotateKey(check, first, open)
     case 'require-touch-id':
       return requireTouchID(check)
     case 'use-touch-id':
@@ -68,7 +80,6 @@ export async function runFix(fix: Fix, check: SecurityCheck, openMove: (check: S
       return openSettings('agent')
     case 'show-keys':
       return useView.getState().showKeys()
-    case 'open-key':
     case 'show-server':
       return first && openItem(first)
     case 'edit-server':

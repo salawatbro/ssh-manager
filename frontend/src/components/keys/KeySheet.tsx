@@ -19,12 +19,13 @@ interface Props {
   users: Server[]
   onClose: () => void
   onInstall: () => void
+  onRotate: () => void
   onDelete: () => void
 }
 
 // One key, opened from its card: name, Touch ID, the servers that use it,
 // the public key and a ~/.ssh/config block. Nothing here reveals the private key.
-export function KeySheet({ k, users, onClose, onInstall, onDelete }: Props) {
+export function KeySheet({ k, users, onClose, onInstall, onRotate, onDelete }: Props) {
   const rename = useKeys((s) => s.rename)
   const setRequireConfirm = useKeys((s) => s.setRequireConfirm)
   const [name, setName] = useState(k.name)
@@ -54,6 +55,7 @@ export function KeySheet({ k, users, onClose, onInstall, onDelete }: Props) {
             Delete…
           </Button>
           <span className="flex-1" />
+          <Button onClick={onRotate}>Rotate…</Button>
           <Button onClick={onInstall}>Install on server…</Button>
           <Button variant="primary" onClick={onClose}>
             Done

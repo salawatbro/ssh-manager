@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { CircleCheck, RotateCw } from 'lucide-react'
 import type { SecurityCheck } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import { checkedLabel, fixFor, splitChecks } from '../../lib/security'
+import { useKeys } from '../../stores/keys'
 import { useLock } from '../../stores/lock'
 import { useSecurity } from '../../stores/security'
 import { useSettings } from '../../stores/settings'
+import { RotateKeySheet } from '../keys/RotateKeySheet'
 import { Button } from '../ui/Button'
 import { IssueCard } from './IssueCard'
 import { MoveToKeySheet } from './MoveToKeySheet'
@@ -22,6 +24,8 @@ export function SecurityPage() {
   const biometricsAvailable = useLock((s) => s.biometricsAvailable)
   const lockEnabled = !!useSettings((s) => s.settings?.lockEnabled)
   const [moving, setMoving] = useState<SecurityCheck | null>(null)
+  const [rotating, setRotating] = useState<SecurityCheck | null>(null)
+  const rotatingKey = useKeys((s) => (rotating ? s.keys.find((k) => k.id === rotating.items?.[0]?.id) : undefined))
   const [, tick] = useState(0)
 
   useEffect(() => {
@@ -68,7 +72,7 @@ export function SecurityPage() {
                 fix={fixFor(check, lock)}
                 onFix={() => {
                   const fix = fixFor(check, lock)
-                  return fix ? runFix(fix, check, setMoving) : undefined
+                  return fix ? runFix(fix, check, { move: setMoving, rotate: setRotating }) : undefined
                 }}
                 onIgnore={() => setIgnored(check.id, true)}
               />
@@ -90,6 +94,13 @@ export function SecurityPage() {
       </div>
 
       {moving && <MoveToKeySheet check={moving} onClose={() => setMoving(null)} />}
+      {rotating && rotatingKey && (
+        <RotateKeySheet
+          oldKey={rotatingKey}
+          onClose={() => setRotating(null)}
+          onRotated={(k) => useSecurity.getState().markFixed(rotating, `Rotated to ${k.name}`)}
+        />
+      )}
     </div>
   )
 }

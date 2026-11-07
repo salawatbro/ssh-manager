@@ -16,9 +16,10 @@ import { KeysEmpty } from './KeysEmpty'
 import { KeySheet } from './KeySheet'
 import { OpenApprovals } from './OpenApprovals'
 import { RecentSignatures } from './RecentSignatures'
+import { RotateKeySheet } from './RotateKeySheet'
 import { TempKeys } from './TempKeys'
 
-type Modal = { kind: 'generate' | 'import' } | { kind: 'install' | 'delete'; key: AgentKey }
+type Modal = { kind: 'generate' | 'import' } | { kind: 'install' | 'rotate' | 'delete'; key: AgentKey }
 
 // The Keys page: the agent band, one card per Zish key, then what is open
 // (approvals) and what happened (recent signatures).
@@ -31,6 +32,12 @@ export function KeysPage() {
   const setOpenId = useKeys((s) => s.openSheet)
   const [modal, setModal] = useState<Modal | null>(null)
   const open = keys.find((k) => k.id === openId)
+
+  // A key deleted from a modal takes its sheet with it.
+  function closeModal(key: AgentKey) {
+    setModal(null)
+    if (!useKeys.getState().keys.some((k) => k.id === key.id)) setOpenId(null)
+  }
 
   useEffect(() => {
     void useKeys.getState().refresh()
@@ -84,21 +91,15 @@ export function KeysPage() {
           users={usersById.get(open.id) ?? []}
           onClose={() => setOpenId(null)}
           onInstall={() => setModal({ kind: 'install', key: open })}
+          onRotate={() => setModal({ kind: 'rotate', key: open })}
           onDelete={() => setModal({ kind: 'delete', key: open })}
         />
       )}
       {modal?.kind === 'generate' && <GenerateKeyModal onClose={() => setModal(null)} />}
       {modal?.kind === 'import' && <ImportKeyModal onClose={() => setModal(null)} />}
       {modal?.kind === 'install' && <InstallKeyModal k={modal.key} onClose={() => setModal(null)} />}
-      {modal?.kind === 'delete' && (
-        <DeleteKeyModal
-          k={modal.key}
-          onClose={() => {
-            setModal(null)
-            if (!useKeys.getState().keys.some((k) => k.id === modal.key.id)) setOpenId(null)
-          }}
-        />
-      )}
+      {modal?.kind === 'rotate' && <RotateKeySheet oldKey={modal.key} onClose={() => closeModal(modal.key)} />}
+      {modal?.kind === 'delete' && <DeleteKeyModal k={modal.key} onClose={() => closeModal(modal.key)} />}
     </div>
   )
 }

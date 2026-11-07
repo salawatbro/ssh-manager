@@ -388,6 +388,18 @@ export interface PortCheck {
 }
 
 /**
+ * RotateResult is how moving one server to a new key went.
+ */
+export interface RotateResult {
+    /**
+     * OldKeyRemoved is false when the server already uses the new key but
+     * the old one is still in its authorized_keys; Note says why.
+     */
+    "oldKeyRemoved": boolean;
+    "note": string;
+}
+
+/**
  * SecurityCheck is one check. Items name what failed; Notes are plain facts
  * shown next to them.
  */

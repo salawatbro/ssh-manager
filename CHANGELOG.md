@@ -66,6 +66,11 @@ existing database and older backups open unchanged.
   can be revoked from the Keys page.
 - **Keys and agent page** — the agent's state, key cards with age, Touch ID and
   the servers that use each key, open approvals and recent signatures.
+- **Key rotation** — "Rotate…" on a key (or "Rotate key" on the Security
+  check's old-key and RSA cards) makes a new key and, server by server, adds it
+  to `authorized_keys`, checks that it signs in, switches the server to it and
+  only then removes the old key. A server that fails stays on the old key;
+  once none uses it, the old key can be deleted from the same sheet.
 - **Tunnels page** — every tunnel in one table with an on/off switch, its
   route and 10 minutes of traffic. Tunnels can start when Zish opens and
   reconnect on their own after a drop, after sleep and when the network

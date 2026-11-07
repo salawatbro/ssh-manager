@@ -101,6 +101,10 @@ live in the Keychain and each use can ask for Touch ID.
 - **Sign log** — every decision (signed, approved, denied, blocked while
   locked, error) with key, program, app and destination; the newest 500 are
   kept, and it can be cleared. It never contains the signed data.
+- **Key rotation** — "Rotate…" on a key makes a new one and moves every
+  server that uses the old key: it adds the new key to `authorized_keys`,
+  checks that it signs in, switches the server, then removes the old key
+  there. A server that fails stays on the old key.
 
 | `ssh-add` | Zish agent |
 |---|---|

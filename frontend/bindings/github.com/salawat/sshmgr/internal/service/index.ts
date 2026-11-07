@@ -54,6 +54,7 @@ export type {
     OpenResult,
     PlatformInfo,
     PortCheck,
+    RotateResult,
     SecurityCheck,
     SecurityItem,
     SecurityReport,

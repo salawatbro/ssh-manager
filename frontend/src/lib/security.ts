@@ -10,7 +10,7 @@ export type FixKind =
   | 'idle-lock'
   | 'open-settings-lock'
   | 'open-settings-keys'
-  | 'open-key'
+  | 'rotate-key'
   | 'show-keys'
   | 'edit-server'
   | 'show-server'
@@ -44,7 +44,7 @@ export function fixFor(c: SecurityCheck, lock: LockContext): Fix | null {
       return { kind: 'require-touch-id', label: 'Require Touch ID' }
     case 'key-age':
     case 'rsa-keys':
-      return one ? { kind: 'open-key', label: 'Open key' } : { kind: 'show-keys', label: 'Show keys' }
+      return one ? { kind: 'rotate-key', label: 'Rotate key' } : { kind: 'show-keys', label: 'Show keys' }
     case 'prod-two-factor':
       return one ? { kind: 'edit-server', label: 'Edit server' } : null
     case 'known-hosts':
