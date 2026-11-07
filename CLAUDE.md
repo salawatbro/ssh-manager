@@ -156,6 +156,10 @@ are never answered by Zish.
   `docs(brand):`, `chore(frontend):`, `release:`. Commit messages are written in
   English and carry **no AI attribution** — no `Co-Authored-By: Claude`, no
   "Generated with Claude Code" trailers or session links.
+- **Grilling asks via `AskUserQuestion`.** When grilling (`/grilling`, `/grill-me`,
+  `/grill-with-docs`, or grilling inside another skill), ask the round's questions
+  through the `AskUserQuestion` tool instead of plain chat text. The tool takes at
+  most 4 questions per call, so split a larger round across consecutive calls.
 
 ### Identity invariants (existing installs depend on these — do not change)
 
