@@ -51,6 +51,10 @@ func main() {
 	if _, err := platform.EnsureDataDir(); err != nil {
 		fatalStartup("cannot prepare the data folder", err)
 	}
+	// A restore leaves its database for this start (BackupService.Restore).
+	if _, err := store.ApplyPendingRestore(dbPath); err != nil {
+		fatalStartup("cannot put the restored backup in place", err)
+	}
 	db, err := store.Open(dbPath)
 	if err != nil {
 		fatalStartup("cannot open the database", err)
@@ -173,6 +177,13 @@ func main() {
 	// The Security check only reads: repos, settings, the agent's socket and
 	// known_hosts through the verifier, which re-reads the file when it changed.
 	securityService := service.NewSecurityService(repo, agentKeys, settingsService, lockService, agentService, verifier)
+	backupService := newBackupService(db, dbPath, repo, agentKeys, settingsRepo, kr, gate, biometricService)
+	// Only the Zish that owns the sockets backs up, so a dev build beside the
+	// installed app does not write a second set.
+	backupStop := make(chan struct{})
+	if instanceErr == nil {
+		service.StartBackupSchedule(backupService, backupStop)
+	}
 	service.SetOnSettingsSaved(settingsService, func(prev, next domain.Settings) {
 		if prev.AgentEnabled != next.AgentEnabled {
 			service.ApplyAgentEnabled(agentService, next.AgentEnabled)
@@ -230,6 +241,7 @@ func main() {
 			application.NewService(stackService),
 			application.NewService(launcherWindowService),
 			application.NewService(&TrayPanelService{}),
+			application.NewService(backupService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -261,6 +273,10 @@ func main() {
 		// pressed button is reported via AddButton(label).OnClick(func()), not
 		// a return value.
 		ShouldQuit: func() bool {
+			if restarting.Load() {
+				forwardMgr.StopAll()
+				return true
+			}
 			s, err := settingsService.Get()
 			running := len(forwardMgr.Running())
 			if err != nil || !s.ConfirmOnQuit || running == 0 {
@@ -407,6 +423,7 @@ func main() {
 	// ordering fix) was never checkpointed away by *any* code path, not even
 	// occasionally.
 	app.OnShutdown(func() {
+		close(backupStop)
 		stopTunnelRuntime()
 		service.StopAgent(agentService)
 		stopLaunchRuntime()
@@ -568,4 +585,5 @@ func init() {
 	application.RegisterEvent[application.Void]("launcher:show")
 	application.RegisterEvent[application.Void]("tray:show")
 	application.RegisterEvent[application.Void]("settings:open")
+	application.RegisterEvent[service.BackupStatus]("backup:status")
 }

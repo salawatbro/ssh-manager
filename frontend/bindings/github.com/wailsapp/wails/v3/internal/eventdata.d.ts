@@ -26,6 +26,7 @@ declare module "@wailsio/runtime" {
             "agent:status": service$0.AgentStatus;
             "approval:close": string;
             "approval:request": service$0.ApprovalRequest;
+            "backup:status": service$0.BackupStatus;
             "code:request": service$0.CodeRequest;
             "forward:stats": forward$0.TrafficReport;
             "forward:status": forward$0.Status;

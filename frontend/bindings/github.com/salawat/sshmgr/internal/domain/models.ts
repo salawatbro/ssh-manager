@@ -356,6 +356,12 @@ export interface Settings {
      * OpenAgain is what opening an already-open server should do.
      */
     "openAgain": string;
+
+    /**
+     * BackupFolder holds the encrypted backups; "" is iCloud Drive. Whether
+     * backups are on is whether their password is in the Keychain.
+     */
+    "backupFolder": string;
 }
 
 /**

@@ -147,3 +147,20 @@ func TestSettingsNewServerLook(t *testing.T) {
 		}
 	}
 }
+
+func TestSettingsSanitiseBackupFolder(t *testing.T) {
+	for in, want := range map[string]string{
+		"":                        "",
+		"Backups":                 "",
+		"../x":                    "",
+		"/Volumes/Disk/Zish/":     "/Volumes/Disk/Zish",
+		"/Users/a/./Dropbox/../B": "/Users/a/B",
+	} {
+		s := DefaultSettings()
+		s.BackupFolder = in
+		s.Sanitise()
+		if s.BackupFolder != want {
+			t.Errorf("Sanitise(%q) = %q, want %q", in, s.BackupFolder, want)
+		}
+	}
+}

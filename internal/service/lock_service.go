@@ -228,6 +228,8 @@ func (s *LockService) ResetAll() error {
 		}
 	}
 	_ = s.secret.DeleteAppLockHash()
+	// Daily backups of the emptied app would soon prune the good ones away.
+	_ = s.secret.DeleteBackupPassword()
 	// Bypassing the lock must not leave agent keys usable.
 	s.agent.wipeAll()
 	if s.stacks != nil {

@@ -40,8 +40,11 @@ export function Sheet({ title, onClose, width = 640, actions, footer, onSubmit, 
     openSheets.push(me)
     function onKeyDown(e: KeyboardEvent) {
       if (e.isComposing || openSheets[openSheets.length - 1] !== me) return
-      if (e.key === 'Escape') closeRef.current()
-      else if (e.key === 'Enter' && e.metaKey && submitRef.current) {
+      if (e.key === 'Escape') {
+        // Taken: the page under the sheet (Settings) must not close too.
+        e.preventDefault()
+        closeRef.current()
+      } else if (e.key === 'Enter' && e.metaKey && submitRef.current) {
         e.preventDefault()
         submitRef.current()
       }

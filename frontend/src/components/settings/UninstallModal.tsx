@@ -50,7 +50,8 @@ export function UninstallModal({ onClose }: Props) {
         </ul>
         <div className="mt-[8px] text-[12px] text-tx3">
           Your <span className="font-mono">~/.ssh/known_hosts</span> and{' '}
-          <span className="font-mono">~/.ssh/config</span> are left untouched.
+          <span className="font-mono">~/.ssh/config</span> are left untouched, and so are encrypted backups: daily
+          backups stop, and the ones already made stay in iCloud Drive or your backup folder.
         </div>
         <label className="mt-[16px] text-[12px] text-tx2">
           Type <span className="font-mono font-semibold text-tx">UNINSTALL</span> to confirm

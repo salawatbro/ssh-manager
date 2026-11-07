@@ -8,6 +8,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"github.com/salawat/sshmgr/internal/backup"
 	"github.com/salawat/sshmgr/internal/platform"
 	"github.com/salawat/sshmgr/internal/service"
 )
@@ -70,6 +71,21 @@ func (d *DataService) PickKeyFile() (string, error) {
 		return "", nil // cancelled
 	}
 	return path, nil
+}
+
+// PickBackupFolder asks for the folder backups go to instead of iCloud Drive.
+// It returns "" when cancelled; Settings saves the choice.
+func (d *DataService) PickBackupFolder() (string, error) {
+	path, err := application.Get().Dialog.OpenFile().
+		SetTitle("Choose where backups go").
+		CanChooseDirectories(true).
+		CanChooseFiles(false).
+		CanCreateDirectories(true).
+		PromptForSingleSelection()
+	if err != nil || path == "" {
+		return "", nil // cancelled
+	}
+	return backup.RootFor(path), nil
 }
 
 // RevealDataFolder opens the app's data folder in the OS file manager.

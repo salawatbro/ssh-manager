@@ -4,6 +4,7 @@ import { useImport } from '../../stores/import'
 import { toastError } from '../../stores/toasts'
 import { importJSON } from '../../lib/restore'
 import { Button } from '../ui/Button'
+import { BackupGroup } from './BackupGroup'
 import { Group, Row } from './Row'
 import { UninstallModal } from './UninstallModal'
 
@@ -18,6 +19,7 @@ export function DataSection() {
 
   return (
     <>
+      <BackupGroup />
       <Group title="Bring servers in">
         <Row label="Import from ~/.ssh/config" hint="Nothing is written to your config.">
           <Button size="sm" onClick={() => void openImport()}>
@@ -36,9 +38,9 @@ export function DataSection() {
             Export…
           </Button>
         </Row>
-        <Row label="Back up the database" hint="Copies the SQLite file somewhere safe.">
+        <Row label="Copy the database" hint="Just the SQLite file, without passwords or keys.">
           <Button size="sm" onClick={() => void DataService.BackupDatabase().catch(fail('Backup failed.'))}>
-            Back up…
+            Copy…
           </Button>
         </Row>
         {/* SSHManager/sshmgr.db are identity invariants (CLAUDE.md), not the brand. */}

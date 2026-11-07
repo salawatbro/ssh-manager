@@ -36,6 +36,14 @@ export function ImportServers(): $CancellablePromise<number> {
 }
 
 /**
+ * PickBackupFolder asks for the folder backups go to instead of iCloud Drive.
+ * It returns "" when cancelled; Settings saves the choice.
+ */
+export function PickBackupFolder(): $CancellablePromise<string> {
+    return $Call.ByID(2064961030);
+}
+
+/**
  * PickKeyFile asks for a private key file to import into the Zish agent,
  * starting in ~/.ssh. It returns "" when cancelled.
  */

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -90,6 +91,10 @@ type Settings struct {
 
 	// OpenAgain is what opening an already-open server should do.
 	OpenAgain string `gorm:"not null;default:'ask'" json:"openAgain"`
+
+	// BackupFolder holds the encrypted backups; "" is iCloud Drive. Whether
+	// backups are on is whether their password is in the Keychain.
+	BackupFolder string `gorm:"not null;default:''" json:"backupFolder"`
 }
 
 // Theme values accepted in Settings.Theme.
@@ -258,7 +263,16 @@ func (s *Settings) Sanitise() {
 	}
 	s.SecurityIgnored = JoinCheckIDs(SplitCheckIDs(s.SecurityIgnored))
 	s.TerminalCustomCommand = sanitiseCustomCommand(s.TerminalCustomCommand)
+	s.BackupFolder = sanitiseBackupFolder(s.BackupFolder)
 	s.ID = 1
+}
+
+// A relative folder would put backups wherever the app happens to run from.
+func sanitiseBackupFolder(dir string) string {
+	if !filepath.IsAbs(dir) {
+		return ""
+	}
+	return filepath.Clean(dir)
 }
 
 func oneOf(v string, allowed []string, fallback string) string {

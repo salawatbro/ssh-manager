@@ -73,8 +73,8 @@ live in the Keychain and each use can ask for Touch ID.
   from `~/.ssh` (OpenSSH, PKCS#1, SEC1 or PKCS#8; passphrase-protected keys
   too — the passphrase is used once and not stored). Rename, copy the public
   key, see which servers use it, delete it (refused while a server still
-  does). Keys created in Zish can't be exported; for a backup, make the key
-  with `ssh-keygen` and import it.
+  does). Keys created in Zish can't be exported in clear; encrypted backups
+  (below) carry them sealed with your backup password.
 - **Touch ID per use** — "Confirm every use" (on by default) asks for Touch
   ID, your Apple Watch or your Mac password before each signature. The prompt
   names the key, the program and app asking (`ssh in Ghostty`), the server
@@ -157,7 +157,15 @@ forward, keep confirmation on so a remote server can't sign unnoticed.
   auto-fill, keep-alive, test terminal), Lock (PIN, Touch ID, idle and sleep,
   approvals), Agent, Tunnels, Appearance (theme, density, icons and colours),
   Shortcuts, Data, and About.
-- **Data tools** — export/import servers as JSON (secret-free), back up the
+- **Encrypted backups** — Settings → Data backs up everything once a day to
+  iCloud Drive or a folder you choose: the database plus every password,
+  passphrase, 2FA secret, Zish key and the App Lock PIN, sealed with a backup
+  password you pick (Argon2id + AES-256-GCM). Seven days are kept per Mac.
+  Restore one from Settings → Data or the first-run screen — on this Mac or a
+  new one; Zish restarts and keeps the replaced database as
+  `sshmgr.before-restore.db`. Without the backup password no backup can be
+  opened, so write it down.
+- **Data tools** — export/import servers as JSON (secret-free), copy the
   database (WAL-safe), and reveal the data folder in Finder.
 
 ---
@@ -170,7 +178,8 @@ This app is built around a few hard invariants:
   SSH connections. All bundled assets (fonts, Fuse.js) are served locally.
 - **Secrets never leave the keychain.** Credentials live in the macOS Keychain.
   They are never written to the SQLite database and never included in JSON
-  exports. Credential values are zeroed from memory after use.
+  exports; an encrypted backup carries them only sealed with your backup
+  password. Credential values are zeroed from memory after use.
 - **Auto-fill never exposes a secret on disk, in argv or in the environment.**
   Secrets go Keychain → Zish → a private socket (`0600`, same user only) →
   the askpass helper's stdout → ssh. The launch script and generated config
@@ -329,6 +338,7 @@ helper_main.go          The askpass and connect helper modes (run before the GUI
 launch_main.go          Launcher runtime: askpass link, control socket, lock gate
 agent_main.go           Agent wiring; agent_confirm_*.go is the Touch ID prompt
 dataops_main.go         Data-service bindings (dialogs live in package main)
+backup_main.go          Backup wiring and the restart a restore ends with
 *_darwin.go / *.m/.c/.h Native macOS: hotkey, close-guard, appearance, Touch ID, app lookup
 internal/
   domain/               Models and validation (the argv-injection gate)
@@ -337,9 +347,10 @@ internal/
   launcher/             Server chain → /usr/bin/ssh argv, generated jump config, terminal-app commands
   askpass/              Launch/askpass token broker, control socket, helper modes
   agent/                Built-in ssh-agent: keys, sign policy, socket listener
+  backup/               Encrypted backup file format and backup folders
   forward/              SSH tunnel manager (-L/-R/-D SOCKS5)
   store/                GORM repositories (servers, settings, forwards, agent keys, sign log)
-  service/              Server, launcher, agent, lock, settings, import, and data services
+  service/              Server, launcher, agent, lock, settings, import, backup and data services
   platform/             Paths, run/launch folders, instance lock, start-at-login, known_hosts
 frontend/               React + TypeScript UI (Vite, Tailwind)
 ```
@@ -357,6 +368,8 @@ frontend/               React + TypeScript UI (Vite, Tailwind)
 | Agent public keys (select a key for ssh) | `~/Library/Application Support/SSHManager/pubkeys/` |
 | Agent private keys | macOS Keychain, service `uz.salawat.sshmgr`, account `agentkey:<id>` |
 | Launch scripts (short-lived) | `~/Library/Caches/SSHManager/launch/` |
+| Encrypted backups | `iCloud Drive/Zish/Backups/<Mac>/` or the folder chosen in Settings → Data |
+| Backup password | macOS Keychain, service `uz.salawat.sshmgr`, account `backup-password` |
 
 The data, `run`, `pubkeys` and `launch` folders are `0700`; the database and
 the sockets are `0600`. A username long enough to push the socket path past

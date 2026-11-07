@@ -21,7 +21,7 @@ export function Row({
   children,
 }: {
   label: string
-  hint?: string
+  hint?: ReactNode
   danger?: boolean
   children?: ReactNode
 }) {

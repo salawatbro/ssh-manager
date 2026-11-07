@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Download, Plus } from 'lucide-react'
 import { heroSub, heroTitle } from '../../lib/firstRun'
 import { importJSON } from '../../lib/restore'
@@ -5,6 +6,7 @@ import { shortcutLabel } from '../../lib/stackShortcut'
 import { useServers } from '../../stores/servers'
 import { useSettings } from '../../stores/settings'
 import { useView } from '../../stores/view'
+import { RestoreSheet } from '../backup/RestoreSheet'
 import { ImportCard } from './ImportCard'
 import { QuickConnectCard } from './QuickConnectCard'
 import { SetupChecklist } from './SetupChecklist'
@@ -14,8 +16,10 @@ import { SetupChecklist } from './SetupChecklist'
 export function FirstRunPage({ onAdd }: { onAdd: () => void }) {
   const serverCount = useServers((s) => s.servers.length)
   const launcherKey = useSettings((s) => s.settings?.launcherHotkey ?? '')
+  const [restoring, setRestoring] = useState(false)
 
-  async function restore() {
+  async function importExport() {
+    setRestoring(false)
     // Pinned first: the reload inside importJSON would hand over to the list.
     useView.getState().showWelcome()
     await importJSON()
@@ -45,14 +49,15 @@ export function FirstRunPage({ onAdd }: { onAdd: () => void }) {
               <Choice
                 icon={<Download size={16} strokeWidth={1.9} />}
                 title="Restore from another Mac"
-                sub="A Zish JSON export · secrets are not in it"
-                onClick={() => void restore()}
+                sub="An encrypted backup, or a JSON export"
+                onClick={() => setRestoring(true)}
               />
             </div>
           </div>
           <SetupChecklist />
         </div>
       </div>
+      {restoring && <RestoreSheet onClose={() => setRestoring(false)} onImportJSON={() => void importExport()} />}
     </main>
   )
 }

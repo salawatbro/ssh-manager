@@ -113,6 +113,52 @@ export interface ApprovalRequest {
 }
 
 /**
+ * BackupEntry is one backup a restore can pick.
+ */
+export interface BackupEntry {
+    "path": string;
+    "mac": string;
+
+    /**
+     * unix ms
+     */
+    "created": number;
+    "size": number;
+    "inCloud": boolean;
+    "thisMac": boolean;
+}
+
+/**
+ * BackupStatus is what Settings › Data shows about backups.
+ */
+export interface BackupStatus {
+    "enabled": boolean;
+
+    /**
+     * Folder is where this Mac's backups go.
+     */
+    "folder": string;
+    "icloud": boolean;
+
+    /**
+     * Available is false while iCloud Drive is off or the chosen folder is gone.
+     */
+    "available": boolean;
+
+    /**
+     * unix ms of this Mac's newest backup; 0 = none
+     */
+    "last": number;
+    "count": number;
+    "running": boolean;
+
+    /**
+     * Error is the last backup's failure, cleared by the next success.
+     */
+    "error": string;
+}
+
+/**
  * CodeRequest is the code:request event payload (TZ 8 TOTP/2FA addendum).
  * It mirrors sshx.CodeRequest as a concrete named type so main.go's
  * application.RegisterEvent[CodeRequest] gives the binding generator a type

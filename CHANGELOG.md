@@ -92,6 +92,13 @@ existing database and older backups open unchanged.
   tunnel with an on/off switch, plus the agent's state, a Search button for the
   launcher, and Open Zish, Lock, Settings and Quit. A server opens straight in
   your terminal app; while Zish is locked the panel offers Touch ID.
+- **Encrypted backups** — Settings → Data turns on a daily backup to iCloud
+  Drive (or a folder you choose) of everything: servers, tunnels, stacks,
+  settings, and every password, passphrase, 2FA secret, Zish key and the App
+  Lock PIN, sealed with a password you pick (Argon2id, AES-256-GCM). The last 7
+  days are kept per Mac. "Restore from another Mac" on the first-run screen,
+  or Settings → Data, restores one onto this or a new Mac and restarts Zish;
+  the replaced database is kept beside it.
 - **Day theme** — Settings → Appearance picks Night, Day or Match macOS. Menus,
   dialogs, the launcher, the menu-bar panel, the approval window and the
   full-screen title bar follow it.

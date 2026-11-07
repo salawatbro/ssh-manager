@@ -34,6 +34,11 @@ export const ApprovalClose = "approval:close";
 export const ApprovalRequest = "approval:request";
 
 /**
+ * Name of the custom event "backup:status".
+ */
+export const BackupStatus = "backup:status";
+
+/**
  * Name of the custom event "code:request".
  */
 export const CodeRequest = "code:request";

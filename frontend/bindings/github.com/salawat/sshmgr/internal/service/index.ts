@@ -3,6 +3,7 @@
 
 import * as AgentService from "./agentservice.js";
 import * as AppInfoService from "./appinfoservice.js";
+import * as BackupService from "./backupservice.js";
 import * as ForwardService from "./forwardservice.js";
 import * as ImportService from "./importservice.js";
 import * as LauncherService from "./launcherservice.js";
@@ -16,6 +17,7 @@ import * as UninstallService from "./uninstallservice.js";
 export {
     AgentService,
     AppInfoService,
+    BackupService,
     ForwardService,
     ImportService,
     LauncherService,
@@ -33,6 +35,8 @@ export type {
     AgentStatus,
     ApprovalHost,
     ApprovalRequest,
+    BackupEntry,
+    BackupStatus,
     CodeRequest,
     CreateServerInput,
     ForwardInput,
