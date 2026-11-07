@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { Check, type LucideIcon } from 'lucide-react'
 import { placeMenu, type MenuAlign } from '../../lib/menuPosition'
 
@@ -55,18 +55,30 @@ export function ContextMenu({ x, y, items, onClose, header, width = 190, align =
 
   const iconColumn = items.some((it) => it !== 'separator' && it.icon)
 
+  // React bubbles these to whoever renders the menu: a row that opens it on
+  // right-click would reopen its own menu wherever the closing click landed.
+  const contain = (e: SyntheticEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
   return (
     <>
       <div
         className="fixed inset-0 z-40"
-        onClick={onClose}
+        onClick={(e) => {
+          e.stopPropagation()
+          onClose()
+        }}
         onContextMenu={(e) => {
-          e.preventDefault()
+          contain(e)
           onClose()
         }}
       />
       <div
         ref={ref}
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={contain}
         className="fixed z-50 animate-[fade-in_90ms_ease-out] rounded-[8px] border border-line2 bg-s2 p-[4px] shadow-pop"
         style={{ left: pos?.left ?? x, top: pos?.top ?? y, width, visibility: pos ? undefined : 'hidden' }}
       >
