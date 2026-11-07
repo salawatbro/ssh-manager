@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, ChevronDown } from 'lucide-react'
 
 export interface SelectOption<T extends string | number> {
@@ -29,13 +30,14 @@ const MAX_POPOVER = 240 // cap tall lists (many groups/servers) and scroll insid
 
 // A custom dropdown that replaces the native <select>. Native selects render as
 // the OS/browser widget (wrong look here) and cannot show a colour swatch inside
-// their own box. This is a button trigger + a fixed-positioned popover: `fixed`
-// lets the list escape an ancestor `overflow-y-auto` (the form modal body) that
-// would otherwise clip it — the same technique ContextMenu uses. Generic over
-// string or number values so it serves every picker in the app.
+// their own box. This is a button trigger + a fixed popover portalled to <body>:
+// that escapes an ancestor `overflow-y-auto` (the form modal body), and keeps the
+// list out of a wrapping <label>, which would re-click the trigger on any click
+// inside it. Generic over string or number values so it serves every picker.
 export function Select<T extends string | number>({ value, options, onChange, ariaLabel, defaultOpen = false }: Props<T>) {
   const [open, setOpen] = useState(defaultOpen)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number; width: number }>({ left: 0, top: 0, width: 0 })
 
   const selected = options.find((o) => o.value === value)
@@ -55,16 +57,36 @@ export function Select<T extends string | number>({ value, options, onChange, ar
     })
   }, [open, height])
 
+  // No backdrop: a click outside closes the list and still lands where it was
+  // aimed, so clicking the Name field while a list is open focuses it at once.
   useEffect(() => {
     if (!open) return
+    const inside = (t: EventTarget | null) =>
+      t instanceof Node && (!!triggerRef.current?.contains(t) || !!listRef.current?.contains(t))
+    const close = () => setOpen(false)
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape' && !e.isComposing) {
         e.stopPropagation() // don't also close the surrounding form modal
-        setOpen(false)
+        close()
       }
     }
+    function onPointerDown(e: PointerEvent) {
+      if (!inside(e.target)) close()
+    }
+    // The list is placed once; a scroll under it would leave it behind.
+    function onScroll(e: Event) {
+      if (!inside(e.target)) close()
+    }
     document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
+    document.addEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', close)
+    return () => {
+      document.removeEventListener('keydown', onKey, true)
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', close)
+    }
   }, [open])
 
   return (
@@ -84,21 +106,13 @@ export function Select<T extends string | number>({ value, options, onChange, ar
         <ChevronDown size={14} className={`shrink-0 text-tx3 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
-      {open && (
-        <>
-          {/* Backdrop: any outside click (or right-click) closes it, matching
-              ContextMenu's dismissal. */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setOpen(false)}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              setOpen(false)
-            }}
-          />
+      {open &&
+        createPortal(
           <ul
+            ref={listRef}
             role="listbox"
-            className="fixed z-50 overflow-y-auto rounded-[8px] border border-line2 bg-s2 p-[4px] shadow-pop"
+            // z-[60]: above a sheet (z-50), below toasts (z-[70]).
+            className="fixed z-[60] overflow-y-auto rounded-[8px] border border-line2 bg-s2 p-[4px] shadow-pop"
             style={{ left: pos.left, top: pos.top, width: pos.width, maxHeight: MAX_POPOVER }}
           >
             {options.map((opt) => {
@@ -124,9 +138,9 @@ export function Select<T extends string | number>({ value, options, onChange, ar
                 </li>
               )
             })}
-          </ul>
-        </>
-      )}
+          </ul>,
+          document.body,
+        )}
     </>
   )
 }
