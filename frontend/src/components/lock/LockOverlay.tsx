@@ -90,7 +90,7 @@ export function LockOverlay({ onForgot }: { onForgot: () => void }) {
           className="flex h-[60px] w-[60px] items-center justify-center rounded-[18px] bg-acc text-acc-on shadow-[0_12px_32px_color-mix(in_srgb,var(--color-acc)_28%,transparent)]"
         >
           <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+            <path d="M14.74 2 6.42 13.67h4.73L8.88 22l8.7-12.37h-4.85z" />
           </svg>
         </span>
         <div className="flex flex-col items-center gap-[6px] text-center">

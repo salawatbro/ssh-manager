@@ -1,24 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#252038"/>
-      <stop offset="1" stop-color="#0b0a12"/>
+      <stop offset="0" stop-color="#2a2d36"/>
+      <stop offset="1" stop-color="#0c0d10"/>
     </linearGradient>
-    <linearGradient id="bolt" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#B794FF"/>
-      <stop offset="1" stop-color="#EC4899"/>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
-    <radialGradient id="back" cx="0.5" cy="0.48" r="0.42">
-      <stop offset="0" stop-color="#C46BFF" stop-opacity="0.55"/>
-      <stop offset="1" stop-color="#C46BFF" stop-opacity="0"/>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff4f8b" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ff4f8b" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="bolt" gradientUnits="userSpaceOnUse" x1="300" y1="220" x2="700" y2="820">
+      <stop offset="0" stop-color="#ffa3c3"/>
+      <stop offset="0.5" stop-color="#ff4f8b"/>
+      <stop offset="1" stop-color="#e0306f"/>
+    </linearGradient>
     <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="12" result="b"/>
+      <feGaussianBlur stdDeviation="14" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#tile)"/>
-  <rect x="103" y="103" width="818" height="818" rx="181" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="3"/>
-  <circle cx="512" cy="500" r="300" fill="url(#back)"/>
-  <path d="M594,215 L372,553 L504,553 L430,809 L685,446 L545,446 Z" fill="url(#bolt)" filter="url(#glow)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#sheen)"/>
+  <rect x="102" y="102" width="820" height="820" rx="183" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="4"/>
+  <circle cx="512" cy="512" r="330" fill="url(#halo)"/>
+  <path d="M604,196 L340,566 L490,566 L418,830 L694,438 L540,438 Z" fill="url(#bolt)" filter="url(#glow)"/>
 </svg>

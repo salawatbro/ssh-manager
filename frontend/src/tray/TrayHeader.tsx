@@ -16,7 +16,7 @@ export function TrayHeader({ badge, hotkey, locked, onSearch }: Props) {
   return (
     <div className="flex h-[44px] shrink-0 items-center gap-[8px] border-b border-line pl-[14px] pr-[10px]">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="shrink-0 text-acc">
-        <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+        <path d="M14.74 2 6.42 13.67h4.73L8.88 22l8.7-12.37h-4.85z" />
       </svg>
       <span className="text-[13px] font-semibold text-tx">Zish</span>
       <span role="status" className="ml-[4px] flex items-center gap-[5px] text-[11.5px] text-tx3">

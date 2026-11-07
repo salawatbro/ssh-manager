@@ -114,6 +114,8 @@ existing database and older backups open unchanged.
   Tunnels, Keys and agent and Security, grouped server rows, and an inspector
   with the route through jump hosts, what happens on connect, tunnels and
   notes. Compact density is one switch away.
+- **A refreshed app icon** — a pink bolt on a graphite tile; the menu-bar
+  glyph and the bolt inside the app follow it.
 - **Settings live in the main window**, in nine sections, with new rows for
   approvals, key rotation reminders, tunnel defaults and appearance.
 - **A new lock screen** — Touch ID first, a six-box PIN, and what keeps running
