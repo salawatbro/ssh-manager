@@ -1,4 +1,5 @@
 import { useSettings } from '../../stores/settings'
+import { TitleBand } from '../layout/TitleBand'
 import { Kbd } from '../ui/Kbd'
 import { SECTIONS } from './sections'
 
@@ -8,7 +9,8 @@ export function SettingsSidebar() {
   const setSection = useSettings((s) => s.setSection)
   return (
     <aside aria-label="Settings sections" className="flex w-[232px] shrink-0 flex-col border-r border-line bg-side">
-      <div className="drag h-[52px] shrink-0" />
+      {/* 6px + the nav's 4px centres the first 32px row on the 52px header. */}
+      <TitleBand fullscreenHeight={6} />
       <nav className="flex flex-1 flex-col gap-[1px] overflow-y-auto px-[10px] py-[4px]">
         {SECTIONS.map((s) => {
           const on = s.id === section

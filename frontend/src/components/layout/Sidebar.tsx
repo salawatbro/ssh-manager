@@ -5,12 +5,13 @@ import { useKeys } from '../../stores/keys'
 import { useLock } from '../../stores/lock'
 import { Kbd } from '../ui/Kbd'
 import { SidebarGroups, SidebarNav, SidebarTags } from './SidebarSections'
+import { TitleBand } from './TitleBand'
 
 export function Sidebar() {
   return (
     <aside className="flex w-[232px] shrink-0 flex-col border-r border-line bg-side">
-      {/* The native traffic lights sit here; the band also drags the window. */}
-      <div className="drag h-[52px] shrink-0" />
+      {/* 11px centres the 30px search box on the 52px page headers. */}
+      <TitleBand fullscreenHeight={11} />
       <div className="flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto px-[10px] pb-[10px]">
         <button
           type="button"
