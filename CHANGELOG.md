@@ -10,7 +10,7 @@ was a version bump that first shipped packaged as part of 1.2.0.
 
 ## [Unreleased]
 
-## [2.0.0] — 2026-11-06
+## [2.0.0] — 2026-11-07
 
 Zish stops being a terminal and gets a new face. It now manages your servers,
 opens them in your own terminal app with stored secrets filled in, runs its own
