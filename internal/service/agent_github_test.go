@@ -5,12 +5,16 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -108,7 +112,38 @@ func (d *greeterDialer) DialChain(_ context.Context, chain []sshx.Hop) (*sshx.Co
 	return &sshx.Conn{Client: c}, nil
 }
 
-func newGitHubFixture(t *testing.T, greeting string, register bool) (*agentFixture, *greeterDialer, string) {
+// fakeGitHubAPI serves /users/<login>/ssh_signing_keys from keys.
+type fakeGitHubAPI struct {
+	mu     sync.Mutex
+	keys   []string
+	status int
+	paths  []string
+}
+
+func (a *fakeGitHubAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.paths = append(a.paths, r.URL.Path)
+	if a.status != 0 {
+		w.WriteHeader(a.status)
+		return
+	}
+	out := make([]map[string]any, 0, len(a.keys))
+	for i, k := range a.keys {
+		out = append(out, map[string]any{"id": i + 1, "key": k, "title": "key", "created_at": "2026-11-08T00:00:00Z"})
+	}
+	_ = json.NewEncoder(w).Encode(out)
+}
+
+type gitHubFixture struct {
+	*agentFixture
+	dialer *greeterDialer
+	api    *fakeGitHubAPI
+	id     string
+	pub    string
+}
+
+func newGitHubFixture(t *testing.T, greeting string, register bool) *gitHubFixture {
 	t.Helper()
 	f := newAgentFixture(t)
 	k, err := f.svc.Generate(GenerateKeyInput{Name: "laptop", Type: agent.KindEd25519})
@@ -126,44 +161,72 @@ func newGitHubFixture(t *testing.T, greeting string, register bool) (*agentFixtu
 		return nil
 	})
 	d := &greeterDialer{fakeDialer: &fakeDialer{}, addr: addr, hostKey: hostKey}
+	api := &fakeGitHubAPI{}
+	srv := httptest.NewServer(api)
+	t.Cleanup(srv.Close)
+	f.svc.gitHubAPI = srv.URL
 	f.svc.rt.mu.Lock()
 	f.svc.rt.deps.Dialer = d
 	f.svc.rt.mu.Unlock()
-	return f, d, k.ID
+	return &gitHubFixture{agentFixture: f, dialer: d, api: api, id: k.ID, pub: k.PublicKey}
 }
 
+const octocatGreeting = "Hi octocat! You've successfully authenticated, but GitHub does not provide shell access.\n"
+
 func TestTestGitHubReportsTheAccount(t *testing.T) {
-	f, d, id := newGitHubFixture(t, "Hi octocat! You've successfully authenticated, but GitHub does not provide shell access.\n", true)
-	got, err := f.svc.TestGitHub(id)
-	if err != nil || got.Login != "octocat" {
+	f := newGitHubFixture(t, octocatGreeting, true)
+	f.api.keys = []string{"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOtherKeyThatStaysOnTheServerXXXXXXXXXXXXXX", f.pub}
+	got, err := f.svc.TestGitHub(f.id)
+	if err != nil || got.Login != "octocat" || got.Signing != SigningRegistered {
 		t.Fatalf("TestGitHub = %+v, %v", got, err)
 	}
-	if s := d.asked[0]; s.Host != "github.com" || s.Port != 22 || s.User != "git" {
+	if s := f.dialer.asked[0]; s.Host != "github.com" || s.Port != 22 || s.User != "git" {
 		t.Fatalf("dialed %+v", s)
 	}
-	if ev, _ := f.log.List(1); len(ev) != 1 || ev[0].KeyID != id || ev[0].ClientChain != "test GitHub" || ev[0].Destination != "GitHub" {
+	if len(f.api.paths) != 1 || f.api.paths[0] != "/users/octocat/ssh_signing_keys" {
+		t.Fatalf("API paths = %v", f.api.paths)
+	}
+	if ev, _ := f.log.List(1); len(ev) != 1 || ev[0].KeyID != f.id || ev[0].ClientChain != "test GitHub" || ev[0].Destination != "GitHub" {
 		t.Fatalf("sign log = %+v", ev)
 	}
 }
 
-func TestTestGitHubNamesADeployKeyRepo(t *testing.T) {
-	f, _, id := newGitHubFixture(t, "Hi salawat/zish! You've successfully authenticated, but GitHub does not provide shell access.\n", true)
-	if got, err := f.svc.TestGitHub(id); err != nil || got.Login != "salawat/zish" {
+func TestTestGitHubSigningKeyMissing(t *testing.T) {
+	f := newGitHubFixture(t, octocatGreeting, true)
+	if got, err := f.svc.TestGitHub(f.id); err != nil || got.Signing != SigningMissing {
 		t.Fatalf("TestGitHub = %+v, %v", got, err)
 	}
 }
 
+func TestTestGitHubSigningUnknownWhenTheAPIFails(t *testing.T) {
+	f := newGitHubFixture(t, octocatGreeting, true)
+	f.api.status = http.StatusForbidden
+	if got, err := f.svc.TestGitHub(f.id); err != nil || got.Login != "octocat" || got.Signing != SigningUnknown {
+		t.Fatalf("TestGitHub = %+v, %v", got, err)
+	}
+}
+
+func TestTestGitHubNamesADeployKeyRepo(t *testing.T) {
+	f := newGitHubFixture(t, "Hi salawat/zish! You've successfully authenticated, but GitHub does not provide shell access.\n", true)
+	if got, err := f.svc.TestGitHub(f.id); err != nil || got.Login != "salawat/zish" || got.Signing != SigningUnknown {
+		t.Fatalf("TestGitHub = %+v, %v", got, err)
+	}
+	if len(f.api.paths) != 0 {
+		t.Fatalf("a deploy key asked the API: %v", f.api.paths)
+	}
+}
+
 func TestTestGitHubUnknownKey(t *testing.T) {
-	f, _, id := newGitHubFixture(t, "Hi octocat!\n", false)
-	_, err := f.svc.TestGitHub(id)
+	f := newGitHubFixture(t, "Hi octocat!\n", false)
+	_, err := f.svc.TestGitHub(f.id)
 	if errCode(err) != domain.CodeAuthFailed || !strings.Contains(err.Error(), "authentication key") {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestTestGitHubWithoutGreeting(t *testing.T) {
-	f, _, id := newGitHubFixture(t, "Welcome to some other server\n", true)
-	_, err := f.svc.TestGitHub(id)
+	f := newGitHubFixture(t, "Welcome to some other server\n", true)
+	_, err := f.svc.TestGitHub(f.id)
 	if errCode(err) != domain.CodeInternal || !strings.Contains(err.Error(), "Welcome to some other server") {
 		t.Fatalf("err = %v", err)
 	}

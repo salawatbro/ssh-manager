@@ -270,10 +270,12 @@ export interface GenerateKeyInput {
 }
 
 /**
- * GitHubCheck is the account GitHub greeted when Zish signed in with a key.
+ * GitHubCheck is the account GitHub greeted when Zish signed in with a key,
+ * and whether that account also lists the key for signing commits.
  */
 export interface GitHubCheck {
     "login": string;
+    "signing": string;
 }
 
 /**

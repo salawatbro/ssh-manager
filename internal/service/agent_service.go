@@ -57,6 +57,8 @@ type AgentService struct {
 	servers *store.ServerRepo
 	secret  secret.Store
 	pubDir  string
+	// gitHubAPI overrides GitHub's REST API root; tests point it at a fake.
+	gitHubAPI string
 
 	rt        agentRuntime
 	approvals approvalBroker

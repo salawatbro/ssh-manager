@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Browser } from '@wailsio/runtime'
-import { Check, CircleX, ExternalLink, LoaderCircle } from 'lucide-react'
+import { Check, CircleAlert, CircleX, ExternalLink, LoaderCircle } from 'lucide-react'
 import { AgentService, type GitHubSetup } from '@bindings/github.com/salawat/sshmgr/internal/service'
 import type { AgentKey } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useKeys } from '../../stores/keys'
@@ -12,7 +12,7 @@ const NEW_KEY_URL = 'https://github.com/settings/ssh/new'
 
 const NOTE = 'text-[11.5px] leading-[1.5] text-tx3'
 
-type SignIn = { state: 'idle' | 'busy' } | { state: 'ok'; login: string } | { state: 'bad'; message: string }
+type SignIn = { state: 'idle' | 'busy' } | { state: 'ok'; login: string; signing: string } | { state: 'bad'; message: string }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -54,9 +54,23 @@ function SignInResult({ r }: { r: SignIn }) {
     )
   if (r.state === 'ok')
     return (
-      <span className="flex items-center gap-[6px] text-[12px] text-ok-tx">
-        <Check size={13} strokeWidth={2.2} />
-        GitHub knows this key as {r.login}.
+      <span className="flex flex-col gap-[4px] text-[12px]">
+        <span className="flex items-center gap-[6px] text-ok-tx">
+          <Check size={13} strokeWidth={2.2} />
+          GitHub knows this key as {r.login}.
+        </span>
+        {r.signing === 'registered' && (
+          <span className="flex items-center gap-[6px] text-ok-tx">
+            <Check size={13} strokeWidth={2.2} />
+            It’s a signing key there too, so signed commits show as Verified.
+          </span>
+        )}
+        {r.signing === 'missing' && (
+          <span className="flex items-start gap-[6px] text-warn-tx">
+            <CircleAlert size={13} strokeWidth={2} className="mt-[2px] shrink-0" />
+            It isn’t a signing key there yet, so signed commits show as Unverified. Add it again with Key type “Signing Key”.
+          </span>
+        )}
       </span>
     )
   if (r.state === 'bad')
@@ -94,7 +108,7 @@ export function GitHubSheet({ k, onClose }: { k: AgentKey; onClose: () => void }
     setSignIn({ state: 'busy' })
     try {
       const res = await AgentService.TestGitHub(k.id)
-      setSignIn(res ? { state: 'ok', login: res.login } : { state: 'bad', message: 'GitHub gave no answer.' })
+      setSignIn(res ? { state: 'ok', login: res.login, signing: res.signing } : { state: 'bad', message: 'GitHub gave no answer.' })
     } catch (e) {
       setSignIn({ state: 'bad', message: message(e) })
     }
