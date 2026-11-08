@@ -70,11 +70,14 @@ func (a *connAgent) destination(data []byte) (host Host, verified, forwarded boo
 	a.mu.Lock()
 	binds := append([]sessionBind(nil), a.binds...)
 	a.mu.Unlock()
-	if len(binds) == 0 {
-		return Host{}, false, false
-	}
 	for _, b := range binds {
 		forwarded = forwarded || b.forwarding
+	}
+	if ns, ok := sshsigNamespace(data); ok {
+		return Host{Name: Label(ns) + " signature"}, false, forwarded
+	}
+	if len(binds) == 0 {
+		return Host{}, false, false
 	}
 	pick := binds[len(binds)-1]
 	if sid, ok := userauthSessionID(data); ok {
@@ -100,6 +103,20 @@ func userauthSessionID(data []byte) ([]byte, bool) {
 		return nil, false
 	}
 	return data[4 : 4+n], true
+}
+
+// sshsigNamespace returns the namespace of the blob "ssh-keygen -Y sign"
+// asks the agent to sign (PROTOCOL.sshsig), such as "git" for a commit.
+func sshsigNamespace(data []byte) (string, bool) {
+	rest, ok := bytes.CutPrefix(data, []byte("SSHSIG"))
+	if !ok || len(rest) < 4 {
+		return "", false
+	}
+	n := binary.BigEndian.Uint32(rest)
+	if n == 0 || uint64(len(rest)) < 4+uint64(n) {
+		return "", false
+	}
+	return string(rest[4 : 4+n]), true
 }
 
 func shortFingerprint(fp string) string {

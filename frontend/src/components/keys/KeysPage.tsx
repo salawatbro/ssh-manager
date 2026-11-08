@@ -9,6 +9,7 @@ import { Button } from '../ui/Button'
 import { AgentBand } from './AgentBand'
 import { DeleteKeyModal } from './DeleteKeyModal'
 import { GenerateKeyModal } from './GenerateKeyModal'
+import { GitHubSheet } from './GitHubSheet'
 import { ImportKeyModal } from './ImportKeyModal'
 import { InstallKeyModal } from './InstallKeyModal'
 import { KeyCard } from './KeyCard'
@@ -19,7 +20,7 @@ import { RecentSignatures } from './RecentSignatures'
 import { RotateKeySheet } from './RotateKeySheet'
 import { TempKeys } from './TempKeys'
 
-type Modal = { kind: 'generate' | 'import' } | { kind: 'install' | 'rotate' | 'delete'; key: AgentKey }
+type Modal = { kind: 'generate' | 'import' } | { kind: 'install' | 'github' | 'rotate' | 'delete'; key: AgentKey }
 
 // The Keys page: the agent band, one card per Zish key, then what is open
 // (approvals) and what happened (recent signatures).
@@ -91,6 +92,7 @@ export function KeysPage() {
           users={usersById.get(open.id) ?? []}
           onClose={() => setOpenId(null)}
           onInstall={() => setModal({ kind: 'install', key: open })}
+          onGitHub={() => setModal({ kind: 'github', key: open })}
           onRotate={() => setModal({ kind: 'rotate', key: open })}
           onDelete={() => setModal({ kind: 'delete', key: open })}
         />
@@ -98,6 +100,7 @@ export function KeysPage() {
       {modal?.kind === 'generate' && <GenerateKeyModal onClose={() => setModal(null)} />}
       {modal?.kind === 'import' && <ImportKeyModal onClose={() => setModal(null)} />}
       {modal?.kind === 'install' && <InstallKeyModal k={modal.key} onClose={() => setModal(null)} />}
+      {modal?.kind === 'github' && <GitHubSheet k={modal.key} onClose={() => setModal(null)} />}
       {modal?.kind === 'rotate' && <RotateKeySheet oldKey={modal.key} onClose={() => closeModal(modal.key)} />}
       {modal?.kind === 'delete' && <DeleteKeyModal k={modal.key} onClose={() => closeModal(modal.key)} />}
     </div>

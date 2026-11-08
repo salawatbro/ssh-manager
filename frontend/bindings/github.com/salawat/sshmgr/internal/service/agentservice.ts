@@ -60,6 +60,15 @@ export function Generate($in: $models.GenerateKeyInput): $CancellablePromise<dom
 }
 
 /**
+ * GitHubSetup returns the ~/.ssh/config block that signs in to GitHub with
+ * the key, and the commands that make git sign commits with it through the
+ * Zish agent. Zish never edits those files itself.
+ */
+export function GitHubSetup(id: string): $CancellablePromise<$models.GitHubSetup | null> {
+    return $Call.ByID(1119927024, id);
+}
+
+/**
  * Grants returns the open approvals, newest first.
  */
 export function Grants(): $CancellablePromise<agent$0.Grant[] | null> {
@@ -163,6 +172,15 @@ export function SignLog(limit: number): $CancellablePromise<domain$0.AgentSignEv
  */
 export function Status(): $CancellablePromise<$models.AgentStatus> {
     return $Call.ByID(1805129490);
+}
+
+/**
+ * TestGitHub signs in to git@github.com with the key, as "ssh -T" does, and
+ * reports the account GitHub greets. The host key goes through the usual
+ * known_hosts check, so a first test asks to trust github.com.
+ */
+export function TestGitHub(id: string): $CancellablePromise<$models.GitHubCheck | null> {
+    return $Call.ByID(3228056843, id);
 }
 
 /**

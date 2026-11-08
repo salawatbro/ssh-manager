@@ -284,3 +284,17 @@ func TestProtocolExtensions(t *testing.T) {
 		t.Fatalf("unknown host destination = %q", req.Destination)
 	}
 }
+
+func TestSSHSigNamespace(t *testing.T) {
+	blob := func(ns string) []byte {
+		return append([]byte("SSHSIG"), ssh.Marshal(struct{ NS, Reserved, Hash, Digest string }{ns, "", "sha512", "d"})...)
+	}
+	if ns, ok := sshsigNamespace(blob("git")); !ok || ns != "git" {
+		t.Fatalf("git blob = %q %v", ns, ok)
+	}
+	for _, data := range [][]byte{nil, []byte("SSHSIG"), []byte("SSHSIG\x00\x00\x00\x00"), []byte("SSHSIG\x00\x00\x00\x09git"), blob("git")[1:]} {
+		if ns, ok := sshsigNamespace(data); ok {
+			t.Fatalf("%q parsed as namespace %q", data, ns)
+		}
+	}
+}

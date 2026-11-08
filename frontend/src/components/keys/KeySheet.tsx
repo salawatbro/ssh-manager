@@ -19,13 +19,14 @@ interface Props {
   users: Server[]
   onClose: () => void
   onInstall: () => void
+  onGitHub: () => void
   onRotate: () => void
   onDelete: () => void
 }
 
 // One key, opened from its card: name, Touch ID, the servers that use it,
 // the public key and a ~/.ssh/config block. Nothing here reveals the private key.
-export function KeySheet({ k, users, onClose, onInstall, onRotate, onDelete }: Props) {
+export function KeySheet({ k, users, onClose, onInstall, onGitHub, onRotate, onDelete }: Props) {
   const rename = useKeys((s) => s.rename)
   const setRequireConfirm = useKeys((s) => s.setRequireConfirm)
   const [name, setName] = useState(k.name)
@@ -136,6 +137,20 @@ export function KeySheet({ k, users, onClose, onInstall, onRotate, onDelete }: P
             </span>
           </span>
           <CopyButton text={() => AgentService.HostSnippet(k.id)} label="Copy block" />
+        </div>
+
+        <div className="flex items-start gap-[10px]">
+          <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+            <span className={LABEL}>Use with GitHub</span>
+            <span className="text-[11.5px] leading-[1.45] text-tx3">Push and pull over SSH, and sign commits so they show as Verified.</span>
+          </span>
+          <button
+            type="button"
+            onClick={onGitHub}
+            className="h-[24px] shrink-0 rounded-[6px] border border-line2 px-[9px] text-[11px] text-tx2 hover:bg-s2 hover:text-tx"
+          >
+            Set up…
+          </button>
         </div>
 
         <p className="m-0 text-[11px] leading-[1.5] text-tx3">

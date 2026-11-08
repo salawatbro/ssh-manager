@@ -18,6 +18,21 @@ const maxRunOutput = 64 << 10
 // returns its combined output. A non-zero exit is an error carrying the
 // output; the session is closed when timeout passes.
 func RunInput(client *ssh.Client, cmd string, stdin []byte, timeout time.Duration) (string, error) {
+	return runSession(client, stdin, timeout, func(s *ssh.Session) error { return s.Run(cmd) })
+}
+
+// RunShell opens a shell without a terminal, as "ssh -T" does, and returns
+// what the server prints before it ends the session.
+func RunShell(client *ssh.Client, timeout time.Duration) (string, error) {
+	return runSession(client, nil, timeout, func(s *ssh.Session) error {
+		if err := s.Shell(); err != nil {
+			return err
+		}
+		return s.Wait()
+	})
+}
+
+func runSession(client *ssh.Client, stdin []byte, timeout time.Duration, run func(*ssh.Session) error) (string, error) {
 	sess, err := client.NewSession()
 	if err != nil {
 		return "", domain.NewError(domain.CodeConnRefused, "The server refused to run a command: "+err.Error())
@@ -28,7 +43,7 @@ func RunInput(client *ssh.Client, cmd string, stdin []byte, timeout time.Duratio
 	sess.Stdout = &out
 	sess.Stderr = &out
 	done := make(chan error, 1)
-	go func() { done <- sess.Run(cmd) }()
+	go func() { done <- run(sess) }()
 	select {
 	case err = <-done:
 	case <-time.After(timeout):

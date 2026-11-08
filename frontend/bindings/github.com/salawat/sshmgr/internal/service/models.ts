@@ -270,6 +270,22 @@ export interface GenerateKeyInput {
 }
 
 /**
+ * GitHubCheck is the account GitHub greeted when Zish signed in with a key.
+ */
+export interface GitHubCheck {
+    "login": string;
+}
+
+/**
+ * GitHubSetup is the text the GitHub sheet offers to paste for one key.
+ */
+export interface GitHubSetup {
+    "sshConfig": string;
+    "shellExport": string;
+    "gitSigning": string;
+}
+
+/**
  * HostKeyRequest is the hostkey:request event payload (TZ 8). It mirrors
  * sshx.HostKeyRequest as a concrete named type so main.go's
  * application.RegisterEvent[HostKeyRequest] gives the binding generator a

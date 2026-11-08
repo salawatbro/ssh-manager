@@ -44,6 +44,8 @@ export type {
     CreateServerInput,
     ForwardInput,
     GenerateKeyInput,
+    GitHubCheck,
+    GitHubSetup,
     HostKeyRequest,
     ImportItem,
     ImportKeyInput,

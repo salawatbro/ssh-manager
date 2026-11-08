@@ -10,6 +10,17 @@ was a version bump that first shipped packaged as part of 1.2.0.
 
 ## [Unreleased]
 
+### Added
+
+- **Use a key with GitHub** — a key's sheet on the Keys page sets it up for
+  GitHub: copy the public key and open GitHub's New SSH key page, paste a
+  `Host github.com` block, test the sign-in (Zish signs in to `git@github.com`
+  and shows the account GitHub greets), and copy the `git config` commands
+  that sign commits and tags with the key over SSH, so they show as Verified.
+  Zish still edits no config or shell files itself.
+- A signature asked for by `ssh-keygen -Y sign` (as git does for a commit)
+  is named in the Touch ID prompt and the sign log, e.g. "git signature".
+
 ## [2.0.0] — 2026-11-07
 
 Zish stops being a terminal and gets a new face. It now manages your servers,

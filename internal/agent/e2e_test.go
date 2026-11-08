@@ -263,3 +263,47 @@ func TestEndToEndOpenSSHWithLauncherArgv(t *testing.T) {
 		t.Fatalf("confirm request = %+v", req)
 	}
 }
+
+// git signs commits with "ssh-keygen -Y sign -f <key.pub>", which asks the
+// agent at SSH_AUTH_SOCK to sign an sshsig blob instead of a login.
+func TestEndToEndSSHKeygenSignsThroughAgent(t *testing.T) {
+	keygen := "/usr/bin/ssh-keygen"
+	if _, err := os.Stat(keygen); err != nil {
+		t.Skip("no ssh-keygen")
+	}
+	f := newFixture(t)
+	pub := f.keys.add(t, "k1", "work", newEd25519(t), true)
+	_, path := startListener(t, f)
+	dir := t.TempDir()
+	pubFile := filepath.Join(dir, "k1.pub")
+	if err := os.WriteFile(pubFile, ssh.MarshalAuthorizedKey(pub), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	payload := filepath.Join(dir, "commit")
+	if err := os.WriteFile(payload, []byte("tree 0000\n\nfirst commit\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run := func(stdin []byte, args ...string) {
+		t.Helper()
+		cmd := exec.Command(keygen, args...) //nolint:gosec // fixed binary, test-only
+		cmd.Env = []string{"SSH_AUTH_SOCK=" + path, "PATH=/usr/bin:/bin"}
+		cmd.Stdin = bytes.NewReader(stdin)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("ssh-keygen %v: %v\n%s", args, err, out)
+		}
+	}
+	run(nil, "-Y", "sign", "-n", "git", "-f", pubFile, payload)
+	data, _ := os.ReadFile(payload)
+	run(data, "-Y", "check-novalidate", "-n", "git", "-s", payload+".sig")
+
+	if reqs := f.conf.requests(); len(reqs) != 1 || reqs[0].KeyName != "work" {
+		t.Fatalf("confirm requests = %+v", reqs)
+	}
+	if reqs := f.conf.requests(); reqs[0].Destination != "git signature" {
+		t.Fatalf("confirm destination = %q", reqs[0].Destination)
+	}
+	ev := f.log.last(t)
+	if ev.KeyID != "k1" || ev.Outcome != domain.SignConfirmed || ev.ClientName != "ssh-keygen" || ev.Destination != "git signature" {
+		t.Fatalf("event = %+v", ev)
+	}
+}
