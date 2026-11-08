@@ -1,13 +1,52 @@
 // Pure helpers for agent keys: labels, short fingerprints and the client-side
 // mirror of the backend's AgentKey.Validate (the backend checks again).
 
+// label is the Select option text (Rotate); title, recommended and
+// description draw the Generate key type picker.
 export const KEY_KINDS = [
-  { value: 'ed25519', label: 'Ed25519 (recommended)' },
-  { value: 'ecdsa-p256', label: 'ECDSA P-256' },
-  { value: 'rsa-4096', label: 'RSA 4096' },
+  {
+    value: 'ed25519',
+    label: 'Ed25519 (recommended)',
+    title: 'Ed25519',
+    recommended: true,
+    description: 'Short and fast. Works with GitHub and modern servers.',
+  },
+  {
+    value: 'ecdsa-p256',
+    label: 'ECDSA P-256',
+    title: 'ECDSA P-256',
+    recommended: false,
+    description: 'For systems that only accept NIST curves.',
+  },
+  {
+    value: 'rsa-4096',
+    label: 'RSA 4096',
+    title: 'RSA 4096',
+    recommended: false,
+    description: 'Only for old servers that refuse Ed25519. Takes a few seconds to create.',
+  },
 ] as const
 
 export type KeyKind = (typeof KEY_KINDS)[number]['value']
+
+export const KEY_NAME_SUGGESTIONS = ['GitHub', 'Work servers', 'Deploy', 'Personal'] as const
+
+const ARROW_STEP: Record<string, number> = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }
+
+// stepKeyKind is the kind an arrow key moves the type picker to, wrapping at
+// both ends; null for any other key.
+export function stepKeyKind(kind: KeyKind, key: string): KeyKind | null {
+  const step = ARROW_STEP[key]
+  if (!step) return null
+  const at = KEY_KINDS.findIndex((k) => k.value === kind)
+  return KEY_KINDS[(at + step + KEY_KINDS.length) % KEY_KINDS.length].value
+}
+
+// publicKeyLine is the authorized_keys line a person copies: the key, then
+// its comment when it has one.
+export function publicKeyLine(k: { publicKey: string; comment: string }): string {
+  return k.comment ? `${k.publicKey} ${k.comment}` : k.publicKey
+}
 
 const CURVES: Record<string, string> = {
   'ecdsa-sha2-nistp256': 'P-256',

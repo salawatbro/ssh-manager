@@ -6,9 +6,10 @@ import { useKeys } from '../../stores/keys'
 import { useServers } from '../../stores/servers'
 import { useSettings } from '../../stores/settings'
 import { Button } from '../ui/Button'
-import { AgentBand } from './AgentBand'
+import { AddKeyTile } from './AddKeyTile'
+import { AgentCard } from './AgentCard'
 import { DeleteKeyModal } from './DeleteKeyModal'
-import { GenerateKeyModal } from './GenerateKeyModal'
+import { GenerateKeyModal, type KeyNext } from './GenerateKeyModal'
 import { GitHubSheet } from './GitHubSheet'
 import { ImportKeyModal } from './ImportKeyModal'
 import { InstallKeyModal } from './InstallKeyModal'
@@ -18,11 +19,12 @@ import { KeySheet } from './KeySheet'
 import { OpenApprovals } from './OpenApprovals'
 import { RecentSignatures } from './RecentSignatures'
 import { RotateKeySheet } from './RotateKeySheet'
+import { SectionHeading } from './SectionHeading'
 import { TempKeys } from './TempKeys'
 
 type Modal = { kind: 'generate' | 'import' } | { kind: 'install' | 'github' | 'rotate' | 'delete'; key: AgentKey }
 
-// The Keys page: the agent band, one card per Zish key, then what is open
+// The Keys page: the agent card, one card per Zish key, then what is open
 // (approvals) and what happened (recent signatures).
 export function KeysPage() {
   const keys = useKeys((s) => s.keys)
@@ -38,6 +40,12 @@ export function KeysPage() {
   function closeModal(key: AgentKey) {
     setModal(null)
     if (!useKeys.getState().keys.some((k) => k.id === key.id)) setOpenId(null)
+  }
+
+  // The new key's sheet sits under the next step, so closing that step lands on it.
+  function nextAfterGenerate(key: AgentKey, next: KeyNext) {
+    setOpenId(key.id)
+    setModal(next === 'details' ? null : { kind: next, key })
   }
 
   useEffect(() => {
@@ -61,8 +69,8 @@ export function KeysPage() {
         </Button>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto px-[18px] pb-[20px] pt-[14px]">
-        <AgentBand />
+      <div className="flex min-h-0 flex-1 flex-col gap-[20px] overflow-y-auto px-[18px] pb-[20px] pt-[16px]">
+        <AgentCard />
 
         {keys.length === 0 ? (
           <KeysEmpty
@@ -71,19 +79,26 @@ export function KeysPage() {
             onImport={() => setModal({ kind: 'import' })}
           />
         ) : (
-          <div className="grid grid-cols-2 gap-[10px] lg:grid-cols-3">
-            {keys.map((k) => (
-              <KeyCard key={k.id} k={k} users={usersById.get(k.id) ?? []} open={k.id === openId} onOpen={() => setOpenId(k.id)} />
-            ))}
-          </div>
+          <section aria-label="Your keys" className="flex shrink-0 flex-col gap-[8px]">
+            <SectionHeading title="Your keys" count={keys.length} />
+            <div className="grid grid-cols-2 gap-[12px] lg:grid-cols-3">
+              {keys.map((k) => (
+                <KeyCard key={k.id} k={k} users={usersById.get(k.id) ?? []} open={k.id === openId} onOpen={() => setOpenId(k.id)} />
+              ))}
+              <AddKeyTile onGenerate={() => setModal({ kind: 'generate' })} onImport={() => setModal({ kind: 'import' })} />
+            </div>
+          </section>
         )}
 
         <TempKeys keys={status?.tempKeys ?? []} />
 
-        <div className="grid grid-cols-1 gap-[14px] lg:grid-cols-5">
-          <OpenApprovals className="lg:col-span-2" />
-          <RecentSignatures className="lg:col-span-3" />
-        </div>
+        <section aria-label="Activity" className="flex shrink-0 flex-col gap-[8px]">
+          <SectionHeading title="Activity" />
+          <div className="grid grid-cols-1 items-start gap-[14px] lg:grid-cols-5">
+            <OpenApprovals className="lg:col-span-2" />
+            <RecentSignatures className="lg:col-span-3" />
+          </div>
+        </section>
       </div>
 
       {open && !modal && (
@@ -97,7 +112,7 @@ export function KeysPage() {
           onDelete={() => setModal({ kind: 'delete', key: open })}
         />
       )}
-      {modal?.kind === 'generate' && <GenerateKeyModal onClose={() => setModal(null)} />}
+      {modal?.kind === 'generate' && <GenerateKeyModal onClose={() => setModal(null)} onNext={nextAfterGenerate} />}
       {modal?.kind === 'import' && <ImportKeyModal onClose={() => setModal(null)} />}
       {modal?.kind === 'install' && <InstallKeyModal k={modal.key} onClose={() => setModal(null)} />}
       {modal?.kind === 'github' && <GitHubSheet k={modal.key} onClose={() => setModal(null)} />}

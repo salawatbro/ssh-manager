@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
+import { AppWindow, CircleCheck } from 'lucide-react'
 import { grantClient, grantLeft, openGrants } from '../../lib/grants'
 import { useGrants } from '../../stores/grants'
-import { Button } from '../ui/Button'
+import { SmallButton } from './SmallButton'
+import { SubHeading } from './SectionHeading'
+import { ToneTile } from './ToneTile'
 
 // Approvals still open: one app may use one key without Touch ID until the
 // time runs out or Zish locks. Revoke closes one at once.
@@ -17,32 +20,39 @@ export function OpenApprovals({ className = '' }: { className?: string }) {
   const open = openGrants(grants, now)
   return (
     <section aria-label="Open approvals" className={`flex min-w-0 flex-col gap-[8px] ${className}`}>
-      <h2 className="m-0 text-[12px] font-semibold text-tx2">Open approvals</h2>
+      <SubHeading title="Open approvals" count={open.length} />
       <div className="flex flex-col overflow-hidden rounded-[12px] border border-line bg-s1">
         {open.length === 0 ? (
-          <div className="px-[12px] py-[14px] text-[12px] leading-[1.5] text-tx3">
-            Nothing open. Every signature asks for Touch ID again.
+          <div className="flex items-center gap-[8px] px-[12px] py-[16px]">
+            <CircleCheck size={14} strokeWidth={1.8} className="shrink-0 text-tx3" />
+            <span className="text-[12px] leading-[1.5] text-tx3">Nothing open — every signature asks for Touch ID.</span>
           </div>
         ) : (
-          open.map((g, i) => (
-            <div key={g.id} className={`flex items-center gap-[10px] px-[12px] py-[11px] ${i ? 'border-t border-line' : ''}`}>
-              <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                <span className="truncate text-[12.5px] font-medium text-tx" title={grantClient(g)}>
-                  {grantClient(g)}
+          open.map((g, i) => {
+            const client = grantClient(g)
+            return (
+              <div key={g.id} className={`flex items-center gap-[10px] px-[12px] py-[10px] ${i ? 'border-t border-line' : ''}`}>
+                <ToneTile icon={AppWindow} tone="neutral" size={28} />
+                <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
+                  <span className="truncate text-[12.5px] font-medium text-tx" title={client}>
+                    {client}
+                  </span>
+                  <span className="truncate text-[11px] text-tx3">
+                    {g.keyName} · {grantLeft(g, now)}
+                    {g.uses > 0 ? ` · used ${g.uses}×` : ''}
+                  </span>
                 </span>
-                <span className="truncate text-[11px] text-tx3">
-                  {g.keyName} · {grantLeft(g, now)}
-                  {g.uses > 0 ? ` · used ${g.uses}×` : ''}
-                </span>
-              </span>
-              <Button size="sm" className="h-[26px] text-[12px]" onClick={() => void useGrants.getState().revoke(g.id)}>
-                Revoke
-              </Button>
-            </div>
-          ))
+                <SmallButton aria-label={`Revoke ${client}`} onClick={() => void useGrants.getState().revoke(g.id)}>
+                  Revoke
+                </SmallButton>
+              </div>
+            )
+          })
         )}
       </div>
-      <span className="text-[11px] leading-[1.5] text-tx3">An approval covers one app and one key. Locking Zish closes them all.</span>
+      <span className="text-[11px] leading-[1.5] text-tx3">
+        An approval lets one app use one key without asking for a while. Locking Zish closes them all.
+      </span>
     </section>
   )
 }

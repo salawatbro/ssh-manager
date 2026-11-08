@@ -1,5 +1,6 @@
 import type { AgentKey, Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { AuthType } from '@bindings/github.com/salawat/sshmgr/internal/domain'
+import { formatRecency } from './relativeTime'
 
 // What a key card on the Keys page says about its key.
 
@@ -9,11 +10,17 @@ export const ROTATE_AFTER_DAYS = 365
 
 const DAY = 86_400_000
 
-export type ChipTone = 'acc' | 'plain' | 'warn'
+export type FactTone = 'plain' | 'warn' | 'muted'
 
-export interface KeyChip {
-  label: string
-  tone: ChipTone
+export interface KeyFact {
+  text: string
+  tone: FactTone
+}
+
+export interface KeyFacts {
+  touch: KeyFact
+  servers: KeyFact
+  age: KeyFact
 }
 
 // serversUsingKey lists the servers that sign in with the Zish key, by name.
@@ -47,14 +54,35 @@ export function rotateDue(createdAt: string, now = Date.now(), afterDays = ROTAT
   return afterDays > 0 && days !== null && days >= afterDays
 }
 
-// keyChips: Touch ID, who uses the key, its age. Warnings use the warn tone.
-export function keyChips(k: AgentKey, users: Server[], now = Date.now(), rotateAfter = ROTATE_AFTER_DAYS): KeyChip[] {
-  const chips: KeyChip[] = [k.requireConfirm ? { label: 'Touch ID', tone: 'acc' } : { label: 'no Touch ID', tone: 'warn' }]
-  if (users.length > 0) chips.push({ label: users.length === 1 ? users[0].name : `${users.length} servers`, tone: 'plain' })
-  else chips.push({ label: k.lastUsedAt ? 'no servers' : 'never used', tone: 'plain' })
+// serverList is "a", "a and b" or "a, b and 2 more".
+export function serverList(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names[0]}, ${names[1]} and ${names.length - 2} more`
+}
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+function ageFact(k: AgentKey, now: number, rotateAfter: number): KeyFact {
   const age = keyAge(k.createdAt, now)
-  if (age) chips.push(rotateDue(k.createdAt, now, rotateAfter) ? { label: `${age} · rotate`, tone: 'warn' } : { label: age, tone: 'plain' })
-  return chips
+  if (rotateDue(k.createdAt, now, rotateAfter)) return { text: `${capitalize(age)} — time to rotate`, tone: 'warn' }
+  const recency = formatRecency(k.lastUsedAt)
+  const use = recency ? `used ${recency}` : 'never used'
+  return { text: age ? `${capitalize(age)} · ${use}` : capitalize(use), tone: 'plain' }
+}
+
+// keyFacts are the card's three rows: Touch ID, the servers that sign in with
+// the key, and its age and last use.
+export function keyFacts(k: AgentKey, users: Server[], now = Date.now(), rotateAfter = ROTATE_AFTER_DAYS): KeyFacts {
+  return {
+    touch: k.requireConfirm
+      ? { text: 'Asks for Touch ID', tone: 'plain' }
+      : { text: 'No Touch ID — any app can use it', tone: 'warn' },
+    servers: users.length
+      ? { text: serverList(users.map((u) => u.name)), tone: 'plain' }
+      : { text: 'Not used by a server yet', tone: 'muted' },
+    age: ageFact(k, now, rotateAfter),
+  }
 }
 
 // keyNeedsCare marks the card's tile amber: no Touch ID, due for rotation, or

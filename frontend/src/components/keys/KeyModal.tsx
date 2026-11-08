@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, type ReactNode } from 'react'
 
 interface Props {
   title: string
@@ -8,12 +8,15 @@ interface Props {
   width?: number
   // Above the server form when opened from it.
   raised?: boolean
+  // Replaces the body's default padding.
+  bodyClassName?: string
 }
 
 // The shared chrome of the key modals: title bar, body, footer. Esc closes in
 // the capture phase so a modal under this one (Settings, the server form)
 // does not close too.
-export function KeyModal({ title, onClose, children, footer, width = 460, raised }: Props) {
+export function KeyModal({ title, onClose, children, footer, width = 460, raised, bodyClassName = 'px-[20px] py-[16px]' }: Props) {
+  const titleId = useId()
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape' || e.isComposing) return
@@ -28,16 +31,21 @@ export function KeyModal({ title, onClose, children, footer, width = 460, raised
   return (
     <div className={`fixed inset-0 ${raised ? 'z-[60]' : 'z-50'} flex items-center justify-center bg-scrim px-[16px]`}>
       <div
-        className="flex max-h-[620px] max-w-full flex-col overflow-hidden rounded-[14px] border border-line2 bg-s1 shadow-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="flex max-h-[min(680px,calc(100vh-48px))] max-w-full flex-col overflow-hidden rounded-[14px] border border-line2 bg-s1 shadow-sheet"
         style={{ width }}
       >
         <div className="flex h-[52px] shrink-0 items-center border-b border-line pl-[20px] pr-[12px]">
-          <span className="flex-1 text-[15px] font-semibold text-tx">{title}</span>
+          <span id={titleId} className="flex-1 text-[15px] font-semibold text-tx">
+            {title}
+          </span>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] text-[15px] text-tx2 hover:bg-s2 hover:text-tx">
             ×
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-[20px] py-[16px]">{children}</div>
+        <div className={`min-h-0 flex-1 overflow-y-auto ${bodyClassName}`}>{children}</div>
         <div className="flex h-[58px] shrink-0 items-center justify-end gap-[8px] border-t border-line bg-s2 pl-[20px] pr-[16px]">{footer}</div>
       </div>
     </div>

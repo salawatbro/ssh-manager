@@ -21,6 +21,22 @@ export function outcomeTone(outcome: string): Tone {
   return OUTCOMES[outcome]?.tone ?? 'bad'
 }
 
+// The outcome pill's look; an outcome this build does not know reads as a
+// plain signature.
+export type OutcomeKind = 'touch' | 'approval' | 'denied' | 'locked' | 'signed'
+
+const KINDS: Record<string, OutcomeKind> = {
+  confirmed: 'touch',
+  granted: 'approval',
+  denied: 'denied',
+  error: 'denied',
+  locked: 'locked',
+}
+
+export function outcomeKind(outcome: string): OutcomeKind {
+  return KINDS[outcome] ?? 'signed'
+}
+
 export const TONE_CLASS: Record<Tone, string> = {
   ok: 'text-ok-tx',
   plain: 'text-tx2',

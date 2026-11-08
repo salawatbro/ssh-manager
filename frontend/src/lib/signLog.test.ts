@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentSignEvent } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { eventClock, outcomeLabel, outcomeTone, prependEvent, whereLine, whoLine } from './signLog'
+import { eventClock, outcomeKind, outcomeLabel, outcomeTone, prependEvent, whereLine, whoLine } from './signLog'
 
 function ev(p: Partial<AgentSignEvent>): AgentSignEvent {
   return {
@@ -20,6 +20,16 @@ describe('sign log formatting', () => {
     expect(outcomeTone('locked')).toBe('warn')
     expect(outcomeLabel('something-new')).toBe('something-new')
     expect(outcomeTone('something-new')).toBe('bad')
+  })
+
+  it('picks the outcome pill', () => {
+    expect(outcomeKind('confirmed')).toBe('touch')
+    expect(outcomeKind('granted')).toBe('approval')
+    expect(outcomeKind('denied')).toBe('denied')
+    expect(outcomeKind('error')).toBe('denied')
+    expect(outcomeKind('locked')).toBe('locked')
+    expect(outcomeKind('allowed')).toBe('signed')
+    expect(outcomeKind('something-new')).toBe('signed')
   })
 
   it('names who asked', () => {

@@ -4,7 +4,7 @@ import { Button } from '../ui/Button'
 // No Zish keys yet: what one is, and the two ways to get one.
 export function KeysEmpty({ agentOn, onGenerate, onImport }: { agentOn: boolean; onGenerate: () => void; onImport: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-[12px] rounded-[12px] border border-line bg-s1 px-[26px] py-[30px] text-center">
+    <section aria-label="Your keys" className="flex shrink-0 flex-col items-center gap-[12px] rounded-[12px] border border-line bg-s1 px-[26px] py-[30px] text-center">
       <span aria-hidden="true" className="mb-[4px] flex h-[52px] w-[52px] items-center justify-center rounded-full bg-acc-soft text-acc-tx">
         <Fingerprint size={24} strokeWidth={1.8} />
       </span>
@@ -24,6 +24,6 @@ export function KeysEmpty({ agentOn, onGenerate, onImport }: { agentOn: boolean;
           Agent is on — keys you add show up here
         </span>
       )}
-    </div>
+    </section>
   )
 }

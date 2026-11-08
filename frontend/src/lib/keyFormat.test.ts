@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { keyCommentError, keyNameError, keyTypeLabel, shortFingerprint } from './keyFormat'
+import {
+  KEY_KINDS,
+  keyCommentError,
+  keyNameError,
+  keyTypeLabel,
+  publicKeyLine,
+  shortFingerprint,
+  stepKeyKind,
+} from './keyFormat'
 
 describe('keyTypeLabel', () => {
   it('names every supported type', () => {
@@ -35,5 +43,38 @@ describe('key validation mirrors the backend', () => {
     expect(keyCommentError('x\ncommand="rm -rf /"')).toMatch(/control/)
     expect(keyCommentError('ы'.repeat(129))).toMatch(/256 bytes/)
     expect(keyCommentError('ы'.repeat(128))).toBeNull()
+  })
+})
+
+describe('stepKeyKind', () => {
+  it('moves down and right to the next kind, up and left to the previous', () => {
+    expect(stepKeyKind('ed25519', 'ArrowDown')).toBe('ecdsa-p256')
+    expect(stepKeyKind('ecdsa-p256', 'ArrowRight')).toBe('rsa-4096')
+    expect(stepKeyKind('rsa-4096', 'ArrowUp')).toBe('ecdsa-p256')
+    expect(stepKeyKind('ecdsa-p256', 'ArrowLeft')).toBe('ed25519')
+  })
+
+  it('wraps at both ends', () => {
+    expect(stepKeyKind('rsa-4096', 'ArrowDown')).toBe('ed25519')
+    expect(stepKeyKind('ed25519', 'ArrowUp')).toBe('rsa-4096')
+  })
+
+  it('ignores other keys', () => {
+    expect(stepKeyKind('ed25519', 'Enter')).toBeNull()
+    expect(stepKeyKind('ed25519', ' ')).toBeNull()
+    expect(stepKeyKind('ed25519', 'Tab')).toBeNull()
+  })
+})
+
+describe('KEY_KINDS', () => {
+  it('recommends exactly Ed25519', () => {
+    expect(KEY_KINDS.filter((k) => k.recommended).map((k) => k.value)).toEqual(['ed25519'])
+  })
+})
+
+describe('publicKeyLine', () => {
+  it('appends the comment only when there is one', () => {
+    expect(publicKeyLine({ publicKey: 'ssh-ed25519 AAAA', comment: 'me@zish' })).toBe('ssh-ed25519 AAAA me@zish')
+    expect(publicKeyLine({ publicKey: 'ssh-ed25519 AAAA', comment: '' })).toBe('ssh-ed25519 AAAA')
   })
 })

@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentKey, Server } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { AuthType } from '@bindings/github.com/salawat/sshmgr/internal/domain'
-import { keyAge, keyChips, keyNeedsCare, rotateDue, serversUsingKey } from './keyCards'
+import { keyAge, keyFacts, keyNeedsCare, rotateDue, serverList, serversUsingKey } from './keyCards'
 
 const NOW = Date.parse('2026-11-05T12:00:00Z')
 const daysAgo = (n: number) => new Date(NOW - n * 86_400_000).toISOString()
@@ -46,22 +46,61 @@ describe('keyAge', () => {
   })
 })
 
-describe('keyChips', () => {
-  it('matches the board', () => {
-    const users = [server('1', 'web', 'k1'), server('2', 'api', 'k1'), server('3', 'db', 'k1')]
-    expect(keyChips(key(), users, NOW)).toEqual([
-      { label: 'Touch ID', tone: 'acc' },
-      { label: '3 servers', tone: 'plain' },
-      { label: '8 months old', tone: 'plain' },
-    ])
-    expect(keyChips(key({ requireConfirm: false, createdAt: daysAgo(800) }), [], NOW)).toEqual([
-      { label: 'no Touch ID', tone: 'warn' },
-      { label: 'never used', tone: 'plain' },
-      { label: '2 years old · rotate', tone: 'warn' },
-    ])
-    expect(keyChips(key({ lastUsedAt: daysAgo(1) }), [users[0]], NOW)[1]).toEqual({ label: 'web', tone: 'plain' })
+describe('serverList', () => {
+  it('names two, then counts the rest', () => {
+    expect(serverList([])).toBe('')
+    expect(serverList(['db-primary'])).toBe('db-primary')
+    expect(serverList(['db-primary', 'api-1'])).toBe('db-primary and api-1')
+    expect(serverList(['db-primary', 'api-1', 'web'])).toBe('db-primary, api-1 and 1 more')
+    expect(serverList(['db-primary', 'api-1', 'web', 'ci'])).toBe('db-primary, api-1 and 2 more')
+  })
+})
+
+describe('keyFacts', () => {
+  // formatRecency reads the wall clock.
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
+  const hoursAgo = (n: number) => new Date(NOW - n * 3_600_000).toISOString()
+
+  it('matches the board', () => {
+    const users = [server('1', 'db-primary', 'k1'), server('2', 'api-1', 'k1'), server('3', 'web', 'k1')]
+    expect(keyFacts(key({ lastUsedAt: hoursAgo(2) }), users, NOW)).toEqual({
+      touch: { text: 'Asks for Touch ID', tone: 'plain' },
+      servers: { text: 'db-primary, api-1 and 1 more', tone: 'plain' },
+      age: { text: '8 months old · used 2h ago', tone: 'plain' },
+    })
+    expect(keyFacts(key({ createdAt: daysAgo(0) }), [], NOW)).toEqual({
+      touch: { text: 'Asks for Touch ID', tone: 'plain' },
+      servers: { text: 'Not used by a server yet', tone: 'muted' },
+      age: { text: 'New today · never used', tone: 'plain' },
+    })
+  })
+
+  it('warns about a key without Touch ID or due for rotation', () => {
+    const f = keyFacts(key({ requireConfirm: false, createdAt: daysAgo(800) }), [server('1', 'old-ci', 'k1')], NOW)
+    expect(f.touch).toEqual({ text: 'No Touch ID — any app can use it', tone: 'warn' })
+    expect(f.servers).toEqual({ text: 'old-ci', tone: 'plain' })
+    expect(f.age).toEqual({ text: '2 years old — time to rotate', tone: 'warn' })
+  })
+
+  it('follows the reminder setting', () => {
+    expect(keyFacts(key({ createdAt: daysAgo(800) }), [], NOW, 0).age).toEqual({ text: '2 years old · never used', tone: 'plain' })
+    expect(keyFacts(key({ createdAt: daysAgo(200) }), [], NOW, 180).age.tone).toBe('warn')
+  })
+
+  it('leaves out an unknown age', () => {
+    expect(keyFacts(key({ createdAt: 'nope', lastUsedAt: hoursAgo(26) }), [], NOW).age.text).toBe('Used yesterday')
+    expect(keyFacts(key({ createdAt: 'nope' }), [], NOW).age.text).toBe('Never used')
+  })
+})
+
+describe('keyNeedsCare', () => {
   it('marks keys that need care', () => {
     expect(keyNeedsCare(key(), NOW)).toBe(false)
     expect(keyNeedsCare(key({ requireConfirm: false }), NOW)).toBe(true)

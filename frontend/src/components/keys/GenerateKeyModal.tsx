@@ -1,42 +1,69 @@
 import { useState } from 'react'
 import type { AgentKey } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import { useKeys } from '../../stores/keys'
-import { KEY_KINDS, keyCommentError, keyNameError, type KeyKind } from '../../lib/keyFormat'
-import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
-import { Toggle } from '../settings/controls'
-import { KeyModal, ModalButton, fieldLabel } from './KeyModal'
+import { keyCommentError, keyNameError } from '../../lib/keyFormat'
+import { KeyModal, ModalButton } from './KeyModal'
+import { GenerateKeyForm, type KeyDraft } from './GenerateKeyForm'
+import { KeyReadyStep } from './KeyReadyStep'
+
+export type KeyNext = 'install' | 'github' | 'details'
 
 interface Props {
   onClose: () => void
   onDone?: (key: AgentKey) => void
+  // Given (the Keys page): a success shows "Key ready" with next steps, and a
+  // pick hands the key back; the parent decides what to open.
+  onNext?: (key: AgentKey, next: KeyNext) => void
   raised?: boolean
 }
 
 // Generate a new key inside Zish. The private key never leaves the Keychain.
-export function GenerateKeyModal({ onClose, onDone, raised }: Props) {
+export function GenerateKeyModal({ onClose, onDone, onNext, raised }: Props) {
   const generate = useKeys((s) => s.generate)
-  const [name, setName] = useState('')
-  const [kind, setKind] = useState<KeyKind>('ed25519')
-  const [comment, setComment] = useState('')
-  const [confirm, setConfirm] = useState(true)
+  const [draft, setDraft] = useState<KeyDraft>({ name: '', kind: 'ed25519', comment: '', confirm: true })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [ready, setReady] = useState<AgentKey | null>(null)
 
-  const invalid = keyNameError(name) ?? keyCommentError(comment)
+  const invalid = keyNameError(draft.name) ?? keyCommentError(draft.comment)
 
   async function submit() {
     if (invalid || busy) return
     setBusy(true)
     setError(null)
-    const res = await generate({ name: name.trim(), type: kind, comment: comment.trim(), requireConfirm: confirm })
+    const res = await generate({
+      name: draft.name.trim(),
+      type: draft.kind,
+      comment: draft.comment.trim(),
+      requireConfirm: draft.confirm,
+    })
     setBusy(false)
     if (typeof res === 'string') {
       setError(res)
       return
     }
     onDone?.(res)
-    onClose()
+    if (onNext) setReady(res)
+    else onClose()
+  }
+
+  if (ready && onNext) {
+    return (
+      <KeyModal
+        title="Key ready"
+        onClose={onClose}
+        raised={raised}
+        width={520}
+        bodyClassName="px-[20px] py-[18px]"
+        footer={
+          <ModalButton primary onClick={onClose}>
+            Done
+          </ModalButton>
+        }
+      >
+        <KeyReadyStep k={ready} onNext={(next) => onNext(ready, next)} />
+      </KeyModal>
+    )
   }
 
   return (
@@ -44,48 +71,22 @@ export function GenerateKeyModal({ onClose, onDone, raised }: Props) {
       title="Generate key"
       onClose={onClose}
       raised={raised}
+      width={520}
+      bodyClassName="px-[20px] py-[18px]"
       footer={
         <>
           <ModalButton onClick={onClose}>Cancel</ModalButton>
           <ModalButton primary disabled={!!invalid || busy} onClick={() => void submit()}>
-            {busy ? 'Generating…' : 'Generate'}
+            {busy ? 'Generating…' : 'Generate key'}
           </ModalButton>
         </>
       }
     >
-      <div className="flex flex-col gap-[12px]">
-        <label className="flex flex-col gap-[5px]">
-          <span className={fieldLabel}>Name</span>
-          <Input autoFocus value={name} placeholder="work laptop" onChange={(e) => setName(e.target.value)} />
-        </label>
-        <div className="flex flex-col gap-[5px]">
-          <span className={fieldLabel}>Type</span>
-          <Select ariaLabel="Key type" value={kind} options={KEY_KINDS.map((k) => ({ ...k }))} onChange={setKind} />
-          {kind === 'rsa-4096' && <span className="text-[11px] text-tx3">RSA keys take a few seconds to generate.</span>}
-        </div>
-        <label className="flex flex-col gap-[5px]">
-          <span className={fieldLabel}>Comment</span>
-          <Input
-            value={comment}
-            placeholder={`${name.trim() || 'name'}@zish`}
-            onChange={(e) => setComment(e.target.value)}
-            className="font-mono"
-          />
-        </label>
-        <div className="flex items-start gap-[10px]">
-          <div className="min-w-0 flex-1">
-            <div className="text-[12.5px] text-tx">Confirm every use</div>
-            <div className="mt-[2px] text-[11px] leading-[1.45] text-tx3">
-              Touch ID or your Mac password before each signature.
-            </div>
-          </div>
-          <Toggle on={confirm} onChange={setConfirm} label="Confirm every use" />
-        </div>
-        <div className="text-[11px] leading-[1.45] text-tx3">
-          Keys created in Zish stay in Zish. To have a backup, generate the key with ssh-keygen and import it.
-        </div>
-        {(error || (name && invalid)) && <div className="text-[12px] text-bad">{error ?? invalid}</div>}
-      </div>
+      <GenerateKeyForm
+        draft={draft}
+        onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+        message={error || (draft.name && invalid ? invalid : null)}
+      />
     </KeyModal>
   )
 }
