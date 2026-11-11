@@ -2,14 +2,14 @@ module github.com/salawat/sshmgr
 
 go 1.26.0
 
-// Floor, not a preference. go1.26.9 and earlier ship stdlib vulnerabilities
+// Floor, not a preference. go1.26.10 and earlier ship stdlib vulnerabilities
 // that govulncheck fails the phase gate on — among them GO-2026-4971, a Dial
-// panic on a NUL byte on Windows, which is a platform we ship (NFR-03), and
-// GO-2026-6809 in crypto/x509. All are fixed by go1.26.10; none require a code
-// change. CI installs the latest 1.26.x, which satisfies this; the directive is
-// what stops a developer's older local toolchain from quietly building a
-// vulnerable binary.
-toolchain go1.26.10
+// panic on a NUL byte on Windows, which is a platform we ship (NFR-03),
+// GO-2026-6809 in crypto/x509, and GO-2026-6859, a header race in net/http's
+// MaxBytesReader. All are fixed by go1.26.11; none require a code change. CI
+// installs the latest 1.26.x, which satisfies this; the directive is what stops
+// a developer's older local toolchain from quietly building a vulnerable binary.
+toolchain go1.26.11
 
 require (
 	github.com/glebarez/sqlite v1.11.0

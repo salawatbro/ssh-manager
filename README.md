@@ -250,7 +250,7 @@ This app is built around a few hard invariants:
 
 ## Requirements
 
-- **Go 1.26+** as the language baseline, but the build needs a **1.26.10+
+- **Go 1.26+** as the language baseline, but the build needs a **1.26.11+
   toolchain**. `go.mod` pins this as a security floor (earlier toolchains ship
   stdlib vulnerabilities that the check gate fails on). With Go's default
   `GOTOOLCHAIN=auto`, the right toolchain is fetched automatically.
