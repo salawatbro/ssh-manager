@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthType, Environment, ForwardType, Placement, StepKind } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { PortForward, Server, Stack, StackStep } from '@bindings/github.com/salawat/sshmgr/internal/domain'
 import type { TunnelRow } from '@bindings/github.com/salawat/sshmgr/internal/service'
@@ -35,6 +35,15 @@ function fixture(): LauncherData {
 }
 
 describe('launcherRows', () => {
+  // A stack's sub reads the wall clock: from 7 days on it says "last week", which fuzzily matches "web".
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(Date.parse('2026-11-05T12:00:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('lists recent use first when the query is empty, and skips empty stacks', () => {
     const rows = launcherRows(fixture(), '  ')
     expect(rows.map((r) => r.key)).toEqual(['server:api', 'stack:st', 'server:ba', 'server:db', 'tunnel:pg'])
