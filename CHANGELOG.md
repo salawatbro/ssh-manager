@@ -21,8 +21,15 @@ was a version bump that first shipped packaged as part of 1.2.0.
   Zish still edits no config or shell files itself.
 - A signature asked for by `ssh-keygen -Y sign` (as git does for a commit)
   is named in the Touch ID prompt and the sign log, e.g. "git signature".
+- **Hidden means menu bar only.** While the window is hidden (⌘⇧S, or the red
+  close button with Keep running in the menu bar on), Zish also leaves the Dock
+  and the ⌘Tab switcher; bringing the window back returns both.
 
 ### Fixed
+
+- Opening Zish again while its window is hidden (from Finder, Spotlight or
+  Raycast) brings back only the main window, no longer the approval, launcher
+  and menu-bar panels with it.
 
 - **An approval now covers every Claude Code session.** Claude Code runs each
   session from its own bundled `claude` app, so an approval was bound to one

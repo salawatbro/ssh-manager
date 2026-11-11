@@ -321,6 +321,13 @@ func main() {
 	app.Event.OnApplicationEvent(events.Mac.ApplicationDidChangeTheme, func(*application.ApplicationEvent) {
 		systemAppearanceChanged()
 	})
+	// Opening Zish.app while it runs in the menu bar (Finder, Spotlight,
+	// Raycast) brings back the main window only; Wails' own handler would show
+	// every hidden window, the panels included, and leave Zish out of the Dock.
+	app.Event.RegisterApplicationEventHook(events.Mac.ApplicationShouldHandleReopen, func(e *application.ApplicationEvent) {
+		e.Cancel()
+		application.InvokeAsync(showMainWindow)
+	})
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		applyTheme(startTheme)
 		// Wire the toggle BEFORE registering the hot key, so the first ⌘⇧S can
@@ -343,7 +350,7 @@ func main() {
 				application.Get().Quit()
 				return
 			}
-			mainWindow.Hide()
+			hideMainWindow()
 		}
 
 		// The agent socket follows the setting; started here so its status
@@ -462,18 +469,30 @@ func toggleMainWindow() {
 		return
 	}
 	if mainWindow.IsVisible() {
-		mainWindow.Hide()
+		hideMainWindow()
 	} else {
 		showMainWindow()
 	}
 }
 
+// hideMainWindow sends Zish to the menu bar: the window goes, and so do the
+// Dock icon and the ⌘Tab entry.
+func hideMainWindow() {
+	if mainWindow == nil {
+		return
+	}
+	mainWindow.Hide()
+	application.InvokeSync(func() { setDockPresence(false) })
+}
+
 // showMainWindow brings the window back and focuses it (the menu-bar panel's
-// Open Zish, and the show half of the toggle).
+// Open Zish, and the show half of the toggle). The Dock icon returns first so
+// Focus activates a regular app and its menu bar appears.
 func showMainWindow() {
 	if mainWindow == nil {
 		return
 	}
+	application.InvokeSync(func() { setDockPresence(true) })
 	mainWindow.Show()
 	mainWindow.Focus()
 }
