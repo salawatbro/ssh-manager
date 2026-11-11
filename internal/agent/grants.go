@@ -35,8 +35,9 @@ func ParseGrantLength(s string) GrantLength {
 	return GrantOnce
 }
 
-// Holder is the process an approval is bound to: the outermost process of the
-// first app bundle above the client, else the client's outermost ancestor.
+// Holder is the process an approval is bound to: the app above the client
+// (climbing through apps that launched it directly), else the client's
+// outermost ancestor.
 // Pid and start time come from the kernel, so another process cannot claim
 // them; whatever runs inside that process tree shares the approval.
 type Holder struct {

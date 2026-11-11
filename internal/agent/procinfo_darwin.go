@@ -58,21 +58,20 @@ type proc struct {
 	name, path string
 }
 
-// holderOf picks the process an approval binds to: the outermost process of
-// the first app bundle above the client (the app itself, not a helper), else
-// the outermost ancestor.
+// holderOf picks the process an approval binds to: the outermost of the app
+// processes above the client that launched one another directly (a shell in
+// between stops the climb), else the outermost ancestor.
 func holderOf(procs []proc) (int, Holder) {
 	if len(procs) == 0 {
 		return 0, Holder{}
 	}
 	at := len(procs) - 1
 	for i, p := range procs {
-		root := bundleRoot(p.path)
-		if root == "" {
+		if bundleRoot(p.path) == "" {
 			continue
 		}
 		at = i
-		for at+1 < len(procs) && bundleRoot(procs[at+1].path) == root {
+		for at+1 < len(procs) && bundleRoot(procs[at+1].path) != "" {
 			at++
 		}
 		break

@@ -22,6 +22,14 @@ was a version bump that first shipped packaged as part of 1.2.0.
 - A signature asked for by `ssh-keygen -Y sign` (as git does for a commit)
   is named in the Touch ID prompt and the sign log, e.g. "git signature".
 
+### Fixed
+
+- **An approval now covers every Claude Code session.** Claude Code runs each
+  session from its own bundled `claude` app, so an approval was bound to one
+  session and every new session asked again. An app that another app launched
+  directly now shares that app's approval; a shell in between still keeps
+  terminal apps apart.
+
 ## [2.0.0] — 2026-11-07
 
 Zish stops being a terminal and gets a new face. It now manages your servers,
